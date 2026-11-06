@@ -34,13 +34,17 @@ object LocalBackupManager {
     private const val maxBackupBytes = 256 * 1024 * 1024
     private const val currentSchemaVersion = 7
 
-    fun createEncryptedBackup(context: Context, database: LottoDatabase, passphrase: CharArray): ByteArray {
+    fun writeEncryptedBackup(
+        context: Context,
+        database: LottoDatabase,
+        passphrase: CharArray,
+        destination: java.io.OutputStream
+    ) {
         validatePassphrase(passphrase)
-        val db = database.openHelper.writableDatabase
-        db.query("PRAGMA wal_checkpoint(TRUNCATE)").close()
-
-        val archiveBytes = ByteArrayOutputStream().use { bytes ->
-            ZipOutputStream(bytes).use { zip ->
+        database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").close()
+        val archiveFile = File(context.cacheDir, "lotto-backup-${System.currentTimeMillis()}.zip")
+        try {
+            ZipOutputStream(FileOutputStream(archiveFile)).use { zip ->
                 val databaseFile = context.getDatabasePath("lotto-local.db")
                 require(databaseFile.isFile && databaseFile.length() > 0L) { "ไม่พบฐานข้อมูลในเครื่อง" }
                 zip.putNextEntry(ZipEntry("lotto-local.db"))
@@ -64,29 +68,78 @@ object LocalBackupManager {
                 zip.write("LOTTO LOCAL BACKUP\nschema=$currentSchemaVersion\ncreatedAt=${System.currentTimeMillis()}\n".toByteArray(Charsets.UTF_8))
                 zip.closeEntry()
             }
-            bytes.toByteArray()
+            require(archiveFile.length() in 1..maxBackupBytes.toLong()) { "ข้อมูลสำรองมีขนาดเกิน 256 MB" }
+
+            val salt = ByteArray(saltSize).also(SecureRandom()::nextBytes)
+            val nonce = ByteArray(nonceSize).also(SecureRandom()::nextBytes)
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, deriveKey(passphrase, salt), GCMParameterSpec(128, nonce))
+            val header = DataOutputStream(destination)
+            header.write(magic)
+            header.writeInt(iterations)
+            header.write(salt)
+            header.write(nonce)
+            header.flush()
+            javax.crypto.CipherOutputStream(destination, cipher).use { encryptedOutput ->
+                FileInputStream(archiveFile).use { it.copyTo(encryptedOutput) }
+            }
+        } finally {
+            archiveFile.delete()
         }
-        require(archiveBytes.size <= maxBackupBytes) { "ข้อมูลสำรองมีขนาดเกิน 256 MB" }
-        return encrypt(archiveBytes, passphrase)
     }
 
-    fun restoreEncryptedBackup(context: Context, encryptedBytes: ByteArray, passphrase: CharArray) {
-        require(encryptedBytes.size in (magic.size + 4 + saltSize + nonceSize + 16)..maxBackupBytes) {
-            "ไฟล์สำรองมีขนาดไม่ถูกต้อง"
-        }
-        val archive = decrypt(encryptedBytes, passphrase)
-        require(archive.size <= maxBackupBytes) { "ข้อมูลสำรองมีขนาดเกินกำหนด" }
-
+    fun restoreEncryptedBackup(context: Context, encryptedInput: java.io.InputStream, passphrase: CharArray) {
+        validatePassphrase(passphrase)
         val staging = File(context.cacheDir, "lotto-restore-${System.currentTimeMillis()}").apply {
             deleteRecursively()
             mkdirs()
         }
+        val archiveFile = File(staging, "backup.zip")
         val extractedDb = File(staging, "lotto-local.db")
         val extractedReceipts = File(staging, "receipts")
-        var totalExtracted = 0L
-        var entryCount = 0
         try {
-            ZipInputStream(ByteArrayInputStream(archive)).use { zip ->
+            val input = DataInputStream(encryptedInput)
+            val header = ByteArray(magic.size)
+            input.readFully(header)
+            require(header.contentEquals(magic)) { "รูปแบบไฟล์สำรองไม่ถูกต้อง" }
+            val rounds = input.readInt()
+            require(rounds in 100_000..1_000_000) { "ค่าความปลอดภัยของไฟล์สำรองไม่ถูกต้อง" }
+            val salt = ByteArray(saltSize).also(input::readFully)
+            val nonce = ByteArray(nonceSize).also(input::readFully)
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, deriveKey(passphrase, salt, rounds), GCMParameterSpec(128, nonce))
+            var encryptedCount = magic.size + 4 + saltSize + nonceSize
+            var plainCount = 0L
+            try {
+                FileOutputStream(archiveFile).use { output ->
+                    val buffer = ByteArray(8192)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        encryptedCount = Math.addExact(encryptedCount, count)
+                        require(encryptedCount <= maxBackupBytes + 64) { "ไฟล์สำรองมีขนาดเกิน 256 MB" }
+                        val decoded = cipher.update(buffer, 0, count)
+                        if (decoded != null && decoded.isNotEmpty()) {
+                            plainCount = Math.addExact(plainCount, decoded.size.toLong())
+                            require(plainCount <= maxBackupBytes) { "ข้อมูลสำรองมีขนาดเกินกำหนด" }
+                            output.write(decoded)
+                        }
+                    }
+                    val finalBytes = cipher.doFinal()
+                    if (finalBytes.isNotEmpty()) {
+                        plainCount = Math.addExact(plainCount, finalBytes.size.toLong())
+                        require(plainCount <= maxBackupBytes) { "ข้อมูลสำรองมีขนาดเกินกำหนด" }
+                        output.write(finalBytes)
+                    }
+                }
+            } catch (_: AEADBadTagException) {
+                throw IllegalArgumentException("รหัสผ่านไม่ถูกต้องหรือไฟล์สำรองถูกแก้ไข")
+            }
+            require(archiveFile.isFile && archiveFile.length() > 0L) { "ไฟล์สำรองไม่มีข้อมูล" }
+
+            var totalExtracted = 0L
+            var entryCount = 0
+            ZipInputStream(FileInputStream(archiveFile)).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
                     entryCount++
@@ -140,7 +193,6 @@ object LocalBackupManager {
                 newReceipts.mkdirs()
             }
 
-            // Close Room before replacing any database files.
             LottoDatabase.closeForRestore()
             var oldDbMoved = false
             var oldReceiptsMoved = false
@@ -163,7 +215,6 @@ object LocalBackupManager {
                 require(newReceipts.renameTo(targetReceipts)) { "ติดตั้งใบเสร็จที่กู้คืนไม่สำเร็จ" }
                 newReceiptsInstalled = true
 
-                // Re-open through Room and force schema validation before reporting success.
                 val reopened = LottoDatabase.getInstance(context)
                 reopened.openHelper.writableDatabase.query("PRAGMA quick_check").use { cursor ->
                     require(cursor.moveToFirst() && cursor.getString(0) == "ok") {
