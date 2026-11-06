@@ -23,6 +23,7 @@ import th.co.lotto.data.NumberLimitRuleEntity
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.UUID
+import java.util.Date
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.concurrent.Executors
@@ -74,7 +75,7 @@ class MainActivity : Activity() {
         addText(currentBody, "ข้อมูลจัดเก็บในโทรศัพท์ ไม่มี Cloud Database, Backend หรือระบบซิงก์", 13, 0xFF526171.toInt())
         addCard(currentBody, "จัดการงวดหวย", "สร้างงวดใหม่และดูงวดที่บันทึกไว้") { showPeriods() }
         addCard(currentBody, "หน้าขาย", "บันทึกรายการขายตามงวด") { showSales() }
-        addCard(currentBody, "รายการขายและประวัติ", "ค้นหาเอกสารและตรวจสอบรายการต้นฉบับ") { showNotReady("รายการขายและประวัติ") }
+        addCard(currentBody, "รายการขายและประวัติ", "ค้นหาเอกสาร กรองงวด และดูใบเสร็จย้อนหลัง") { showSalesHistory() }
         addCard(currentBody, "ลูกค้า", "จัดการลูกค้าเงินสดและเงินเชื่อ") { showCustomers() }
         addCard(currentBody, "บัญชีเงินเชื่อ", "ยอดค้างและประวัติรับชำระ") { showCreditLedger() }
         addCard(currentBody, "รับชำระเงิน", "บันทึกรับชำระเต็มจำนวนหรือบางส่วน") { showCreditLedger() }
@@ -201,7 +202,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun createSaleDialog() {
+    private fun createSaleDialog(correctionOfDocumentId: String? = null) {
         val dao = database.lottoDao()
         io.execute {
             val period = dao.getOpenPeriod()
@@ -209,6 +210,11 @@ class MainActivity : Activity() {
             runOnUiThread {
                 if (period == null) {
                     Toast.makeText(this, "ยังไม่มีงวดเปิดขาย กรุณาสร้างงวดก่อน", Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                val correctionSource = correctionOfDocumentId?.let { dao.getSaleDocument(it) }
+                if (correctionOfDocumentId != null && (correctionSource == null || correctionSource.periodId != period.periodId || correctionSource.correctionOfDocumentId != null)) {
+                    Toast.makeText(this, "เอกสารอ้างอิงต้องเป็นบิลต้นฉบับในงวดที่กำลังเปิดอยู่", Toast.LENGTH_LONG).show()
                     return@runOnUiThread
                 }
                 val customerType = Spinner(this).apply {
@@ -268,7 +274,7 @@ class MainActivity : Activity() {
                             val total = parsed.sumOf { it.third.first }
                             val document = SaleDocumentEntity(
                                 documentId, period.periodId, selectedCustomer?.customerId, type,
-                                total, now, java.util.TimeZone.getDefault().id
+                                total, now, java.util.TimeZone.getDefault().id, correctionOfDocumentId
                             )
                             val lines = parsed.map { (number, category, amountAndHalf) ->
                                 SaleLineEntity(UUID.randomUUID().toString(), documentId, period.periodId,
@@ -299,6 +305,91 @@ class MainActivity : Activity() {
         }
     }
 
+
+
+    private fun showSalesHistory() {
+        base("รายการขายและประวัติ")
+        val dao = database.lottoDao()
+        val search = EditText(this).apply { hint = "ค้นหาด้วยเลขที่บิลหรือเลขที่ขาย" }
+        val periods = dao.getPeriods()
+        val periodPicker = Spinner(this).apply {
+            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
+                listOf("ทุกงวด") + periods.map { it.title })
+        }
+        val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        addText(currentBody, "ค้นหาบิลจากเลขที่เอกสารหรือเลขที่อยู่ในรายการ และเลือกกรองตามงวด", 13, ink)
+        currentBody.addView(search)
+        currentBody.addView(periodPicker)
+        addButton(currentBody, "ค้นหา") {
+            val selectedIndex = periodPicker.selectedItemPosition - 1
+            val periodId = if (selectedIndex >= 0) periods[selectedIndex].periodId else null
+            val query = search.text.toString().trim()
+            results.removeAllViews()
+            io.execute {
+                val documents = dao.searchSales(periodId, query)
+                runOnUiThread {
+                    if (documents.isEmpty()) addText(results, "ไม่พบเอกสารขาย", 14, ink)
+                    documents.forEach { doc ->
+                        val periodTitle = dao.getPeriod(doc.periodId)?.title ?: "ไม่ทราบชื่องวด"
+                        val label = if (doc.correctionOfDocumentId == null) "บิลต้นฉบับ" else "เอกสารอ้างอิงบิล ${doc.correctionOfDocumentId.take(8)}"
+                        addCard(results, "บิล ${doc.documentId.take(8)} • ${formatMoney(doc.totalAmountSatang)}",
+                            "$periodTitle • $label • ${SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(doc.createdAtEpochMillis))}") {
+                            showSaleDetail(doc.documentId)
+                        }
+                    }
+                }
+            }
+        }
+        currentBody.addView(results)
+        addButton(currentBody, "กลับหน้าหลัก") { showHome() }
+    }
+
+    private fun showSaleDetail(documentId: String) {
+        io.execute {
+            val dao = database.lottoDao()
+            val document = dao.getSaleDocument(documentId) ?: return@execute
+            val period = dao.getPeriod(document.periodId)
+            val customer = document.customerId?.let { dao.getCustomer(it) }
+            val lines = dao.getLinesForDocument(documentId)
+            val receiptFile = java.io.File(java.io.File(filesDir, "receipts"), "${document.documentId}.png")
+            runOnUiThread {
+                base("รายละเอียดบิล")
+                addText(currentBody, "เลขที่เอกสาร: ${document.documentId}", 12, ink)
+                addText(currentBody, "งวด: ${period?.title ?: "ไม่ทราบงวด"} • สถานะ: ${period?.status ?: "ไม่ทราบ"}", 14, ink)
+                addText(currentBody, "วันที่: ${SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale("th", "TH")).format(Date(document.createdAtEpochMillis))}", 14, ink)
+                addText(currentBody, "ประเภทลูกค้า: ${document.customerType}${customer?.let { " • ${it.displayName}" } ?: ""}", 14, ink)
+                if (document.correctionOfDocumentId != null) addText(currentBody, "อ้างอิงบิลต้นฉบับ: ${document.correctionOfDocumentId}", 12, ink)
+                addText(currentBody, "รายการขาย", 17, navy)
+                lines.forEach { line ->
+                    val category = when (line.betCategory) {
+                        "TWO_TOP" -> "2 ตัวบน"
+                        "TWO_BOTTOM" -> "2 ตัวล่าง"
+                        "THREE_TOP" -> "3 ตัวบน"
+                        "THREE_BOTTOM" -> "3 ตัวล่าง"
+                        "THREE_TOAD" -> "3 ตัวโต๊ด"
+                        else -> line.betCategory
+                    }
+                    addCard(currentBody, "${line.numberText} • $category",
+                        "${formatMoney(line.amountSatang)} • ${if (line.halfPayout) "จ่ายครึ่ง" else "จ่ายเต็ม"}") { }
+                }
+                addText(currentBody, "ยอดรวม: ${formatMoney(document.totalAmountSatang)}", 18, navy)
+                addButton(currentBody, if (receiptFile.exists()) "เปิดสร้างใบเสร็จใหม่จากข้อมูลต้นฉบับ" else "สร้างใบเสร็จจากข้อมูลต้นฉบับ") {
+                    io.execute {
+                        try {
+                            val file = ReceiptRenderer.render(this, document, period?.title ?: "ไม่ทราบงวด", lines)
+                            runOnUiThread { Toast.makeText(this, "สร้างใบเสร็จแล้ว: ${file.name}", Toast.LENGTH_LONG).show() }
+                        } catch (e: Exception) {
+                            runOnUiThread { Toast.makeText(this, "สร้างใบเสร็จไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
+                        }
+                    }
+                }
+                if (period?.status == "OPEN" && document.correctionOfDocumentId == null) {
+                    addButton(currentBody, "สร้างเอกสารใหม่อ้างอิงบิลนี้") { createSaleDialog(document.documentId) }
+                }
+                addButton(currentBody, "กลับประวัติการขาย") { showSalesHistory() }
+            }
+        }
+    }
 
     private fun showCreditLedger() {
         base("บัญชีเงินเชื่อ")
