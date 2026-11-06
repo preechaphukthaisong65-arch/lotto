@@ -25,7 +25,12 @@ class GloResultClientTest {
                 "last2": {
                   "number": [
                     { "round": 1, "value": "01" }
-                  ]
+                  ],
+                  "last2": {
+                    "number": [
+                      { "round": 1, "value": "01" }
+                    ]
+                  }
                 }
               }
             }
@@ -44,6 +49,7 @@ class GloResultClientTest {
         assertEquals("639214", result.firstPrizeNumber)
         assertEquals("214", result.threeTopNumber)
         assertEquals("01", result.twoBottomNumber)
+        assertEquals("01", result.twoBottomNumber)
         assertEquals(123L, result.fetchedAtEpochMillis)
     }
 
@@ -52,6 +58,7 @@ class GloResultClientTest {
         val response = validResponse.replace("639214", "123004")
         val result = GloResultClient.parseResponse(response, "2026-07-16")
         assertEquals("004", result.threeTopNumber)
+        assertEquals("01", result.twoBottomNumber)
         assertEquals("01", result.twoBottomNumber)
     }
 
