@@ -1101,6 +1101,40 @@ class MainActivity : Activity() {
                         }
                     }
                 }
+                addButton(currentBody, "บันทึกอัตราจ่ายประจำงวด") {
+                    val selectedPeriod = periods[picker.selectedItemPosition]
+                    if (selectedPeriod.status != "CLOSED") {
+                        Toast.makeText(this, "ต้องปิดงวดก่อนบันทึกอัตราจ่าย", Toast.LENGTH_LONG).show()
+                    } else {
+                        io.execute {
+                            try {
+                                val existing = dao.getSettlementSnapshot(selectedPeriod.periodId)
+                                if (existing != null) {
+                                    runOnUiThread { Toast.makeText(this, "งวดนี้บันทึกอัตราจ่ายไว้แล้ว • รุ่น ${existing.payoutConfigVersion}", Toast.LENGTH_LONG).show() }
+                                } else {
+                                    val rates = dao.getPayoutRateSettings() ?: error("กรุณาตั้งค่าอัตราจ่ายก่อน")
+                                    require(dao.getDrawResults(selectedPeriod.periodId).isNotEmpty()) { "กรุณาบันทึกผลหวยก่อน" }
+                                    val now = System.currentTimeMillis()
+                                    val snapshot = th.co.lotto.data.SettlementSnapshotEntity(
+                                        UUID.randomUUID().toString(), selectedPeriod.periodId,
+                                        rates.twoDigitRateHundredths, rates.threeTopRateHundredths,
+                                        rates.threeBottomRateHundredths, rates.threeToadRateHundredths,
+                                        rates.configVersion, now
+                                    )
+                                    val audit = AuditEventEntity(UUID.randomUUID().toString(),
+                                        "SETTLEMENT", snapshot.settlementId, "SNAPSHOTTED",
+                                        "Payout rates snapshot version ${rates.configVersion}", now)
+                                    dao.createSettlementSnapshot(snapshot, audit)
+                                    runOnUiThread {
+                                        Toast.makeText(this, "บันทึกอัตราจ่ายของงวดนี้แล้ว", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                runOnUiThread { Toast.makeText(this, "บันทึกอัตราจ่ายไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
+                            }
+                        }
+                    }
+                }
                 addButton(currentBody, "ตรวจสอบเลขที่ถูกรางวัล") {
                     resultList.removeAllViews()
                     val selectedPeriod = periods[picker.selectedItemPosition]

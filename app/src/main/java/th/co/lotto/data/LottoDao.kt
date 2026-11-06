@@ -476,6 +476,35 @@ abstract class LottoDao {
         return saved
     }
 
+    @Query("SELECT * FROM settlement_snapshots WHERE periodId = :periodId LIMIT 1")
+    abstract fun getSettlementSnapshot(periodId: String): SettlementSnapshotEntity?
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract fun insertSettlementSnapshot(snapshot: SettlementSnapshotEntity)
+
+    @Transaction
+    open fun createSettlementSnapshot(snapshot: SettlementSnapshotEntity, audit: AuditEventEntity) {
+        require(snapshot.settlementId.isNotBlank()) { "Settlement ID is required" }
+        val period = getPeriod(snapshot.periodId) ?: error("Draw period not found")
+        require(period.status == "CLOSED") { "Settlement snapshot requires a closed period" }
+        require(getDrawResults(snapshot.periodId).isNotEmpty()) { "Draw results are required before settlement" }
+        require(getSettlementSnapshot(snapshot.periodId) == null) { "Settlement snapshot already exists for this period" }
+        val rates = getPayoutRateSettings() ?: error("Payout rates must be configured before settlement")
+        require(snapshot.twoDigitRateHundredths == rates.twoDigitRateHundredths &&
+            snapshot.threeTopRateHundredths == rates.threeTopRateHundredths &&
+            snapshot.threeBottomRateHundredths == rates.threeBottomRateHundredths &&
+            snapshot.threeToadRateHundredths == rates.threeToadRateHundredths &&
+            snapshot.payoutConfigVersion == rates.configVersion) {
+            "Settlement snapshot must exactly copy the current payout configuration"
+        }
+        require(audit.eventId.isNotBlank() && audit.entityType == "SETTLEMENT" &&
+            audit.entityId == snapshot.settlementId && audit.action == "SNAPSHOTTED") {
+            "Settlement audit event does not match the snapshot"
+        }
+        insertSettlementSnapshot(snapshot)
+        insertAuditEvent(audit)
+    }
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract fun insertDrawResult(result: DrawResultEntity)
 

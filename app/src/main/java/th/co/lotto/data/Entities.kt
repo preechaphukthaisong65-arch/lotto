@@ -131,6 +131,22 @@ data class DrawResultEntity(
     val importedAtEpochMillis: Long
 )
 
+@Entity(
+    tableName = "settlement_snapshots",
+    foreignKeys = [ForeignKey(entity = DrawPeriodEntity::class, parentColumns = ["periodId"], childColumns = ["periodId"], onDelete = ForeignKey.RESTRICT)],
+    indices = [Index(value = ["periodId"], unique = true)]
+)
+data class SettlementSnapshotEntity(
+    @PrimaryKey val settlementId: String,
+    val periodId: String,
+    val twoDigitRateHundredths: Long,
+    val threeTopRateHundredths: Long,
+    val threeBottomRateHundredths: Long,
+    val threeToadRateHundredths: Long,
+    val payoutConfigVersion: Long,
+    val createdAtEpochMillis: Long
+)
+
 @Entity(tableName = "audit_events", indices = [Index(value = ["entityId"]), Index(value = ["createdAtEpochMillis"])])
 data class AuditEventEntity(
     @PrimaryKey val eventId: String,

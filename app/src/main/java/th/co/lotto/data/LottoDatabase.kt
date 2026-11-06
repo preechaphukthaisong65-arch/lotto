@@ -18,9 +18,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         NumberBlockRuleEntity::class,
         DrawResultEntity::class,
         AuditEventEntity::class,
-        PayoutRateSettingsEntity::class
+        PayoutRateSettingsEntity::class,
+        SettlementSnapshotEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -85,6 +86,29 @@ abstract class LottoDatabase : RoomDatabase() {
                     )
                 """.trimIndent())
                 installIntegrityGuards(db)
+            }
+        }
+
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS settlement_snapshots (
+                        settlementId TEXT NOT NULL PRIMARY KEY,
+                        periodId TEXT NOT NULL,
+                        twoDigitRateHundredths INTEGER NOT NULL,
+                        threeTopRateHundredths INTEGER NOT NULL,
+                        threeBottomRateHundredths INTEGER NOT NULL,
+                        threeToadRateHundredths INTEGER NOT NULL,
+                        payoutConfigVersion INTEGER NOT NULL,
+                        createdAtEpochMillis INTEGER NOT NULL,
+                        FOREIGN KEY(periodId) REFERENCES draw_periods(periodId)
+                            ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_settlement_snapshots_periodId ON settlement_snapshots(periodId)")
+                installIntegrityGuards(db)
+                db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_settlement_snapshot_update BEFORE UPDATE ON settlement_snapshots BEGIN SELECT RAISE(ABORT, 'Settlement snapshots are immutable'); END")
+                db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_settlement_snapshot_delete BEFORE DELETE ON settlement_snapshots BEGIN SELECT RAISE(ABORT, 'Settlement snapshots are immutable'); END")
             }
         }
 
@@ -173,6 +197,9 @@ abstract class LottoDatabase : RoomDatabase() {
                 BEGIN SELECT RAISE(ABORT, 'Payment does not match a credit document'); END
             """.trimIndent())
 
+            db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_settlement_snapshot_update BEFORE UPDATE ON settlement_snapshots BEGIN SELECT RAISE(ABORT, 'Settlement snapshots are immutable'); END")
+            db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_settlement_snapshot_delete BEFORE DELETE ON settlement_snapshots BEGIN SELECT RAISE(ABORT, 'Settlement snapshots are immutable'); END")
+
             // Posted financial source records and their audit trail are append-only.
             db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_sale_document_update BEFORE UPDATE ON sale_documents BEGIN SELECT RAISE(ABORT, 'Sale documents are immutable'); END")
             db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_sale_document_delete BEFORE DELETE ON sale_documents BEGIN SELECT RAISE(ABORT, 'Sale documents are immutable'); END")
@@ -194,7 +221,7 @@ abstract class LottoDatabase : RoomDatabase() {
                 LottoDatabase::class.java,
                 "lotto-local.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)

@@ -51,6 +51,36 @@ class LottoDatabaseIntegrityTest {
     }
 
     @Test
+    fun settlementSnapshotRequiresClosedPeriodAndIsImmutable() {
+        dao.insertPeriod(period("period-settlement"))
+        val settings = PayoutRateSettingsEntity(1, 7_000L, 50_000L, 50_000L, 10_000L, 1L, 1L)
+        dao.insertPayoutRateSettings(settings)
+        val openSnapshot = SettlementSnapshotEntity("settlement-open", "period-settlement",
+            7_000L, 50_000L, 50_000L, 10_000L, 1L, 2L)
+        val openAudit = AuditEventEntity("settlement-open-audit", "SETTLEMENT", "settlement-open", "SNAPSHOTTED", "test", 2L)
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.createSettlementSnapshot(openSnapshot, openAudit)
+        }
+        database.openHelper.writableDatabase.execSQL("UPDATE draw_periods SET status = 'CLOSED' WHERE periodId = 'period-settlement'")
+        dao.postDrawResult(
+            DrawResultEntity("settlement-result", "period-settlement", "TWO_TOP", "12", "manual", 3L, 3L),
+            AuditEventEntity("settlement-result-audit", "DRAW_RESULT", "settlement-result", "POSTED", "test", 3L)
+        )
+        dao.createSettlementSnapshot(openSnapshot, openAudit)
+        assertEquals(1L, dao.getSettlementSnapshot("period-settlement")?.payoutConfigVersion)
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.createSettlementSnapshot(openSnapshot.copy(settlementId = "duplicate"),
+                openAudit.copy(eventId = "duplicate-audit", entityId = "duplicate"))
+        }
+        assertThrows(SQLiteException::class.java) {
+            database.openHelper.writableDatabase.execSQL("UPDATE settlement_snapshots SET twoDigitRateHundredths = 1 WHERE settlementId = 'settlement-open'")
+        }
+        assertThrows(SQLiteException::class.java) {
+            database.openHelper.writableDatabase.execSQL("DELETE FROM settlement_snapshots WHERE settlementId = 'settlement-open'")
+        }
+    }
+
+    @Test
     fun paymentHistoryIsAppendOnlyAndCanBeReadPerCreditDocument() {
         dao.insertPeriod(period("period-payment"))
         dao.insertCustomer(CustomerEntity("credit-payment", "Credit customer", "0800000000", "verified", "CREDIT", 1L))
