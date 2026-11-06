@@ -94,7 +94,6 @@ class GloResultClient(
                 ?: error("GLO response object is missing")
             val result = response.optJSONObject("result")
                 ?: error("GLO has not published a result for this draw date")
-            require(result.optInt("status") == 1) { "GLO draw result is not in published status" }
             val drawDate = result.optString("date")
             require(drawDate == requestedDateIso) {
                 "GLO draw date mismatch: requested $requestedDateIso, received $drawDate"
