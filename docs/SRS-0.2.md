@@ -65,11 +65,28 @@ Use Room/SQLite with foreign keys, indexes, transactions, stable IDs, duplicate 
 ## 13. Backup and restore
 Manual local backup, encrypted export, version validation, integrity check before restore, and manual device-to-device transfer. No automatic cloud backup or sync.
 
+Implemented phase-7 backup format:
+- The user supplies and confirms a passphrase of at least 10 characters; the app derives a 256-bit key with PBKDF2-HMAC-SHA256 (210,000 rounds) and encrypts with AES-256-GCM using a fresh random salt and nonce for every backup.
+- One archive contains the Room/SQLite database and local receipt images. The archive is written through Android's document picker; no network upload is performed.
+- Restore authenticates/decrypts before extraction, rejects unsafe archive paths and oversized archives, checks SQLite integrity, foreign keys, schema version, and required Lotto tables, then replaces the local database and receipts with rollback protection.
+- The backup passphrase is not stored by the app and cannot be recovered. Losing it makes that backup unreadable.
+- Supported restore schema versions are 1 through 7, subject to the app's registered Room migrations. Restore never accepts a database newer than the app.
+- Android Auto Backup is disabled in the manifest. Backup files are user-managed and must be stored securely.
+
 ## 14. Security
 PIN-gated access for configured sensitive actions. Restrict access by role. Preserve immutable records and audit events. Use Android secure storage for encryption key material; do not hardcode keys.
 
+Phase-7 implemented protections:
+- Application data remains inside the Android app sandbox; no internet permission, cloud service, or synchronization is added.
+- Android system backup is disabled (allowBackup=false).
+- Exported backup data is encrypted with a portable passphrase-derived key and authenticated encryption; the passphrase is held only in memory during the operation and cleared afterwards.
+- Restore validates contents before replacement and rolls back to the prior database/receipts if installation or Room re-open validation fails.
+- PIN enrollment, roles, and per-module permissions remain a release gate. A role matrix and recovery policy must be explicitly approved before an access-control design can safely be enabled; the app must not silently invent staff roles or a recovery bypass.
+
 ## 15. Acceptance tests
 Install/launch; create period; all entry types; variable amounts; limit enforcement; half-payout labeling; cash/credit customers; partial/full payments; receipt image generation; immutable documents; settlement; reports; backup/restore; airplane-mode operation; process death/restart; and failure recovery on a physical Android device.
+
+Phase-7 automated acceptance coverage includes encryption/decryption round trip, wrong-passphrase rejection, tamper detection, and minimum passphrase length. Restore validation additionally checks archive paths, archive size, SQLite integrity, foreign keys, schema version, required tables, and rollback on replacement failure. Manual cross-device restore and physical-device interruption testing remain required.
 
 ## 16. Unresolved decisions — do not invent
 1. Exact half-payout formula and precedence.
