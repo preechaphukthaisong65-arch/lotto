@@ -577,6 +577,7 @@ abstract class LottoDao {
             .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
         val sourceOne = latestChecks["LOTTERYCHECKS"] ?: error("LotteryChecks verification is required")
         val sourceTwo = latestChecks["HUAYREVIEW"] ?: error("HuayReview verification is required")
+        require(sourceOne.checkStatus == "SUCCESS" && sourceTwo.checkStatus == "SUCCESS") { "Both sources must be available" }
         require(sourceOne.drawDateIso == sourceTwo.drawDateIso &&
             sourceOne.drawDateIso == expectedDrawDateIso(result.periodId)) { "Source checks are for a different draw date" }
         if (result.sourceLabel.startsWith("AUTO-COMPARED")) {
@@ -619,9 +620,16 @@ abstract class LottoDao {
     open fun insertDrawSourceCheck(check: DrawSourceCheckEntity) {
         require(check.checkId.isNotBlank()) { "Source check ID is required" }
         require(check.sourceId in setOf("LOTTERYCHECKS", "HUAYREVIEW")) { "Unknown result source" }
-        require(check.firstPrizeNumber.length == 6 && check.firstPrizeNumber.all { it in '0'..'9' }) { "Invalid first-prize number" }
-        require(check.threeTopNumber == check.firstPrizeNumber.takeLast(3)) { "Derived three-top number is invalid" }
-        require(check.twoBottomNumber.length == 2 && check.twoBottomNumber.all { it in '0'..'9' }) { "Invalid last-two number" }
+        require(check.checkStatus in setOf("SUCCESS", "FAILED")) { "Unknown source check status" }
+        if (check.checkStatus == "SUCCESS") {
+            require(check.firstPrizeNumber.length == 6 && check.firstPrizeNumber.all { it in '0'..'9' }) { "Invalid first-prize number" }
+            require(check.threeTopNumber == check.firstPrizeNumber.takeLast(3)) { "Derived three-top number is invalid" }
+            require(check.twoBottomNumber.length == 2 && check.twoBottomNumber.all { it in '0'..'9' }) { "Invalid last-two number" }
+            require(check.errorMessage == null) { "Successful source check cannot contain an error" }
+        } else {
+            require(check.firstPrizeNumber.isEmpty() && check.threeTopNumber.isEmpty() && check.twoBottomNumber.isEmpty()) { "Failed source check must not contain result values" }
+            require(!check.errorMessage.isNullOrBlank()) { "Failed source check must include a reason" }
+        }
         require(check.drawDateIso.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) { "Invalid draw date" }
         require(check.sourceUrl.startsWith("https://")) { "Source URL must use HTTPS" }
         require(check.fetchedAtEpochMillis > 0L) { "Source check timestamp is invalid" }
@@ -653,6 +661,7 @@ abstract class LottoDao {
             .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
         val first = latest["LOTTERYCHECKS"] ?: error("LotteryChecks result is missing")
         val second = latest["HUAYREVIEW"] ?: error("HuayReview result is missing")
+        require(first.checkStatus == "SUCCESS" && second.checkStatus == "SUCCESS") { "Both sources must be available" }
         require(first.drawDateIso == second.drawDateIso && first.drawDateIso == expectedDrawDateIso(periodId) &&
             first.firstPrizeNumber == second.firstPrizeNumber && first.twoBottomNumber == second.twoBottomNumber) {
             "Public source results do not match; settlement is blocked"
@@ -698,6 +707,7 @@ abstract class LottoDao {
             .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
         val first = latest["LOTTERYCHECKS"] ?: return false
         val second = latest["HUAYREVIEW"] ?: return false
+        if (first.checkStatus != "SUCCESS" || second.checkStatus != "SUCCESS") return false
         if (first.drawDateIso != second.drawDateIso || runCatching { first.drawDateIso != expectedDrawDateIso(periodId) }.getOrDefault(true)) return false
         val results = getDrawResults(periodId)
         val latestCheckTime = maxOf(first.fetchedAtEpochMillis, second.fetchedAtEpochMillis)
