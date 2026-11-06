@@ -60,6 +60,7 @@ class SaleCancellationDaoTest {
         )
 
         assertNotNull(dao.getSaleCancellation(documentId))
+        assertEquals(1, dao.getSaleCancellationsForPeriod(periodId).size)
         assertEquals(0L, dao.getSoldAmountForNumber(periodId, "123", "THREE_TOP"))
         assertEquals(0, dao.getSalesForPeriod(periodId).size)
         assertEquals(1, dao.searchSales(periodId, "").size)
