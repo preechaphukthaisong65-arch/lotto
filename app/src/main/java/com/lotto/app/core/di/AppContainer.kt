@@ -14,7 +14,10 @@ class AppContainer(context: Context) {
         LottoDatabase::class.java,
         LottoDatabase.DATABASE_NAME
     )
-        .addMigrations(LottoDatabase.MIGRATION_1_2)
+        .addMigrations(
+            LottoDatabase.MIGRATION_1_2,
+            LottoDatabase.MIGRATION_2_3
+        )
         .build()
 
     val settingsRepository: SettingsRepository by lazy {
