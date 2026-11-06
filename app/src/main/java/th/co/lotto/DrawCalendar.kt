@@ -113,11 +113,11 @@ object DrawCalendarService {
         val dates = linkedSetOf<LocalDate>()
         val plain = htmlToText(html)
         dates.addAll(fullDateMatches(plain))
-        val rowRegex = Regex("(?is)<tr\\\\b[^>]*>(.*?)</tr>")
-        val dayRegex = Regex("""(\\d{1,2})\\s*(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|ม\\.ค\\.|ก\\.พ\\.|มี\\.ค\\.|เม\\.ย\\.|พ\\.ค\\.|มิ\\.ย\\.|ก\\.ค\\.|ส\\.ค\\.|ก\\.ย\\.|ต\\.ค\\.|พ\\.ย\\.|ธ\\.ค\\.)""")
+        val rowRegex = Regex("(?is)<tr\\b[^>]*>(.*?)</tr>")
+        val dayRegex = Regex("""(\d{1,2})\s*(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.)""")
         for (row in rowRegex.findAll(html)) {
             val rowText = htmlToText(row.groupValues[1])
-            val yearText = Regex("""(25\\d{2})""").find(rowText)?.groupValues?.get(1)
+            val yearText = Regex("""(25\d{2})""").find(rowText)?.groupValues?.get(1)
             val year = yearText?.toIntOrNull() ?: pageYear
             if (year !in 2500..2700) continue
             for (match in dayRegex.findAll(rowText)) {
@@ -130,8 +130,8 @@ object DrawCalendarService {
     }
 
     private fun fullDateMatches(text: String): List<LocalDate> {
-        val monthNames = "มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|ม\\\\.ค\\\\.|ก\\\\.พ\\\\.|มี\\\\.ค\\\\.|เม\\\\.ย\\\\.|พ\\\\.ค\\\\.|มิ\\\\.ย\\\\.|ก\\\\.ค\\\\.|ส\\\\.ค\\\\.|ก\\\\.ย\\\\.|ต\\\\.ค\\\\.|พ\\\\.ย\\\\.|ธ\\\\.ค\\\\."
-        val regex = Regex("""(?:วัน[^\\s]+ที่\\s*)?(\\d{1,2})\\s*($monthNames)\\s*(25\\d{2}|20\\d{2})""")
+        val monthNames = "มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|ม\\.ค\\.|ก\\.พ\\.|มี\\.ค\\.|เม\\.ย\\.|พ\\.ค\\.|มิ\\.ย\\.|ก\\.ค\\.|ส\\.ค\\.|ก\\.ย\\.|ต\\.ค\\.|พ\\.ย\\.|ธ\\.ค\\."
+        val regex = Regex("""(?:วัน[^\s]+ที่\s*)?(\d{1,2})\s*($monthNames)\s*(25\d{2}|20\d{2})""")
         return regex.findAll(text).mapNotNull { match ->
             val day = match.groupValues[1].toIntOrNull() ?: return@mapNotNull null
             val month = thaiMonthNumber(match.groupValues[2]) ?: return@mapNotNull null
@@ -162,7 +162,7 @@ object DrawCalendarService {
 
     private fun htmlToText(html: String): String =
         Html.fromHtml(html.replace(Regex("(?is)<script.*?</script>|<style.*?</style>"), " "),
-            Html.FROM_HTML_MODE_LEGACY).toString().replace(' ', ' ').replace(Regex("""\\s+"""), " ").trim()
+            Html.FROM_HTML_MODE_LEGACY).toString().replace(' ', ' ').replace(Regex("""\s+"""), " ").trim()
 }
 
 private object LotteryChecksCalendarClient {
