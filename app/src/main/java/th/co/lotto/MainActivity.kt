@@ -3,6 +3,8 @@ package th.co.lotto
 import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.Spinner
@@ -226,11 +228,29 @@ class MainActivity : Activity() {
                         listOf("เลือกข้อมูลลูกค้าเงินเชื่อ") + creditCustomers.map { it.displayName })
                 }
                 val entries = EditText(this).apply {
-                    hint = "เลข,ประเภท,จำนวนเงิน,HALF/FULL\n12,TWO_TOP,20,FULL\n123,THREE_TOAD,10,HALF"
+                    hint = "เลข,ประเภท,จำนวนเงิน,HALF/FULL\\n12,TWO_TOP,20,FULL\\n123,THREE_TOAD,10,HALF"
                     minLines = 5
                     gravity = android.view.Gravity.TOP
                     inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
                 }
+                val totalPreview = TextView(this).apply {
+                    text = "ยอดรวม: กรุณากรอกรายการ"
+                    textSize = 14f
+                    setTextColor(navy)
+                    setPadding(0, dp(8), 0, dp(4))
+                }
+                entries.addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                        try {
+                            val parsed = SaleEntryParser.parse(s?.toString().orEmpty())
+                            totalPreview.text = "ยอดรวม " + parsed.size + " รายการ: " + formatMoney(SaleEntryParser.totalSatang(parsed))
+                        } catch (e: Exception) {
+                            totalPreview.text = "ตรวจสอบรายการ: " + e.message
+                        }
+                    }
+                    override fun afterTextChanged(s: Editable?) = Unit
+                })
                 val form = LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL
                     setPadding(dp(20), dp(8), dp(20), 0)
@@ -240,6 +260,7 @@ class MainActivity : Activity() {
                     addView(customer)
                     addView(TextView(this@MainActivity).apply { text = "รายการขาย" })
                     addView(entries)
+                    addView(totalPreview)
                 }
                 val dialog = AlertDialog.Builder(this).setTitle("บันทึกบิล • ${period.title}").setView(form)
                     .setNegativeButton("กลับ", null).setPositiveButton("บันทึก", null).create()
@@ -254,34 +275,17 @@ class MainActivity : Activity() {
                                 require(index >= 0 && index < creditCustomers.size) { "กรุณาเลือกลูกค้าเงินเชื่อ" }
                                 creditCustomers[index]
                             } else null
-                            val parsed = entries.text.toString().lines().filter { it.isNotBlank() }.map { raw ->
-                                val parts = raw.split(",").map { it.trim() }
-                                require(parts.size == 4) { "รูปแบบรายการไม่ถูกต้อง: $raw" }
-                                val number = parts[0]
-                                val category = parts[1].uppercase(Locale.ROOT)
-                                val satang = BigDecimal(parts[2]).multiply(BigDecimal(100)).setScale(0, RoundingMode.HALF_UP).longValueExact()
-                                val half = when (parts[3].uppercase(Locale.ROOT)) {
-                                    "HALF" -> true
-                                    "FULL" -> false
-                                    else -> error("ระบุ HALF หรือ FULL ในรายการ: $raw")
-                                }
-                                require(number.length in 2..3 && number.all { it in '0'..'9' }) { "เลขต้องมี 2 หรือ 3 หลัก: $number" }
-                                require(satang > 0L) { "จำนวนเงินต้องมากกว่า 0" }
-                                val allowed = if (number.length == 2) setOf("TWO_TOP", "TWO_BOTTOM") else setOf("THREE_TOP", "THREE_BOTTOM", "THREE_TOAD")
-                                require(category in allowed) { "ประเภทไม่ตรงกับจำนวนหลัก: $number" }
-                                Triple(number, category, satang to half)
-                            }
-                            require(parsed.isNotEmpty()) { "กรุณากรอกรายการขายอย่างน้อย 1 บรรทัด" }
+                            val parsed = SaleEntryParser.parse(entries.text.toString())
                             val now = System.currentTimeMillis()
                             val documentId = UUID.randomUUID().toString()
-                            val total = parsed.fold(0L) { sum, item -> Math.addExact(sum, item.third.first) }
+                            val total = SaleEntryParser.totalSatang(parsed)
                             val document = SaleDocumentEntity(
                                 documentId, period.periodId, selectedCustomer?.customerId, type,
                                 total, now, java.util.TimeZone.getDefault().id, correctionOfDocumentId
                             )
-                            val lines = parsed.map { (number, category, amountAndHalf) ->
+                            val lines = parsed.map { entry ->
                                 SaleLineEntity(UUID.randomUUID().toString(), documentId, period.periodId,
-                                    number, category, amountAndHalf.first, amountAndHalf.second)
+                                    entry.number, entry.category, entry.amountSatang, entry.halfPayout)
                             }
                             val audit = AuditEventEntity(UUID.randomUUID().toString(), "SALE_DOCUMENT",
                                 documentId, "POSTED", "Sale posted from sales screen", now)
