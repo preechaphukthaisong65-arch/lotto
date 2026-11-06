@@ -13,16 +13,13 @@ data class WinningLineMatch(
 
 /**
  * Deterministic matching only. This deliberately does not calculate payouts:
- * Approved sales are limited to THREE_TOP and THREE_TOAD; payout calculation remains separate.
+ * The official GLO three-digit top result is the sole source; THREE_TOAD matches are derived by permutation.
  */
 object DrawResultMatcher {
     private val aliases = mapOf(
         "THREE_TOP" to "THREE_TOP",
         "3 ตัวบน" to "THREE_TOP",
         "3บน" to "THREE_TOP",
-        "THREE_TOAD" to "THREE_TOAD",
-        "3 ตัวโต๊ด" to "THREE_TOAD",
-        "3โต๊ด" to "THREE_TOAD"
     )
 
     fun findMatches(
@@ -38,7 +35,6 @@ object DrawResultMatcher {
 
         val categoriesToCheck = when (category) {
             "THREE_TOP" -> listOf("THREE_TOP", "THREE_TOAD")
-            "THREE_TOAD" -> listOf("THREE_TOAD")
             else -> emptyList()
         }
         categoriesToCheck.mapNotNull { betCategory ->
