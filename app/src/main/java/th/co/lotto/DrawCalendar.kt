@@ -9,6 +9,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -246,9 +248,12 @@ private object CalendarAuditLog {
 object DrawCalendarReminder {
     fun ensureScheduled(context: Context) {
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+        val manager = WorkManager.getInstance(context)
+        val initial = OneTimeWorkRequestBuilder<DrawCalendarWorker>().setConstraints(constraints).build()
+        manager.enqueueUniqueWork("lotto_draw_calendar_initial_refresh", ExistingWorkPolicy.KEEP, initial)
         val request = PeriodicWorkRequestBuilder<DrawCalendarWorker>(24, TimeUnit.HOURS)
             .setConstraints(constraints).build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        manager.enqueueUniquePeriodicWork(
             CALENDAR_WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request
         )
     }
