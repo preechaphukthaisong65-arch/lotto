@@ -25,20 +25,17 @@ android {
         jvmTarget = "17"
     }
 
-    testOptions {
-        unitTests.all {
-            // Robolectric downloads its Android runtime on demand. Use the canonical
-            // Maven Central hostname to avoid repo1.maven.org rate-limit responses.
-            systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
-        }
-    }
-
     kapt {
         correctErrorTypes = true
         arguments {
             arg("room.schemaLocation", "$projectDir/schemas")
         }
     }
+}
+
+// Configure Robolectric's runtime download endpoint on all JVM test tasks.
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
 }
 
 dependencies {
