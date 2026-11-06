@@ -3,6 +3,8 @@ package th.co.lotto
 import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.ViewGroup
@@ -40,15 +42,46 @@ class MainActivity : Activity() {
     private val blue = 0xFF2463A6.toInt()
     private val pale = 0xFFF3F6FA.toInt()
     private val ink = 0xFF17212B.toInt()
+    private val scheduleHandler = Handler(Looper.getMainLooper())
+    private val scheduleTick = object : Runnable {
+        override fun run() {
+            advancePeriodSchedule()
+            scheduleHandler.postDelayed(this, 60_000L)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         showHome()
     }
 
+    override fun onResume() {
+        super.onResume()
+        scheduleHandler.removeCallbacks(scheduleTick)
+        scheduleHandler.post(scheduleTick)
+    }
+
+    override fun onPause() {
+        scheduleHandler.removeCallbacks(scheduleTick)
+        super.onPause()
+    }
+
     override fun onDestroy() {
+        scheduleHandler.removeCallbacks(scheduleTick)
         io.shutdown()
         super.onDestroy()
+    }
+
+    private fun advancePeriodSchedule() {
+        io.execute {
+            try {
+                PeriodSchedule.advance(database.lottoDao(), System.currentTimeMillis())
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this, "ตรวจสอบตารางงวดไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     private fun base(title: String) {
@@ -91,50 +124,132 @@ class MainActivity : Activity() {
 
     private fun showPeriods() {
         base("จัดการงวดหวย")
-        addButton(currentBody, "＋ สร้างงวดใหม่") { createPeriodDialog() }
+        addButton(currentBody, "＋ สร้าง/เตรียมงวดใหม่") { createPeriodDialog() }
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
         io.execute {
-            val periods = database.lottoDao().getPeriods()
+            val dao = database.lottoDao()
+            PeriodSchedule.advance(dao, System.currentTimeMillis())
+            val periods = dao.getPeriods()
+            val prepared = dao.getPreparedPeriod()
             runOnUiThread {
                 if (periods.isEmpty()) addText(currentBody, "ยังไม่มีข้อมูลงวดหวย", 14, ink)
                 periods.forEach { p ->
-                    addCard(currentBody, p.title, "สถานะ: ${p.status} • รหัสงวด: ${p.periodId.take(8)}") { }
+                    val statusLabel = when (p.status) {
+                        "OPEN" -> "เปิดรับขาย"
+                        "PREPARED" -> "เตรียมเปิด"
+                        "CLOSED" -> "ปิดรับขายแล้ว"
+                        else -> p.status
+                    }
+                    val dateLabel = p.drawDateEpochMillis?.let {
+                        SimpleDateFormat("dd/MM/yyyy", Locale("th", "TH")).format(Date(it))
+                    } ?: "ยังไม่กำหนดวันหวยออก"
+                    val openLabel = p.scheduledOpenEpochMillis?.let {
+                        " • กำหนดเปิด " + SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(it))
+                    } ?: ""
+                    addCard(currentBody, p.title,
+                        "$statusLabel • วันหวยออก $dateLabel$openLabel • รหัสงวด: ${p.periodId.take(8)}") { }
+                    if (p.status == "OPEN") {
+                        addButton(currentBody, "ปิดรับขายงวดนี้") { confirmClosePeriod(p) }
+                    }
+                }
+                if (prepared != null) {
+                    addText(currentBody, "งวดถัดไปจะเปิดอัตโนมัติตามเวลาที่เตรียมไว้", 12, 0xFF526171.toInt())
                 }
             }
         }
     }
 
+    private fun confirmClosePeriod(period: DrawPeriodEntity) {
+        AlertDialog.Builder(this)
+            .setTitle("ปิดรับขาย")
+            .setMessage("ยืนยันปิดรับขายงวด ${period.title} หรือไม่? เมื่อปิดแล้วจะไม่สามารถบันทึกบิลเพิ่มในงวดนี้ได้")
+            .setNegativeButton("กลับ", null)
+            .setPositiveButton("ยืนยันปิดงวด") { _, _ ->
+                io.execute {
+                    try {
+                        database.lottoDao().closePeriod(period.periodId, System.currentTimeMillis())
+                        runOnUiThread {
+                            Toast.makeText(this, "ปิดรับขายงวดแล้ว", Toast.LENGTH_SHORT).show()
+                            showPeriods()
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread { Toast.makeText(this, "ปิดงวดไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
+                    }
+                }
+            }
+            .show()
+    }
+
     private fun createPeriodDialog() {
         val titleInput = EditText(this).apply { hint = "ชื่องวด เช่น งวด 16 พ.ย. 2569" }
-        val dateInput = EditText(this).apply { hint = "วันที่หวยออก (dd/MM/yyyy) ไม่บังคับ" }
+        val dateInput = EditText(this).apply { hint = "วันที่หวยออก (dd/MM/yyyy) จำเป็น" }
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
             addView(titleInput)
             addView(dateInput)
+            addView(TextView(this@MainActivity).apply {
+                text = "ระบบปิดรับขายเวลา 14:00 และเปิดงวดที่เตรียมไว้เวลา 18:00 ตามวันหวยออก"
+                textSize = 12f
+                setTextColor(0xFF526171.toInt())
+            })
         }
-        val dialog = AlertDialog.Builder(this).setTitle("สร้างงวดใหม่").setView(form)
+        val dialog = AlertDialog.Builder(this).setTitle("สร้าง/เตรียมงวดใหม่").setView(form)
             .setNegativeButton("กลับ", null).setPositiveButton("บันทึก", null).create()
         dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val saveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            saveButton.setOnClickListener {
                 val title = titleInput.text.toString().trim()
                 if (title.isBlank()) { titleInput.error = "กรุณาระบุชื่องวด"; return@setOnClickListener }
                 val dateText = dateInput.text.toString().trim()
-                val date = if (dateText.isBlank()) null else try {
+                val drawDate = if (dateText.isBlank()) null else try {
                     SimpleDateFormat("dd/MM/yyyy", Locale("th", "TH")).apply { isLenient = false }.parse(dateText)?.time
                 } catch (_: Exception) { null }
-                if (dateText.isNotBlank() && date == null) { dateInput.error = "รูปแบบวันที่ไม่ถูกต้อง"; return@setOnClickListener }
+                if (drawDate == null) { dateInput.error = "กรุณาระบุวันที่หวยออกให้ถูกต้อง"; return@setOnClickListener }
+                saveButton.isEnabled = false
                 io.execute {
-                    val dao = database.lottoDao()
-                    val open = dao.getOpenPeriod()
-                    if (open != null) {
-                        runOnUiThread { Toast.makeText(this, "ยังมีงวดเปิดอยู่: ${open.title}", Toast.LENGTH_LONG).show() }
-                    } else {
-                        dao.insertPeriod(DrawPeriodEntity(UUID.randomUUID().toString(), title, date, "OPEN", null, System.currentTimeMillis()))
-                        runOnUiThread { Toast.makeText(this, "บันทึกงวดแล้ว", Toast.LENGTH_SHORT).show(); showPeriods() }
+                    try {
+                        val dao = database.lottoDao()
+                        val now = System.currentTimeMillis()
+                        PeriodSchedule.advance(dao, now)
+                        val open = dao.getOpenPeriod()
+                        val prepared = dao.getPreparedPeriod()
+                        require(prepared == null) { "มีงวดที่เตรียมเปิดอยู่แล้ว: ${prepared?.title}" }
+
+                        val latestClosedDrawDate = if (open == null) {
+                            dao.getPeriods().firstOrNull { period ->
+                                period.status == "CLOSED" && period.drawDateEpochMillis != null &&
+                                    now >= PeriodSchedule.closeAt(period.drawDateEpochMillis) &&
+                                    now < PeriodSchedule.openNextAt(period.drawDateEpochMillis)
+                            }?.drawDateEpochMillis
+                        } else null
+
+                        val scheduleFromDate = open?.drawDateEpochMillis ?: latestClosedDrawDate
+                        if (open != null) require(scheduleFromDate != null) {
+                            "กรุณากำหนดวันหวยออกของงวดปัจจุบันก่อนเตรียมงวดถัดไป"
+                        }
+                        val scheduledOpen = scheduleFromDate?.let { PeriodSchedule.openNextAt(it) }
+                        val status = if (scheduledOpen != null && scheduledOpen > now) "PREPARED" else "OPEN"
+                        dao.insertPeriod(DrawPeriodEntity(
+                            UUID.randomUUID().toString(), title, drawDate, status, null, now,
+                            if (status == "PREPARED") scheduledOpen else null
+                        ))
+                        runOnUiThread {
+                            Toast.makeText(
+                                this,
+                                if (status == "PREPARED") "บันทึกงวดถัดไปแล้ว จะเปิดเวลา 18:00" else "เปิดงวดใหม่แล้ว",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            dialog.dismiss()
+                            showPeriods()
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread {
+                            saveButton.isEnabled = true
+                            Toast.makeText(this, "บันทึกงวดไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
-                dialog.dismiss()
             }
         }
         dialog.show()
@@ -197,6 +312,7 @@ class MainActivity : Activity() {
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
         io.execute {
             val dao = database.lottoDao()
+            PeriodSchedule.advance(dao, System.currentTimeMillis())
             val period = dao.getOpenPeriod()
             runOnUiThread {
                 addText(currentBody, if (period == null) "ยังไม่มีงวดที่เปิดขาย" else "งวดที่กำลังขาย: ${period.title}", 15, ink)
@@ -208,6 +324,7 @@ class MainActivity : Activity() {
     private fun createSaleDialog(correctionOfDocumentId: String? = null) {
         val dao = database.lottoDao()
         io.execute {
+            PeriodSchedule.advance(dao, System.currentTimeMillis())
             val period = dao.getOpenPeriod()
             val creditCustomers = dao.getCustomers().filter { it.customerType == "CREDIT" }
             runOnUiThread {
@@ -292,6 +409,7 @@ class MainActivity : Activity() {
                             saveButton.isEnabled = false
                             io.execute {
                                 try {
+                                    PeriodSchedule.advance(dao, System.currentTimeMillis())
                                     dao.postSale(document, lines, audit)
                                     try {
                                         val receipt = ReceiptRenderer.render(this, document, period.title, lines)
