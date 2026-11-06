@@ -23,7 +23,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SettlementSnapshotEntity::class,
         DrawSourceCheckEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -154,6 +154,14 @@ abstract class LottoDatabase : RoomDatabase() {
                 BEFORE INSERT ON sale_cancellations
                 WHEN NEW.originalAmountSatang <= 0
                   OR length(trim(NEW.reason)) = 0
+                  OR NEW.cashRefundedSatang < 0
+                  OR NEW.cashRefundedSatang > NEW.originalAmountSatang
+                  OR EXISTS (
+                    SELECT 1 FROM sale_documents
+                    WHERE documentId = NEW.documentId
+                      AND customerType = 'CREDIT'
+                      AND NEW.cashRefundedSatang != 0
+                  )
                   OR NOT EXISTS (
                     SELECT 1 FROM sale_documents
                     WHERE documentId = NEW.documentId
@@ -188,6 +196,14 @@ abstract class LottoDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_source_checks_periodId_fetchedAtEpochMillis ON draw_source_checks(periodId, fetchedAtEpochMillis)")
                 db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_draw_source_check_update BEFORE UPDATE ON draw_source_checks BEGIN SELECT RAISE(ABORT, 'source check immutable'); END")
                 db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_draw_source_check_delete BEFORE DELETE ON draw_source_checks BEGIN SELECT RAISE(ABORT, 'source check immutable'); END")
+            }
+        }
+
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sale_cancellations ADD COLUMN cashRefundedSatang INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("DROP TRIGGER IF EXISTS validate_sale_cancellation_insert")
+                installIntegrityGuards(db)
             }
         }
 
@@ -384,7 +400,7 @@ abstract class LottoDatabase : RoomDatabase() {
                 LottoDatabase::class.java,
                 "lotto-local.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
