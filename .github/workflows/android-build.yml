@@ -1,0 +1,85 @@
+name: Android APK Build
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+      - "srs-0.2-offline"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Verify build toolchain
+        run: |
+          java -version
+          gradle --version
+          sdkmanager --list_installed
+
+      - name: Run Android lint
+        run: gradle --no-daemon --stacktrace --warning-mode all :app:lintDebug
+
+      - name: Run Room database integrity tests
+        run: gradle --no-daemon --stacktrace --warning-mode all :app:testDebugUnitTest
+
+      - name: Build debug APK
+        run: gradle --no-daemon --stacktrace --warning-mode all :app:assembleDebug
+
+      - name: Verify APK and generate build metadata
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/SHA256SUMS.txt
+          printf 'commit=%s\nbranch=%s\nworkflow_run=%s\n' "$GITHUB_SHA" "$GITHUB_REF_NAME" "$GITHUB_RUN_ID" > app/build/outputs/apk/debug/BUILD-METADATA.txt
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lotto-debug-apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/debug/SHA256SUMS.txt
+            app/build/outputs/apk/debug/BUILD-METADATA.txt
+            app/schemas/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lotto-build-diagnostics
+          path: |
+            **/build/reports/
+            **/build/outputs/logs/
+          if-no-files-found: ignore
+          retention-days: 7
