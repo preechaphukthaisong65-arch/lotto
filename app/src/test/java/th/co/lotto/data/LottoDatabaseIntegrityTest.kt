@@ -6,6 +6,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
@@ -176,6 +177,66 @@ class LottoDatabaseIntegrityTest {
                 AuditEventEntity("event-correction", "SALE_DOCUMENT", "sale-correction", "POSTED", "linked correction", 20L))
         }
         assertEquals(0, dao.documentExists("sale-correction"))
+    }
+
+    @Test
+    fun savingSameLimitRuleUpdatesItInsteadOfCreatingDuplicates() {
+        dao.insertPeriod(period("period-1"))
+        dao.saveLimitRule(NumberLimitRuleEntity(
+            "rule-original", "period-1", 2, "TWO_TOP", "12", 2_000L, true
+        ))
+
+        dao.saveLimitRule(NumberLimitRuleEntity(
+            "rule-new-id", "period-1", 2, "TWO_TOP", "12", 3_000L, false
+        ))
+
+        val rules = dao.getLimitRules("period-1")
+        assertEquals(1, rules.size)
+        assertEquals("rule-original", rules.single().ruleId)
+        assertEquals(3_000L, rules.single().maximumAmountSatang)
+        assertFalse(rules.single().enabled)
+    }
+
+    @Test
+    fun limitCannotBeReducedBelowAlreadySoldAmount() {
+        dao.insertPeriod(period("period-1"))
+        val rule = NumberLimitRuleEntity(
+            "rule-1", "period-1", 2, "TWO_TOP", "12", 2_000L, true
+        )
+        dao.saveLimitRule(rule)
+        val document = SaleDocumentEntity(
+            "sale-1", "period-1", null, "CASH", 1_500L, 10L, "Asia/Bangkok"
+        )
+        dao.postSale(
+            document,
+            listOf(SaleLineEntity("line-1", "sale-1", "period-1", "12", "TWO_TOP", 1_500L, false)),
+            AuditEventEntity("event-1", "SALE_DOCUMENT", "sale-1", "POSTED", "test", 10L)
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.saveLimitRule(rule.copy(maximumAmountSatang = 1_000L))
+        }
+        assertEquals(2_000L, dao.getLimitRules("period-1").single().maximumAmountSatang)
+    }
+
+    @Test
+    fun disabledLimitDoesNotBlockSales() {
+        dao.insertPeriod(period("period-1"))
+        dao.saveLimitRule(NumberLimitRuleEntity(
+            "rule-1", "period-1", 2, "TWO_TOP", "12", 1_000L, false
+        ))
+        val document = SaleDocumentEntity(
+            "sale-1", "period-1", null, "CASH", 1_500L, 10L, "Asia/Bangkok"
+        )
+
+        dao.postSale(
+            document,
+            listOf(SaleLineEntity("line-1", "sale-1", "period-1", "12", "TWO_TOP", 1_500L, false)),
+            AuditEventEntity("event-1", "SALE_DOCUMENT", "sale-1", "POSTED", "test", 10L)
+        )
+
+        assertEquals(1, dao.documentExists("sale-1"))
+        assertEquals(1_500L, dao.getSoldAmountForNumber("period-1", "12", "TWO_TOP"))
     }
 
     private fun period(id: String) = DrawPeriodEntity(
