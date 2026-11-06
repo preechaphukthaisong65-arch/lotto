@@ -531,6 +531,7 @@ abstract class LottoDao {
         require(snapshot.settlementId.isNotBlank()) { "Settlement ID is required" }
         val period = getPeriod(snapshot.periodId) ?: error("Draw period not found")
         require(period.status == "CLOSED") { "Settlement snapshot requires a closed period" }
+        require(isResultVerificationComplete(snapshot.periodId)) { "Two-source result verification or manual adjudication is required before settlement" }
         require(getDrawResults(snapshot.periodId).isNotEmpty()) { "Draw results are required before settlement" }
         require(getSettlementSnapshot(snapshot.periodId) == null) { "Settlement snapshot already exists for this period" }
         val rates = getPayoutRateSettings() ?: error("Payout rates must be configured before settlement")
@@ -569,7 +570,7 @@ abstract class LottoDao {
         require(expectedLength > 0 && result.winningNumber.length == expectedLength) {
             "Only GLO first-prize top and official last-two results are supported"
         }
-        require(result.sourceLabel.isNotBlank()) { "Result source is required" }
+        require(result.sourceLabel.startsWith("AUTO-COMPARED") || result.sourceLabel.startsWith("MANUAL-GLO")) { "Result must be confirmed by matching public sources or manual GLO verification" }
         val period = getPeriod(result.periodId) ?: error("Draw period not found")
         require(period.status == "CLOSED") { "Results can only be recorded for a closed draw period" }
         require(getDrawResults(result.periodId).none { it.resultType == result.resultType }) {
@@ -596,6 +597,80 @@ abstract class LottoDao {
         }
         postDrawResult(topResult, topAudit)
         postDrawResult(bottomResult, bottomAudit)
+    }
+
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract fun insertDrawSourceCheck(check: DrawSourceCheckEntity)
+
+    @Query("SELECT * FROM draw_source_checks WHERE periodId = :periodId ORDER BY fetchedAtEpochMillis DESC")
+    abstract fun getDrawSourceChecks(periodId: String): List<DrawSourceCheckEntity>
+
+    @Transaction
+    open fun postComparedResults(
+        periodId: String,
+        topResult: DrawResultEntity,
+        bottomResult: DrawResultEntity,
+        topAudit: AuditEventEntity,
+        bottomAudit: AuditEventEntity
+    ) {
+        val latest = getDrawSourceChecks(periodId).groupBy { it.sourceId }
+            .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
+        val first = latest["LOTTERYCHECKS"] ?: error("LotteryChecks result is missing")
+        val second = latest["HUAYREVIEW"] ?: error("HuayReview result is missing")
+        require(first.drawDateIso == second.drawDateIso &&
+            first.firstPrizeNumber == second.firstPrizeNumber && first.twoBottomNumber == second.twoBottomNumber) {
+            "Public source results do not match; settlement is blocked"
+        }
+        require(topResult.periodId == periodId && bottomResult.periodId == periodId)
+        require(topResult.resultType == "THREE_TOP" && topResult.winningNumber == first.threeTopNumber)
+        require(bottomResult.resultType == "TWO_BOTTOM" && bottomResult.winningNumber == first.twoBottomNumber)
+        postDrawResult(topResult, topAudit)
+        postDrawResult(bottomResult, bottomAudit)
+    }
+
+    @Transaction
+    open fun postManualVerifiedResults(
+        periodId: String,
+        firstPrizeNumber: String,
+        twoBottomNumber: String,
+        topAudit: AuditEventEntity,
+        bottomAudit: AuditEventEntity,
+        now: Long
+    ) {
+        require(firstPrizeNumber.length == 6 && firstPrizeNumber.all { it in '0'..'9' }) { "รางวัลที่ 1 ต้องมี 6 หลัก" }
+        require(twoBottomNumber.length == 2 && twoBottomNumber.all { it in '0'..'9' }) { "เลขท้าย 2 ตัวต้องมี 2 หลัก" }
+        val latest = getDrawSourceChecks(periodId).groupBy { it.sourceId }
+            .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
+        val first = latest["LOTTERYCHECKS"] ?: error("ยังไม่มีผลจาก LotteryChecks")
+        val second = latest["HUAYREVIEW"] ?: error("ยังไม่มีผลจาก HuayReview")
+        require(first.drawDateIso == second.drawDateIso &&
+            (first.firstPrizeNumber != second.firstPrizeNumber || first.twoBottomNumber != second.twoBottomNumber)) {
+            "ไม่สามารถกรอกผลแทนได้เมื่อสองเว็บไซต์ตรงกัน"
+        }
+        val top = DrawResultEntity(java.util.UUID.randomUUID().toString(), periodId, "THREE_TOP",
+            firstPrizeNumber.takeLast(3), "MANUAL-GLO • ผู้ใช้ตรวจสอบจากเว็บไซต์ GLO ด้วยตนเอง • รางวัลที่ 1 " + firstPrizeNumber, now, now)
+        val bottom = DrawResultEntity(java.util.UUID.randomUUID().toString(), periodId, "TWO_BOTTOM",
+            twoBottomNumber, "MANUAL-GLO • ผู้ใช้ตรวจสอบจากเว็บไซต์ GLO ด้วยตนเอง", now, now)
+        postDrawResult(top, topAudit.copy(entityId = top.resultId,
+            details = "Manual GLO verification; first prize=" + firstPrizeNumber + "; THREE_TOP=" + firstPrizeNumber.takeLast(3) + "; TWO_BOTTOM=" + twoBottomNumber))
+        postDrawResult(bottom, bottomAudit.copy(entityId = bottom.resultId,
+            details = "Manual GLO verification; TWO_BOTTOM=" + twoBottomNumber))
+    }
+
+    fun isResultVerificationComplete(periodId: String): Boolean {
+        val latest = getDrawSourceChecks(periodId).groupBy { it.sourceId }
+            .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
+        val first = latest["LOTTERYCHECKS"] ?: return false
+        val second = latest["HUAYREVIEW"] ?: return false
+        if (first.drawDateIso != second.drawDateIso) return false
+        val results = getDrawResults(periodId)
+        if (first.firstPrizeNumber == second.firstPrizeNumber && first.twoBottomNumber == second.twoBottomNumber) {
+            return results.any { it.resultType == "THREE_TOP" && it.sourceLabel.startsWith("AUTO-COMPARED") } &&
+                results.any { it.resultType == "TWO_BOTTOM" && it.sourceLabel.startsWith("AUTO-COMPARED") }
+        }
+        return results.any { it.resultType == "THREE_TOP" && it.sourceLabel.startsWith("MANUAL-GLO") } &&
+            results.any { it.resultType == "TWO_BOTTOM" && it.sourceLabel.startsWith("MANUAL-GLO") }
     }
 
     @Query("SELECT * FROM draw_results WHERE periodId = :periodId ORDER BY importedAtEpochMillis DESC")
