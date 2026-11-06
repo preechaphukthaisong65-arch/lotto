@@ -41,6 +41,19 @@ class PayoutCalculatorTest {
     }
 
     @Test
+    fun blocksDuplicatePayoutWhenOneLineMatchesMultipleResults() {
+        val snapshot = SettlementSnapshotEntity("s", "p", 7_000L, 7_000L, 50_000L, 10_000L, 1L, 1L)
+        val line = SaleLineEntity("same-line", "doc", "p", "123", "THREE_TOP", 100L, false)
+        val matches = listOf(
+            WinningLineMatch("r1", "THREE_TOP", "123", "THREE_TOP", listOf(line)),
+            WinningLineMatch("r2", "THREE_TOP", "123", "THREE_TOP", listOf(line))
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            PayoutCalculator.calculatePeriod(matches, snapshot, 100L)
+        }
+    }
+
+    @Test
     fun rejectsNegativeStakeAndUnsupportedPayoutCategory() {
         assertThrows(IllegalArgumentException::class.java) {
             PayoutCalculator.calculateLinePayoutSatang(-1L, 7_000L, false)
