@@ -1456,7 +1456,7 @@ class MainActivity : Activity() {
     private fun showSettings() {
         base("ตั้งค่าอัตราจ่าย")
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
-        addText(currentBody, "อัตราจ่ายเป็นตัวคูณต่อเงินเดิมพัน 1 บาท เก็บเป็นทศนิยม 2 ตำแหน่ง และจะใช้กับงวดใหม่เมื่อมีระบบบันทึกการชำระผล", 13, ink)
+        addText(currentBody, "อัตราจ่ายเป็นตัวคูณต่อเงินเดิมพัน 1 บาท เก็บเป็นทศนิยม 2 ตำแหน่ง และจะตรึงไว้เป็น snapshot ของแต่ละงวดเมื่อบันทึกผล", 13, ink)
         addText(currentBody, "กำหนดอัตราจ่ายแยกเฉพาะ 3 ตัวบน และ 3 ตัวโต๊ด", 13, navy)
         io.execute {
             val current = database.lottoDao().getPayoutRateSettings()
