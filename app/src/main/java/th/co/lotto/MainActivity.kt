@@ -308,13 +308,42 @@ class MainActivity : Activity() {
         base("ลูกค้า")
         addButton(currentBody, "＋ เพิ่มลูกค้า") { createCustomerDialog() }
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
+        val search = EditText(this).apply {
+            hint = "ค้นหาชื่อ เบอร์โทร หรือข้อมูลระบุตัวตน"
+            setSingleLine(true)
+        }
+        currentBody.addView(search)
         io.execute {
             val customers = database.lottoDao().getCustomers()
             runOnUiThread {
-                if (customers.isEmpty()) addText(currentBody, "ยังไม่มีข้อมูลลูกค้า", 14, ink)
-                customers.forEach { c ->
-                    addCard(currentBody, c.displayName, "${c.customerType} • ${c.phone ?: "ไม่ระบุเบอร์โทร"}") { }
+                val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                currentBody.addView(results)
+                fun render(query: String) {
+                    results.removeAllViews()
+                    val normalized = query.trim()
+                    val filtered = customers.filter { customer ->
+                        normalized.isBlank() ||
+                            customer.displayName.contains(normalized, ignoreCase = true) ||
+                            customer.phone.orEmpty().contains(normalized, ignoreCase = true) ||
+                            customer.identityNote.orEmpty().contains(normalized, ignoreCase = true)
+                    }
+                    if (filtered.isEmpty()) {
+                        addText(results, if (customers.isEmpty()) "ยังไม่มีข้อมูลลูกค้า" else "ไม่พบลูกค้าที่ค้นหา", 14, ink)
+                    }
+                    filtered.forEach { customer ->
+                        val typeLabel = if (customer.customerType == "CREDIT") "เงินเชื่อ" else "เงินสด"
+                        addCard(results, customer.displayName,
+                            "$typeLabel • ${customer.phone ?: "ไม่ระบุเบอร์โทร"}") { }
+                    }
                 }
+                render("")
+                search.addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                        render(s?.toString().orEmpty())
+                    }
+                    override fun afterTextChanged(s: Editable?) = Unit
+                })
             }
         }
     }
