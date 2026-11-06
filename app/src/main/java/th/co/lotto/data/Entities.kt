@@ -71,7 +71,9 @@ data class SaleCancellationEntity(
     val documentId: String,
     val originalAmountSatang: Long,
     val reason: String,
-    val cancelledAtEpochMillis: Long
+    val cancelledAtEpochMillis: Long,
+    /** Actual cash physically returned to the customer; zero when no cash was received/returned. */
+    val cashRefundedSatang: Long = 0L
 )
 
 @Entity(
