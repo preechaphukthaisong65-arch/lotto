@@ -1291,9 +1291,15 @@ class MainActivity : Activity() {
                     .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
                 val first = latest["LOTTERYCHECKS"]
                 val second = latest["HUAYREVIEW"]
+                val expectedDrawDate = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+                    timeZone = java.util.TimeZone.getTimeZone("Asia/Bangkok")
+                }.format(Date(drawDate))
+                val datesMatchExpectedPeriod = first != null && second != null &&
+                    first.drawDateIso == expectedDrawDate && second.drawDateIso == expectedDrawDate &&
+                    first.drawDateIso == second.drawDateIso
                 val comparable = failures.isEmpty() && first != null && second != null &&
                     first.checkStatus == "SUCCESS" && second.checkStatus == "SUCCESS" &&
-                    first.drawDateIso == second.drawDateIso &&
+                    datesMatchExpectedPeriod &&
                     first.fetchedAtEpochMillis >= System.currentTimeMillis() - 10 * 60 * 1000L &&
                     second.fetchedAtEpochMillis >= System.currentTimeMillis() - 10 * 60 * 1000L
                 if (comparable && first != null && second != null &&
@@ -1319,15 +1325,17 @@ class MainActivity : Activity() {
                 runOnUiThread {
                     if (failures.isNotEmpty()) {
                         Toast.makeText(this, failures.joinToString("\n") + "\nยังยืนยันผลไม่ได้และยังคำนวณจ่ายไม่ได้", Toast.LENGTH_LONG).show()
-                    } else if (failures.isEmpty() && first != null && second != null && first.drawDateIso == second.drawDateIso &&
+                    } else if (failures.isEmpty() && first != null && second != null && datesMatchExpectedPeriod &&
                         (first.firstPrizeNumber != second.firstPrizeNumber || first.twoBottomNumber != second.twoBottomNumber)) {
                         showManualResultDialog(period, first.firstPrizeNumber, first.twoBottomNumber,
                             second.firstPrizeNumber, second.twoBottomNumber)
-                    } else if (failures.isEmpty() && first != null && second != null &&
+                    } else if (failures.isEmpty() && first != null && second != null && datesMatchExpectedPeriod &&
                         first.firstPrizeNumber == second.firstPrizeNumber && first.twoBottomNumber == second.twoBottomNumber) {
                         // Matching sources are confirmed silently; details are shown in the results screen.
                     } else {
-                        Toast.makeText(this, "ยังตรวจสอบผลจากทั้งสองเว็บไซต์ไม่ครบ", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this,
+                            "วันที่ออกรางวัลจากเว็บไซต์ไม่ตรงกับวันที่กำหนดของงวด ($expectedDrawDate) หรือข้อมูลยังไม่ครบ • ระงับการยืนยันและคำนวณจ่าย",
+                            Toast.LENGTH_LONG).show()
                     }
                     showResults(period.periodId)
                 }
@@ -1475,11 +1483,21 @@ class MainActivity : Activity() {
                         startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://creativecommons.org/licenses/by/4.0/")))
                     }
                     addText(resultList, "การใช้ข้อมูล HuayReview: CC BY 4.0 • แปลงผลรางวัลที่ 1 เป็นเลขท้าย 3 ตัวและ 2 ตัวบนตามกติกาของแอป", 11, 0xFF526171.toInt())
-                    addText(resultList, "LotteryChecks: ${lc.firstPrizeNumber} / ${lc.twoBottomNumber} • HuayReview: ${hr.firstPrizeNumber} / ${hr.twoBottomNumber}", 12, ink)
-                    if (lc.firstPrizeNumber != hr.firstPrizeNumber || lc.twoBottomNumber != hr.twoBottomNumber) {
+                    val configuredDate = dao.getPeriod(periodId)?.drawDateEpochMillis?.let {
+                        SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+                            timeZone = java.util.TimeZone.getTimeZone("Asia/Bangkok")
+                        }.format(Date(it))
+                    } ?: "ไม่กำหนด"
+                    addText(resultList, "วันออกรางวัลตามงวด: $configuredDate", 13, navy)
+                    addText(resultList, "LotteryChecks • วันงวด ${lc.drawDateIso}: ${lc.firstPrizeNumber} / ${lc.twoBottomNumber}", 12, ink)
+                    addText(resultList, "HuayReview • วันงวด ${hr.drawDateIso}: ${hr.firstPrizeNumber} / ${hr.twoBottomNumber}", 12, ink)
+                    val sourceDatesMatch = lc.drawDateIso == hr.drawDateIso && lc.drawDateIso == configuredDate
+                    if (!sourceDatesMatch) {
+                        addText(resultList, "วันที่จากสองเว็บไซต์ไม่ตรงกัน หรือไม่ตรงกับวันงวดที่กำหนด • ระงับการยืนยันผลและคำนวณจ่าย", 13, 0xFF9B2C2C.toInt())
+                    } else if (lc.firstPrizeNumber != hr.firstPrizeNumber || lc.twoBottomNumber != hr.twoBottomNumber) {
                         addText(resultList, if (verificationComplete) "ผลไม่ตรงกัน แต่ผู้ใช้ตรวจสอบ GLO และยืนยันผลแล้ว" else "ผลสองเว็บไซต์ไม่ตรงกัน • ระงับการคำนวณจ่ายและสรุปยอด", 13, 0xFF9B2C2C.toInt())
                     } else {
-                        addText(resultList, if (verificationComplete) "ผลสองเว็บไซต์ตรงกัน • ยืนยันอัตโนมัติแล้ว" else "ผลตรงกัน แต่ยังไม่มีผลยืนยันที่บันทึก", 13, navy)
+                        addText(resultList, if (verificationComplete) "วันที่และเลขรางวัลจากสองเว็บไซต์ตรงกัน • ยืนยันอัตโนมัติแล้ว" else "วันที่และเลขรางวัลตรงกัน แต่ยังไม่มีผลยืนยันที่บันทึก", 13, navy)
                     }
                 }
                 if (!verificationComplete) addText(resultList, "ยังไม่อนุญาตให้คำนวณจ่ายหรือสรุปยอด", 13, 0xFF9B2C2C.toInt())
