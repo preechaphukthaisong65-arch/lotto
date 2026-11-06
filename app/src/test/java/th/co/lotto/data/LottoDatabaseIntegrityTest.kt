@@ -68,6 +68,15 @@ class LottoDatabaseIntegrityTest {
         )
         dao.createSettlementSnapshot(openSnapshot, openAudit)
         assertEquals(1L, dao.getSettlementSnapshot("period-settlement")?.payoutConfigVersion)
+        val changedSettings = settings.copy(
+            twoDigitRateHundredths = 8_000L,
+            configVersion = 1L,
+            updatedAtEpochMillis = 4L
+        )
+        dao.savePayoutRateSettings(changedSettings,
+            AuditEventEntity("settings-update-audit", "PAYOUT_SETTINGS", "1", "UPDATED", "test", 4L))
+        assertEquals(7_000L, dao.getSettlementSnapshot("period-settlement")?.twoDigitRateHundredths)
+        assertEquals(8_000L, dao.getPayoutRateSettings()?.twoDigitRateHundredths)
         assertThrows(IllegalArgumentException::class.java) {
             dao.createSettlementSnapshot(openSnapshot.copy(settlementId = "duplicate"),
                 openAudit.copy(eventId = "duplicate-audit", entityId = "duplicate"))

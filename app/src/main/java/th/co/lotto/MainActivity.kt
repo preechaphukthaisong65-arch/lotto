@@ -1090,10 +1090,18 @@ class MainActivity : Activity() {
                     val selected = periods[picker.selectedItemPosition]
                     io.execute {
                         val results = dao.getDrawResults(selected.periodId)
+                        val settlementSnapshot = dao.getSettlementSnapshot(selected.periodId)
                         val documents = dao.getSalesForPeriod(selected.periodId)
                         val saleLines = documents.flatMap { dao.getLinesForDocument(it.documentId) }
                         val matches = th.co.lotto.DrawResultMatcher.findMatches(results, saleLines)
                         runOnUiThread {
+                            if (settlementSnapshot == null) {
+                                addText(resultList, "อัตราจ่ายงวดนี้: ยังไม่ได้บันทึก snapshot", 12, 0xFF9B2C2C.toInt())
+                            } else {
+                                addText(resultList,
+                                    "อัตราจ่ายที่ตรึงไว้ • รุ่น ${settlementSnapshot.payoutConfigVersion} • 2 ตัว ${BigDecimal.valueOf(settlementSnapshot.twoDigitRateHundredths, 2).stripTrailingZeros().toPlainString()} • 3 บน ${BigDecimal.valueOf(settlementSnapshot.threeTopRateHundredths, 2).stripTrailingZeros().toPlainString()} • 3 ล่าง ${BigDecimal.valueOf(settlementSnapshot.threeBottomRateHundredths, 2).stripTrailingZeros().toPlainString()} • โต๊ด ${BigDecimal.valueOf(settlementSnapshot.threeToadRateHundredths, 2).stripTrailingZeros().toPlainString()}",
+                                    12, navy)
+                            }
                             if (results.isEmpty()) addText(resultList, "ยังไม่มีผลหวยที่บันทึกในงวดนี้", 13, ink)
                             results.forEach { result ->
                                 val verified = if (result.verifiedAtEpochMillis == null) "ยังไม่ยืนยัน" else
