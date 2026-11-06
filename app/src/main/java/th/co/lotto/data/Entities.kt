@@ -89,6 +89,22 @@ data class NumberLimitRuleEntity(
     val enabled: Boolean
 )
 
+@Entity(
+    tableName = "number_block_rules",
+    foreignKeys = [ForeignKey(entity = DrawPeriodEntity::class, parentColumns = ["periodId"], childColumns = ["periodId"], onDelete = ForeignKey.RESTRICT)],
+    indices = [Index(value = ["periodId", "blockCategory", "numberText"], unique = true)]
+)
+data class NumberBlockRuleEntity(
+    @PrimaryKey val ruleId: String,
+    val periodId: String,
+    /** TWO_DIGIT, THREE_STRAIGHT, or THREE_TOAD */
+    val blockCategory: String,
+    val numberText: String,
+    val blocked: Boolean,
+    val createdAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long
+)
+
 @Entity(tableName = "draw_results", indices = [Index(value = ["periodId"])])
 data class DrawResultEntity(
     @PrimaryKey val resultId: String,
