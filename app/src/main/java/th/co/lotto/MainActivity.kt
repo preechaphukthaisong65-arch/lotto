@@ -1296,7 +1296,8 @@ class MainActivity : Activity() {
                     first.drawDateIso == second.drawDateIso &&
                     first.fetchedAtEpochMillis >= System.currentTimeMillis() - 10 * 60 * 1000L &&
                     second.fetchedAtEpochMillis >= System.currentTimeMillis() - 10 * 60 * 1000L
-                if (comparable && first!!.firstPrizeNumber == second!!.firstPrizeNumber &&
+                if (comparable && first != null && second != null &&
+                    first.firstPrizeNumber == second.firstPrizeNumber &&
                     first.twoBottomNumber == second.twoBottomNumber &&
                     !dao.isResultVerificationComplete(period.periodId)) {
                     val now = System.currentTimeMillis()
