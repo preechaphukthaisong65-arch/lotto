@@ -13,6 +13,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import java.time.LocalDate
+import java.time.ZoneId
 
 @RunWith(RobolectricTestRunner::class)
 class LottoDatabaseIntegrityTest {
@@ -237,6 +239,46 @@ class LottoDatabaseIntegrityTest {
 
         assertEquals(1, dao.documentExists("sale-1"))
         assertEquals(1_500L, dao.getSoldAmountForNumber("period-1", "12", "TWO_TOP"))
+    }
+
+    @Test
+    fun scheduleClosesCurrentPeriodAtFourteenAndOpensPreparedPeriodAtEighteen() {
+        val zone = ZoneId.of("Asia/Bangkok")
+        val drawDate = LocalDate.of(2026, 11, 6).atStartOfDay(zone).toInstant().toEpochMilli()
+        val closeAt = PeriodSchedule.closeAt(drawDate, zone)
+        val openAt = PeriodSchedule.openNextAt(drawDate, zone)
+        dao.insertPeriod(DrawPeriodEntity(
+            "period-current", "งวดปัจจุบัน", drawDate, "OPEN", null, 1L
+        ))
+        dao.insertPeriod(DrawPeriodEntity(
+            "period-next", "งวดถัดไป",
+            LocalDate.of(2026, 11, 16).atStartOfDay(zone).toInstant().toEpochMilli(),
+            "PREPARED", null, 2L, openAt
+        ))
+
+        PeriodSchedule.advance(dao, closeAt, zone)
+        assertEquals("CLOSED", dao.getPeriod("period-current")?.status)
+        assertEquals(null, dao.getOpenPeriod())
+        assertEquals("PREPARED", dao.getPeriod("period-next")?.status)
+
+        PeriodSchedule.advance(dao, openAt, zone)
+        assertEquals("OPEN", dao.getPeriod("period-next")?.status)
+        assertEquals("period-next", dao.getOpenPeriod()?.periodId)
+        assertEquals(closeAt, dao.getPeriod("period-current")?.salesCloseEpochMillis)
+    }
+
+    @Test
+    fun overduePreparedPeriodCanCatchUpWhenAppReturnsAfterEighteen() {
+        val zone = ZoneId.of("Asia/Bangkok")
+        val drawDate = LocalDate.of(2026, 11, 6).atStartOfDay(zone).toInstant().toEpochMilli()
+        val openAt = PeriodSchedule.openNextAt(drawDate, zone)
+        dao.insertPeriod(DrawPeriodEntity(
+            "period-next", "งวดถัดไป", null, "PREPARED", null, 1L, openAt
+        ))
+
+        PeriodSchedule.advance(dao, openAt + 60_000L, zone)
+
+        assertEquals("period-next", dao.getOpenPeriod()?.periodId)
     }
 
     private fun period(id: String) = DrawPeriodEntity(
