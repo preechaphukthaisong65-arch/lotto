@@ -117,6 +117,33 @@ class LottoDatabaseIntegrityTest {
     }
 
     @Test
+    fun drawResultsRequireClosedPeriodAndAreImmutableWithAudit() {
+        dao.insertPeriod(period("period-1"))
+        val openResult = DrawResultEntity(
+            "result-open", "period-1", "TWO_BOTTOM", "12", "manual", null, 10L
+        )
+        val openAudit = AuditEventEntity(
+            "result-open-event", "DRAW_RESULT", "result-open", "POSTED", "test", 10L
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.postDrawResult(openResult, openAudit)
+        }
+        database.openHelper.writableDatabase.execSQL("UPDATE draw_periods SET status = 'CLOSED' WHERE periodId = 'period-1'")
+        val result = openResult.copy(resultId = "result-closed", verifiedAtEpochMillis = 20L, importedAtEpochMillis = 20L)
+        val audit = openAudit.copy(eventId = "result-event", entityId = "result-closed", createdAtEpochMillis = 20L)
+        dao.postDrawResult(result, audit)
+        assertEquals(1, dao.getDrawResults("period-1").size)
+        assertEquals(listOf("POSTED"), dao.getAuditEvents("result-closed").map { it.action })
+        val sql = database.openHelper.writableDatabase
+        assertThrows(SQLiteException::class.java) {
+            sql.execSQL("UPDATE draw_results SET winningNumber = '99' WHERE resultId = 'result-closed'")
+        }
+        assertThrows(SQLiteException::class.java) {
+            sql.execSQL("DELETE FROM draw_results WHERE resultId = 'result-closed'")
+        }
+    }
+
+    @Test
     fun saleHistoryCanSearchByDocumentOrNumberAndFilterByPeriod() {
         dao.insertPeriod(period("period-1"))
         val first = SaleDocumentEntity("document-alpha", "period-1", null, "CASH", 2_000L, 10L, "Asia/Bangkok")
