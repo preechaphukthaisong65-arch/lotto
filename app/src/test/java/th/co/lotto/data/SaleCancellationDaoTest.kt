@@ -117,23 +117,43 @@ class SaleCancellationDaoTest {
     }
 
     @Test
-    fun databaseRejectsUnsupportedSaleCategoriesAndTwoDigitNumbers() {
+    fun databaseAcceptsBothTwoDigitCategoriesAndRejectsUnsupportedCategoriesOrLengths() {
         val dao = createDatabase()
         val now = System.currentTimeMillis()
         val periodId = "period-category"
         dao.insertPeriod(DrawPeriodEntity(periodId, "งวดประเภท", now + 86_400_000L, "OPEN", null, now, null, now))
 
+        val validLines = listOf(
+            SaleLineEntity("valid-top-line", "valid-top-sale", periodId, "05", "TWO_TOP", 1_000L, false),
+            SaleLineEntity("valid-bottom-line", "valid-bottom-sale", periodId, "01", "TWO_BOTTOM", 1_000L, false)
+        )
+        validLines.forEachIndexed { index, line ->
+            val documentId = if (index == 0) "valid-top-sale" else "valid-bottom-sale"
+            dao.postSale(
+                SaleDocumentEntity(documentId, periodId, null, "CASH", 1_000L, now + index, "Asia/Bangkok"),
+                listOf(line),
+                AuditEventEntity("valid-audit-$index", "SALE_DOCUMENT", documentId, "POSTED", "valid two-digit category", now + index)
+            )
+        }
+
+        assertEquals(1, dao.searchSales(periodId, "").size.let { count ->
+            // Each saved document has one sale line; history returns documents.
+            count
+        })
+        assertEquals(1_000L, dao.getSoldAmountForNumber(periodId, "05", "TWO_TOP"))
+        assertEquals(1_000L, dao.getSoldAmountForNumber(periodId, "01", "TWO_BOTTOM"))
+
         val invalidLines = listOf(
-            SaleLineEntity("bad-2", "bad-sale-2", periodId, "12", "TWO_TOP", 1_000L, false),
-            SaleLineEntity("bad-bottom", "bad-sale-bottom", periodId, "123", "THREE_BOTTOM", 1_000L, false)
+            SaleLineEntity("bad-length", "bad-sale-length", periodId, "123", "TWO_TOP", 1_000L, false),
+            SaleLineEntity("bad-category", "bad-sale-category", periodId, "123", "THREE_BOTTOM", 1_000L, false)
         )
         invalidLines.forEachIndexed { index, line ->
-            val documentId = if (index == 0) "bad-sale-2" else "bad-sale-bottom"
+            val documentId = if (index == 0) "bad-sale-length" else "bad-sale-category"
             assertThrows(IllegalArgumentException::class.java) {
                 dao.postSale(
-                    SaleDocumentEntity(documentId, periodId, null, "CASH", 1_000L, now, "Asia/Bangkok"),
+                    SaleDocumentEntity(documentId, periodId, null, "CASH", 1_000L, now + 10_000L + index, "Asia/Bangkok"),
                     listOf(line),
-                    AuditEventEntity("bad-audit-$index", "SALE_DOCUMENT", documentId, "POSTED", "invalid test", now)
+                    AuditEventEntity("bad-audit-$index", "SALE_DOCUMENT", documentId, "POSTED", "invalid test", now + 10_000L + index)
                 )
             }
         }
