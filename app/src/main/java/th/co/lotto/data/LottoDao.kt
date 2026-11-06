@@ -515,6 +515,14 @@ abstract class LottoDao {
         require(result.winningNumber.isNotBlank() && result.winningNumber.all { it in '0'..'9' }) {
             "Winning number must contain digits only"
         }
+        val expectedLength = when (result.resultType.trim().uppercase(java.util.Locale.ROOT)) {
+            "TWO_TOP", "TWO_BOTTOM", "2 ตัวบน", "2 ตัวล่าง" -> 2
+            "THREE_TOP", "THREE_BOTTOM", "3 ตัวบน", "3 ตัวล่าง" -> 3
+            else -> 0
+        }
+        require(expectedLength > 0 && result.winningNumber.length == expectedLength) {
+            "Result type must be a supported 2- or 3-digit category and number length must match"
+        }
         require(result.sourceLabel.isNotBlank()) { "Result source is required" }
         val period = getPeriod(result.periodId) ?: error("Draw period not found")
         require(period.status == "CLOSED") { "Results can only be recorded for a closed draw period" }

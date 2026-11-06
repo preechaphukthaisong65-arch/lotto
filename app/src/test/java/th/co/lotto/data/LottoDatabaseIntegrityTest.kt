@@ -51,6 +51,16 @@ class LottoDatabaseIntegrityTest {
     }
 
     @Test
+    fun drawResultNumberLengthMustMatchSupportedResultCategory() {
+        dao.insertPeriod(period("period-result-validation"))
+        database.openHelper.writableDatabase.execSQL("UPDATE draw_periods SET status = 'CLOSED' WHERE periodId = 'period-result-validation'")
+        val invalid = DrawResultEntity("bad-result", "period-result-validation", "2 ตัวบน", "123", "manual", null, 1L)
+        val audit = AuditEventEntity("bad-result-audit", "DRAW_RESULT", "bad-result", "POSTED", "test", 1L)
+        assertThrows(IllegalArgumentException::class.java) { dao.postDrawResult(invalid, audit) }
+        assertEquals(0, dao.getDrawResults("period-result-validation").size)
+    }
+
+    @Test
     fun settlementSnapshotRequiresClosedPeriodAndIsImmutable() {
         dao.insertPeriod(period("period-settlement"))
         val settings = PayoutRateSettingsEntity(1, 7_000L, 50_000L, 50_000L, 10_000L, 1L, 1L)

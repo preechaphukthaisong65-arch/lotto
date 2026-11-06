@@ -1192,7 +1192,10 @@ class MainActivity : Activity() {
                         Toast.makeText(this, "ต้องปิดงวดก่อนจึงจะบันทึกผลหวยได้", Toast.LENGTH_LONG).show()
                         return@addButton
                     }
-                    val type = EditText(this).apply { hint = "ประเภทผล (เช่น รางวัลที่ 1, 2 ตัวล่าง)" }
+                    val type = Spinner(this).apply {
+                        adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
+                            listOf("2 ตัวบน", "2 ตัวล่าง", "3 ตัวบน", "3 ตัวล่าง"))
+                    }
                     val number = EditText(this).apply {
                         hint = "เลขผลรางวัล"
                         inputType = android.text.InputType.TYPE_CLASS_NUMBER
@@ -1208,12 +1211,12 @@ class MainActivity : Activity() {
                         .setNegativeButton("กลับ", null).setPositiveButton("บันทึก", null).create()
                     dialog.setOnShowListener {
                         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                            val resultType = type.text.toString().trim()
+                            val resultType = type.selectedItem.toString()
                             val winningNumber = number.text.toString().trim()
                             val sourceLabel = source.text.toString().trim()
-                            if (resultType.isBlank()) { type.error = "กรุณาระบุประเภทผล"; return@setOnClickListener }
-                            if (winningNumber.isBlank() || !winningNumber.all { it in '0'..'9' }) {
-                                number.error = "กรุณากรอกตัวเลขให้ถูกต้อง"; return@setOnClickListener
+                            val expectedLength = if (resultType.startsWith("2")) 2 else 3
+                            if (winningNumber.length != expectedLength || !winningNumber.all { it in '0'..'9' }) {
+                                number.error = "กรุณากรอกเลข $expectedLength หลักให้ถูกต้อง"; return@setOnClickListener
                             }
                             if (sourceLabel.isBlank()) { source.error = "กรุณาระบุแหล่งที่มา"; return@setOnClickListener }
                             val now = System.currentTimeMillis()
