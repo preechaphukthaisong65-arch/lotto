@@ -1,5 +1,6 @@
 package th.co.lotto.data
 
+import android.database.sqlite.SQLiteException
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -64,6 +65,16 @@ class SaleCancellationDaoTest {
         assertEquals(1, dao.searchSales(periodId, "").size)
         assertEquals("บันทึกเลขผิด", dao.getSaleCancellation(documentId)?.reason)
         assertNotNull(dao.getAuditEvents("cancel-1").firstOrNull())
+        assertThrows(SQLiteException::class.java) {
+            database!!.openHelper.writableDatabase.execSQL(
+                "UPDATE sale_cancellations SET reason = 'แก้ไข' WHERE cancellationId = 'cancel-1'"
+            )
+        }
+        assertThrows(SQLiteException::class.java) {
+            database!!.openHelper.writableDatabase.execSQL(
+                "DELETE FROM sale_cancellations WHERE cancellationId = 'cancel-1'"
+            )
+        }
         assertThrows(IllegalArgumentException::class.java) {
             dao.cancelSaleDocument(
                 cancellation.copy(cancellationId = "cancel-2"),
