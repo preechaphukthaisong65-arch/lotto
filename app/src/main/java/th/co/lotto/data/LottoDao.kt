@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 
 @Dao
 abstract class LottoDao {
@@ -194,6 +195,57 @@ abstract class LottoDao {
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract fun insertLimitRule(rule: NumberLimitRuleEntity)
+
+    @Update
+    abstract fun updateLimitRule(rule: NumberLimitRuleEntity)
+
+    @Query("""
+        SELECT * FROM number_limit_rules
+        WHERE periodId = :periodId AND numberLength = :numberLength
+          AND betCategory = :betCategory AND numberText = :numberText
+        LIMIT 1
+    """)
+    abstract fun getLimitRuleForManagement(
+        periodId: String, numberLength: Int, betCategory: String, numberText: String
+    ): NumberLimitRuleEntity?
+
+    @Transaction
+    open fun saveLimitRule(rule: NumberLimitRuleEntity) {
+        require(rule.ruleId.isNotBlank()) { "Limit rule ID is required" }
+        require(rule.numberText.length in 2..3 && rule.numberText.all { it in '0'..'9' }) {
+            "Limit number must contain 2 or 3 ASCII digits"
+        }
+        val validCategories = if (rule.numberLength == 2) {
+            setOf("TWO_TOP", "TWO_BOTTOM")
+        } else if (rule.numberLength == 3) {
+            setOf("THREE_TOP", "THREE_BOTTOM", "THREE_TOAD")
+        } else {
+            emptySet()
+        }
+        require(rule.numberLength == rule.numberText.length && rule.betCategory in validCategories) {
+            "Limit category does not match number length"
+        }
+        require(rule.maximumAmountSatang > 0L) { "Limit amount must be positive" }
+        val period = getPeriod(rule.periodId) ?: error("Draw period not found")
+        require(period.status == "OPEN") { "Limits can only be changed for an open period" }
+
+        val sold = getSoldAmountForNumber(rule.periodId, rule.numberText, rule.betCategory)
+        require(rule.maximumAmountSatang >= sold) {
+            "Limit cannot be lower than the amount already sold ($sold satang)"
+        }
+
+        val existing = getLimitRuleForManagement(
+            rule.periodId, rule.numberLength, rule.betCategory, rule.numberText
+        )
+        if (existing == null) {
+            insertLimitRule(rule)
+        } else {
+            updateLimitRule(existing.copy(
+                maximumAmountSatang = rule.maximumAmountSatang,
+                enabled = rule.enabled
+            ))
+        }
+    }
 
     @Query("SELECT * FROM number_limit_rules WHERE periodId = :periodId ORDER BY numberLength, betCategory, numberText")
     abstract fun getLimitRules(periodId: String): List<NumberLimitRuleEntity>
