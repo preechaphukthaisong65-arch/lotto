@@ -17,9 +17,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         NumberLimitRuleEntity::class,
         NumberBlockRuleEntity::class,
         DrawResultEntity::class,
-        AuditEventEntity::class
+        AuditEventEntity::class,
+        PayoutRateSettingsEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -63,6 +64,26 @@ abstract class LottoDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Existing rules default to full payout; historical sale rows are unchanged.
                 db.execSQL("ALTER TABLE number_limit_rules ADD COLUMN halfPayout INTEGER NOT NULL DEFAULT 0")
+                installIntegrityGuards(db)
+            }
+        }
+
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Preserve the first known open time for legacy periods and fence future sales.
+                db.execSQL("ALTER TABLE draw_periods ADD COLUMN openedAtEpochMillis INTEGER")
+                db.execSQL("UPDATE draw_periods SET openedAtEpochMillis = createdAtEpochMillis WHERE status = 'OPEN'")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS payout_rate_settings (
+                        settingsId INTEGER NOT NULL PRIMARY KEY,
+                        twoDigitRateHundredths INTEGER NOT NULL,
+                        threeTopRateHundredths INTEGER NOT NULL,
+                        threeBottomRateHundredths INTEGER NOT NULL,
+                        threeToadRateHundredths INTEGER NOT NULL,
+                        configVersion INTEGER NOT NULL,
+                        updatedAtEpochMillis INTEGER NOT NULL
+                    )
+                """.trimIndent())
                 installIntegrityGuards(db)
             }
         }
@@ -173,7 +194,7 @@ abstract class LottoDatabase : RoomDatabase() {
                 LottoDatabase::class.java,
                 "lotto-local.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)

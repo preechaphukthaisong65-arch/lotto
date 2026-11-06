@@ -118,7 +118,8 @@ class MainActivity : Activity() {
         addCard(currentBody, "เลขอั้นและเลขเต็ม", "กำหนดวงเงินแยกตามประเภทเลข") { showLimits() }
         addCard(currentBody, "ผลหวยและสรุปยอด", "บันทึกผลพร้อมแหล่งที่มาและข้อมูลตรวจสอบ") { showResults() }
         addCard(currentBody, "รายงาน", "รายงานยอดขาย ลูกหนี้ และยอดคงเหลือ") { showReports() }
-        addCard(currentBody, "ตั้งค่าและ PIN", "กำหนดค่าระบบและสิทธิ์การเข้าถึง") { showNotReady("ตั้งค่าและ PIN") }
+        addCard(currentBody, "ตั้งค่าอัตราจ่าย", "กำหนดอัตรา 2 ตัวและ 3 ตัวแยกประเภท") { showSettings() }
+        addCard(currentBody, "PIN และสิทธิ์", "การกำหนดบทบาทและสิทธิ์ยังไม่เปิดใช้") { showNotReady("PIN และสิทธิ์") }
         addCard(currentBody, "สำรองและกู้คืน", "สำรองข้อมูลลงไฟล์ในเครื่อง") { showNotReady("สำรองและกู้คืน") }
     }
 
@@ -1160,6 +1161,76 @@ class MainActivity : Activity() {
                     }
                 }
                 currentBody.addView(results)
+            }
+        }
+    }
+
+
+    private fun showSettings() {
+        base("ตั้งค่าอัตราจ่าย")
+        addButton(currentBody, "กลับหน้าหลัก") { showHome() }
+        addText(currentBody, "อัตราจ่ายเป็นตัวคูณต่อเงินเดิมพัน 1 บาท เก็บเป็นทศนิยม 2 ตำแหน่ง และจะใช้กับงวดใหม่เมื่อมีระบบบันทึกการชำระผล", 13, ink)
+        addText(currentBody, "2 ตัวบนและ 2 ตัวล่างใช้อัตราเดียวกัน ส่วน 3 ตัวบน 3 ตัวล่าง และ 3 ตัวโต๊ดตั้งแยกกัน", 13, navy)
+        io.execute {
+            val current = database.lottoDao().getPayoutRateSettings()
+            runOnUiThread {
+                fun rateText(value: Long?): String =
+                    value?.let { BigDecimal.valueOf(it, 2).stripTrailingZeros().toPlainString() } ?: ""
+                fun rateInput(label: String, value: Long?): EditText {
+                    val field = EditText(this).apply {
+                        hint = label
+                        inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                        setSingleLine(true)
+                        setText(rateText(value))
+                    }
+                    currentBody.addView(TextView(this).apply { text = label; textSize = 14f; setTextColor(ink) })
+                    currentBody.addView(field)
+                    return field
+                }
+                val two = rateInput("อัตรา 2 ตัวบน/ล่าง", current?.twoDigitRateHundredths)
+                val top = rateInput("อัตรา 3 ตัวบน", current?.threeTopRateHundredths)
+                val bottom = rateInput("อัตรา 3 ตัวล่าง", current?.threeBottomRateHundredths)
+                val toad = rateInput("อัตรา 3 ตัวโต๊ด", current?.threeToadRateHundredths)
+                if (current == null) addText(currentBody, "ยังไม่กำหนดอัตรา • กรอกทุกช่องเพื่อเริ่มตั้งค่า", 12, 0xFF9B2C2C.toInt())
+                else addText(currentBody, "เวอร์ชันการตั้งค่า: ${current.configVersion}", 12, 0xFF526171.toInt())
+                addButton(currentBody, "บันทึกอัตราจ่าย") {
+                    try {
+                        fun parseRate(field: EditText): Long {
+                            val value = BigDecimal(field.text.toString().trim())
+                                .multiply(BigDecimal(100)).setScale(0, RoundingMode.UNNECESSARY).longValueExact()
+                            require(value > 0L) { "อัตราจ่ายต้องมากกว่า 0" }
+                            return value
+                        }
+                        val now = System.currentTimeMillis()
+                        val proposed = th.co.lotto.data.PayoutRateSettingsEntity(
+                            settingsId = 1,
+                            twoDigitRateHundredths = parseRate(two),
+                            threeTopRateHundredths = parseRate(top),
+                            threeBottomRateHundredths = parseRate(bottom),
+                            threeToadRateHundredths = parseRate(toad),
+                            configVersion = current?.configVersion ?: 0L,
+                            updatedAtEpochMillis = now
+                        )
+                        val audit = AuditEventEntity(
+                            UUID.randomUUID().toString(), "PAYOUT_SETTINGS", "1",
+                            "UPDATED", "Payout rates changed", now
+                        )
+                        io.execute {
+                            try {
+                                val saved = database.lottoDao().savePayoutRateSettings(proposed, audit)
+                                runOnUiThread {
+                                    Toast.makeText(this, "บันทึกอัตราจ่ายแล้ว • เวอร์ชัน ${saved.configVersion}", Toast.LENGTH_LONG).show()
+                                    showSettings()
+                                }
+                            } catch (e: Exception) {
+                                runOnUiThread { Toast.makeText(this, "บันทึกไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(this, e.message ?: "กรุณากรอกอัตราจ่ายให้ถูกต้อง", Toast.LENGTH_LONG).show()
+                    }
+                }
+                addText(currentBody, "หมายเหตุ: ยังไม่เปิดคำนวณยอดจ่ายรางวัลหรือยอดสุทธิ จนกว่าจะอนุมัติสูตรจ่ายครึ่งและกฎบัญชีตาม SRS 0.2", 12, 0xFF9B2C2C.toInt())
             }
         }
     }

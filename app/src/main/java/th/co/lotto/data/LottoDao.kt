@@ -46,7 +46,7 @@ abstract class LottoDao {
     abstract fun closeOpenPeriod(periodId: String, closedAtEpochMillis: Long): Int
 
     @Query("""
-        UPDATE draw_periods SET status = 'OPEN'
+        UPDATE draw_periods SET status = 'OPEN', openedAtEpochMillis = scheduledOpenEpochMillis
         WHERE periodId = :periodId AND status = 'PREPARED'
           AND scheduledOpenEpochMillis IS NOT NULL
           AND scheduledOpenEpochMillis <= :nowEpochMillis
@@ -124,6 +124,22 @@ abstract class LottoDao {
 
         val period = getPeriod(document.periodId) ?: error("Draw period not found")
         require(period.status == "OPEN") { "Draw period is closed" }
+        val openedAt = period.openedAtEpochMillis ?: period.createdAtEpochMillis
+        require(document.createdAtEpochMillis >= openedAt) {
+            "Backdated sale is not allowed before this period opened"
+        }
+        require(document.createdAtEpochMillis <= System.currentTimeMillis()) {
+            "Sale timestamp cannot be in the future"
+        }
+        val saleZone = runCatching { java.time.ZoneId.of(document.deviceTimeZone) }
+            .getOrDefault(java.time.ZoneId.systemDefault())
+        val scheduledClose = period.drawDateEpochMillis?.let { drawDate ->
+            java.time.Instant.ofEpochMilli(drawDate).atZone(saleZone).toLocalDate()
+                .atTime(java.time.LocalTime.of(14, 0)).atZone(saleZone).toInstant().toEpochMilli()
+        }
+        require(scheduledClose == null || System.currentTimeMillis() < scheduledClose) {
+            "Sales cutoff time has passed"
+        }
         document.correctionOfDocumentId?.let { originalId ->
             val original = getSaleDocument(originalId) ?: error("Original sale document not found")
             require(original.periodId == document.periodId) { "Correction must stay in the original draw period" }
@@ -393,6 +409,37 @@ abstract class LottoDao {
 
     @Query("SELECT * FROM number_limit_rules WHERE periodId = :periodId ORDER BY numberLength, betCategory, numberText")
     abstract fun getLimitRules(periodId: String): List<NumberLimitRuleEntity>
+
+    @Query("SELECT * FROM payout_rate_settings WHERE settingsId = 1 LIMIT 1")
+    abstract fun getPayoutRateSettings(): PayoutRateSettingsEntity?
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract fun insertPayoutRateSettings(settings: PayoutRateSettingsEntity)
+
+    @Update
+    abstract fun updatePayoutRateSettings(settings: PayoutRateSettingsEntity)
+
+    @Transaction
+    open fun savePayoutRateSettings(settings: PayoutRateSettingsEntity, audit: AuditEventEntity): PayoutRateSettingsEntity {
+        require(settings.settingsId == 1) { "Only the singleton payout settings row is supported" }
+        require(listOf(
+            settings.twoDigitRateHundredths,
+            settings.threeTopRateHundredths,
+            settings.threeBottomRateHundredths,
+            settings.threeToadRateHundredths
+        ).all { it > 0L }) { "Every payout rate must be greater than zero" }
+        require(audit.eventId.isNotBlank() && audit.entityType == "PAYOUT_SETTINGS" &&
+            audit.entityId == "1" && audit.action == "UPDATED") {
+            "Payout settings audit event is invalid"
+        }
+        val existing = getPayoutRateSettings()
+        val saved = settings.copy(
+            configVersion = Math.addExact(existing?.configVersion ?: 0L, 1L)
+        )
+        if (existing == null) insertPayoutRateSettings(saved) else updatePayoutRateSettings(saved)
+        insertAuditEvent(audit.copy(details = "Payout configuration version ${saved.configVersion}"))
+        return saved
+    }
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract fun insertDrawResult(result: DrawResultEntity)

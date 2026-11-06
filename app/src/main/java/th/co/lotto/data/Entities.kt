@@ -17,6 +17,18 @@ data class DrawPeriodEntity(
     val scheduledOpenEpochMillis: Long? = null
 )
 
+@Entity(tableName = "payout_rate_settings")
+data class PayoutRateSettingsEntity(
+    @PrimaryKey val settingsId: Int = 1,
+    /** Multiplier stored in hundredths: 7000 means 70.00 baht per baht. */
+    val twoDigitRateHundredths: Long,
+    val threeTopRateHundredths: Long,
+    val threeBottomRateHundredths: Long,
+    val threeToadRateHundredths: Long,
+    val configVersion: Long,
+    val updatedAtEpochMillis: Long
+)
+
 @Entity(tableName = "customers", indices = [Index(value = ["phone"])])
 data class CustomerEntity(
     @PrimaryKey val customerId: String,

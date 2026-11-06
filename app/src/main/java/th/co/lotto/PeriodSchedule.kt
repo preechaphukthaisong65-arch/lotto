@@ -31,7 +31,7 @@ object PeriodSchedule {
         val open = dao.getOpenPeriod()
         val drawDate = open?.drawDateEpochMillis
         if (open != null && drawDate != null && nowEpochMillis >= closeAt(drawDate, zoneId)) {
-            dao.closePeriod(open.periodId, nowEpochMillis)
+            dao.closePeriod(open.periodId, closeAt(drawDate, zoneId))
         }
         dao.openDuePeriod(nowEpochMillis)
     }
