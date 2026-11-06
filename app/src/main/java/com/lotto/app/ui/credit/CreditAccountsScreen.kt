@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
@@ -40,6 +41,7 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit) {
     var selectedTab by remember { mutableStateOf(0) }
@@ -86,8 +88,9 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(bills, key = { it.creditDocumentId }) { bill ->
                         val payments = paymentHistory[bill.creditDocumentId].orEmpty()
-                        val paid = payments.sumOf { it.amount }
-                        val remaining = (bill.creditAmount - paid).coerceAtLeast(0L)
+                        val creditPaid = payments.sumOf { it.amount }
+                        val paidTotal = bill.cashAmount + creditPaid
+                        val remaining = (bill.creditAmount - creditPaid).coerceAtLeast(0L)
                         Card(modifier = Modifier.fillMaxWidth()) {
                             Column(
                                 modifier = Modifier.fillMaxWidth().padding(14.dp),
@@ -102,8 +105,11 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
                                 Text("ยอดขายรวม: ${bill.saleTotalAmount} บาท")
                                 Text("เงินสด: ${bill.cashAmount} บาท")
                                 Text("ยอดเงินเชื่อ: ${bill.creditAmount} บาท")
-                                Text("รับชำระแล้ว: $paid บาท")
+                                Text("รับชำระแล้วรวม: $paidTotal บาท")
                                 Text(if (bill.status == CreditDocumentEntity.STATUS_OPEN) "ยอดค้าง: $remaining บาท" else "สถานะ: จ่ายแล้ว")
+                                if (bill.status == CreditDocumentEntity.STATUS_PAID) {
+                                    Text("เริ่มนับอายุ 180 วัน: ${bill.paidAt?.let { dateFormat.format(Date(it)) } ?: "ไม่พบวันที่"}")
+                                }
                                 payments.forEach { payment ->
                                     Text(
                                         "รับชำระ ${payment.amount} บาท · ${dateFormat.format(Date(payment.paidAt))}",
