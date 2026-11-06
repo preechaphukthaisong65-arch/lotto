@@ -1,7 +1,6 @@
 package th.co.lotto.data
 
 import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import android.content.Context
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -10,6 +9,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 
 @RunWith(RobolectricTestRunner::class)
 class PayoutRateSettingsTest {
@@ -19,7 +19,7 @@ class PayoutRateSettingsTest {
     @Before
     fun setUp() {
         database = Room.inMemoryDatabaseBuilder(
-            ApplicationProvider.getApplicationContext<Context>(),
+            RuntimeEnvironment.getApplication<Context>(),
             LottoDatabase::class.java
         ).allowMainThreadQueries().build()
         dao = database.lottoDao()

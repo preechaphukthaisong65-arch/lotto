@@ -14,7 +14,8 @@ data class DrawPeriodEntity(
     val status: String,
     val salesCloseEpochMillis: Long?,
     val createdAtEpochMillis: Long,
-    val scheduledOpenEpochMillis: Long? = null
+    val scheduledOpenEpochMillis: Long? = null,
+    val openedAtEpochMillis: Long? = null
 )
 
 @Entity(tableName = "payout_rate_settings")

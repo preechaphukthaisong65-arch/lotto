@@ -417,6 +417,6 @@ class LottoDatabaseIntegrityTest {
     }
 
     private fun period(id: String) = DrawPeriodEntity(
-        id, id, null, "OPEN", null, System.currentTimeMillis()
+        id, id, null, "OPEN", null, 0L
     )
 }
