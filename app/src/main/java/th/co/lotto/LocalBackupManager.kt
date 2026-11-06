@@ -32,7 +32,7 @@ object LocalBackupManager {
     private const val saltSize = 16
     private const val nonceSize = 12
     private const val maxBackupBytes = 256 * 1024 * 1024
-    private const val currentSchemaVersion = 9
+    private const val currentSchemaVersion = 10
 
     fun writeEncryptedBackup(
         context: Context,
@@ -344,6 +344,7 @@ object LocalBackupManager {
             require(version in 1..currentSchemaVersion) { "เวอร์ชันฐานข้อมูลไม่รองรับ: $version" }
             val requiredTables = mutableSetOf("draw_periods", "sale_documents", "sale_lines", "audit_events")
             if (version >= 8) requiredTables.add("sale_cancellations")
+            if (version >= 10) requiredTables.add("draw_source_checks")
             val foundTables = mutableSetOf<String>()
             sqlite.rawQuery(
                 "SELECT name FROM sqlite_master WHERE type='table'",
