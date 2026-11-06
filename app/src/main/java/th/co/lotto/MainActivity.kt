@@ -1090,6 +1090,9 @@ class MainActivity : Activity() {
                     val selected = periods[picker.selectedItemPosition]
                     io.execute {
                         val results = dao.getDrawResults(selected.periodId)
+                        val documents = dao.getSalesForPeriod(selected.periodId)
+                        val saleLines = documents.flatMap { dao.getLinesForDocument(it.documentId) }
+                        val matches = th.co.lotto.DrawResultMatcher.findMatches(results, saleLines)
                         runOnUiThread {
                             if (results.isEmpty()) addText(resultList, "ยังไม่มีผลหวยที่บันทึกในงวดนี้", 13, ink)
                             results.forEach { result ->
@@ -1097,6 +1100,19 @@ class MainActivity : Activity() {
                                     "ยืนยันแล้ว " + SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(result.verifiedAtEpochMillis))
                                 addCard(resultList, "${result.resultType}: ${result.winningNumber}",
                                     "แหล่งที่มา: ${result.sourceLabel} • $verified") { }
+                            }
+                            if (results.isNotEmpty()) {
+                                addText(resultList, "สรุปรายการที่ตรงกับผลหวย", 16, navy)
+                                if (matches.isEmpty()) addText(resultList, "ไม่พบรายการขายที่ถูกรางวัลจากผลที่บันทึก", 13, ink)
+                                matches.forEach { match ->
+                                    val totalStake = match.lines.fold(0L) { total, line -> Math.addExact(total, line.amountSatang) }
+                                    addText(resultList,
+                                        "${match.resultType} • ${match.winningNumber} • ${categoryLabel(match.betCategory)} • ${match.lines.size} รายการ • ยอดแทง ${formatMoney(totalStake)}",
+                                        13, ink)
+                                }
+                                addText(resultList,
+                                    "เป็นสรุปการจับคู่เลขเท่านั้น ยังไม่ใช่ยอดจ่ายรางวัลหรือยอดสุทธิ",
+                                    12, 0xFF9B2C2C.toInt())
                             }
                         }
                     }
