@@ -121,7 +121,7 @@ class MainActivity : Activity() {
         addCard(currentBody, "เลขอั้นและเลขเต็ม", "กำหนดวงเงินแยกตามประเภทเลข") { showLimits() }
         addCard(currentBody, "ผลหวยและสรุปยอด", "บันทึกผลพร้อมแหล่งที่มาและข้อมูลตรวจสอบ") { showResults() }
         addCard(currentBody, "รายงาน", "รายงานยอดขาย ลูกหนี้ และยอดคงเหลือ") { showReports() }
-        addCard(currentBody, "ตั้งค่าอัตราจ่าย", "กำหนดอัตรา 3 ตัวบนและ 3 ตัวโต๊ด") { showSettings() }
+        addCard(currentBody, "ตั้งค่าอัตราจ่าย", "กำหนดอัตราจ่ายแยกตามเลขทั้ง 4 ประเภท") { showSettings() }
         addCard(currentBody, "สำรองและกู้คืน", "ไฟล์สำรองเข้ารหัสด้วยรหัสผ่าน • ย้ายเครื่องและกู้คืนได้") { showBackup() }
     }
 
@@ -1261,18 +1261,18 @@ class MainActivity : Activity() {
                                 "GLO draw ${official.drawDateIso}; first prize ${official.firstPrizeNumber}; THREE_TOP ${official.threeTopNumber}; fetchedAt=$now",
                                 now
                             )
-                            dao.postDrawResult(result, audit)
                             val bottomResult = th.co.lotto.data.DrawResultEntity(
                                 UUID.randomUUID().toString(), selected.periodId, "TWO_BOTTOM",
                                 official.twoBottomNumber,
                                 "GLO Official API • ${official.sourceUrl} • เลขท้าย 2 ตัว",
                                 now, now
                             )
-                            dao.postDrawResult(bottomResult, AuditEventEntity(
+                            val bottomAudit = AuditEventEntity(
                                 UUID.randomUUID().toString(), "DRAW_RESULT", bottomResult.resultId, "POSTED",
                                 "GLO draw ${official.drawDateIso}; TWO_BOTTOM ${official.twoBottomNumber}; fetchedAt=$now",
                                 now
-                            ))
+                            )
+                            dao.postGloResults(result, bottomResult, audit, bottomAudit)
                             val snapshotMessage = try {
                                 val rates = dao.getPayoutRateSettings()
                                 if (rates == null) {
@@ -1338,7 +1338,7 @@ class MainActivity : Activity() {
                     addText(resultList, "อัตราจ่ายงวดนี้: ยังไม่ได้บันทึก snapshot", 12, 0xFF9B2C2C.toInt())
                 } else {
                     addText(resultList,
-                        "อัตราจ่ายที่ตรึงไว้ • รุ่น ${snapshot.payoutConfigVersion} • 3 ตัวบน ${BigDecimal.valueOf(snapshot.threeTopRateHundredths, 2).stripTrailingZeros().toPlainString()} • 3 ตัวโต๊ด ${BigDecimal.valueOf(snapshot.threeToadRateHundredths, 2).stripTrailingZeros().toPlainString()}",
+                        "อัตราจ่ายที่ตรึงไว้ • รุ่น ${snapshot.payoutConfigVersion} • 3 ตัวบน ${BigDecimal.valueOf(snapshot.threeTopRateHundredths, 2).stripTrailingZeros().toPlainString()} • 3 ตัวโต๊ด ${BigDecimal.valueOf(snapshot.threeToadRateHundredths, 2).stripTrailingZeros().toPlainString()} • 2 ตัวบน ${BigDecimal.valueOf(snapshot.twoTopRateHundredths, 2).stripTrailingZeros().toPlainString()} • 2 ตัวล่าง ${BigDecimal.valueOf(snapshot.twoBottomRateHundredths, 2).stripTrailingZeros().toPlainString()}",
                         12, navy)
                 }
                 if (results.isEmpty()) addText(resultList, "ยังไม่มีผลหวยที่บันทึกในงวดนี้", 13, ink)
