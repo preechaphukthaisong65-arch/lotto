@@ -128,7 +128,7 @@ object DrawCalendarService {
     }
 
     private fun mismatchSignature(lottery: CalendarSourceSnapshot, huay: CalendarSourceSnapshot): String =
-        listOf(lottery.dates.take(3).joinToString(","), huay.dates.take(3).joinToString(",")).joinToString("|")
+        listOf(lottery.dates.joinToString(","), huay.dates.joinToString(",")).joinToString("|")
 
     fun confirmManualDate(context: Context, date: LocalDate): DrawCalendarState {
         val currentState = readState(context)
@@ -326,12 +326,14 @@ object DrawCalendarReminder {
         val today = LocalDate.now(BANGKOK)
         val prefs = context.getSharedPreferences("draw_calendar_reminders", Context.MODE_PRIVATE)
         if (state.status == "DISAGREEMENT") {
-            val signature = state.lotteryChecksDates.take(3).joinToString(",") + "|" + state.huayReviewDates.take(3).joinToString(",")
+            val signature = state.lotteryChecksDates.joinToString(",") + "|" + state.huayReviewDates.joinToString(",")
             if (signature != prefs.getString("last_mismatch_alert", null)) {
-                val lotteryDate = state.lotteryChecksDates.firstOrNull()?.toString() ?: "ไม่พบข้อมูล"
-                val huayDate = state.huayReviewDates.firstOrNull()?.toString() ?: "ไม่พบข้อมูล"
+                val mismatchIndex = (0 until maxOf(state.lotteryChecksDates.size, state.huayReviewDates.size))
+                    .firstOrNull { state.lotteryChecksDates.getOrNull(it) != state.huayReviewDates.getOrNull(it) } ?: 0
+                val lotteryDate = state.lotteryChecksDates.getOrNull(mismatchIndex)?.toString() ?: "ไม่มีรายการลำดับนี้"
+                val huayDate = state.huayReviewDates.getOrNull(mismatchIndex)?.toString() ?: "ไม่มีรายการลำดับนี้"
                 post(context, 800002, "วันออกรางวัลจากเว็บไซต์ไม่ตรงกัน",
-                    "LotteryChecks: $lotteryDate • HuayReview: $huayDate • กรุณาเปิดปฏิทินในแอปเพื่อตรวจสอบและยืนยันวัน")
+                    "งวดลำดับ ${mismatchIndex + 1} • LotteryChecks: $lotteryDate • HuayReview: $huayDate • กรุณาเปิดปฏิทินในแอปเพื่อตรวจสอบและยืนยันวัน")
                 prefs.edit().putString("last_mismatch_alert", signature).apply()
             }
             return
