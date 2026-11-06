@@ -1300,7 +1300,7 @@ class MainActivity : Activity() {
                             second.firstPrizeNumber, second.twoBottomNumber)
                     } else if (failures.isEmpty() && first != null && second != null &&
                         first.firstPrizeNumber == second.firstPrizeNumber && first.twoBottomNumber == second.twoBottomNumber) {
-                        Toast.makeText(this, "ผลจากสองเว็บไซต์ตรงกัน • ยืนยันผลอัตโนมัติแล้ว", Toast.LENGTH_LONG).show()
+                        // Matching sources are confirmed silently; details are shown in the results screen.
                     } else {
                         Toast.makeText(this, "ยังตรวจสอบผลจากทั้งสองเว็บไซต์ไม่ครบ", Toast.LENGTH_LONG).show()
                     }
@@ -1372,7 +1372,7 @@ class MainActivity : Activity() {
                 val topAudit = AuditEventEntity(UUID.randomUUID().toString(), "DRAW_RESULT", "pending",
                     "POSTED", "Manual result verification", now)
                 val bottomAudit = AuditEventEntity(UUID.randomUUID().toString(), "DRAW_RESULT", "pending",
-                    "MANUAL_VERIFIED", "Manual result verification", now)
+                    "POSTED", "Manual result verification", now)
                 io.execute {
                     try {
                         database.lottoDao().postManualVerifiedResults(period.periodId, first, bottom,
