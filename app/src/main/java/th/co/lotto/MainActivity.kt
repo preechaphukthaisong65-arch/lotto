@@ -1159,7 +1159,7 @@ class MainActivity : Activity() {
                             results.forEach { result ->
                                 val verified = if (result.verifiedAtEpochMillis == null) "ยังไม่ยืนยัน" else
                                     "ยืนยันแล้ว " + SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(result.verifiedAtEpochMillis))
-                                addCard(resultList, "${result.resultType}: ${result.winningNumber}",
+                                addCard(resultList, "${categoryLabel(result.resultType)}: ${result.winningNumber}",
                                     "แหล่งที่มา: ${result.sourceLabel} • $verified") { }
                             }
                             if (results.isNotEmpty()) {
