@@ -7,6 +7,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.lotto.app.data.local.dao.AppSettingDao
 import com.lotto.app.data.local.dao.SaleDao
 import com.lotto.app.data.local.entity.AppSettingEntity
+import com.lotto.app.data.local.entity.CreditDocumentEntity
+import com.lotto.app.data.local.entity.CreditDocumentItemEntity
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
 
@@ -14,9 +16,11 @@ import com.lotto.app.data.local.entity.SaleItemEntity
     entities = [
         AppSettingEntity::class,
         SaleEntity::class,
-        SaleItemEntity::class
+        SaleItemEntity::class,
+        CreditDocumentEntity::class,
+        CreditDocumentItemEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -57,6 +61,42 @@ abstract class LottoDatabase : RoomDatabase() {
                 )
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS index_sale_items_saleId ON sale_items(saleId)"
+                )
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS credit_documents (
+                        creditDocumentId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        sourceSaleId INTEGER NOT NULL,
+                        customerFirstName TEXT NOT NULL,
+                        customerLastName TEXT NOT NULL,
+                        saleTotalAmount INTEGER NOT NULL,
+                        cashAmount INTEGER NOT NULL,
+                        creditAmount INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        status TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS credit_document_items (
+                        creditItemId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        creditDocumentId INTEGER NOT NULL,
+                        number TEXT NOT NULL,
+                        prizeType TEXT NOT NULL,
+                        amount INTEGER NOT NULL,
+                        payoutMultiplier INTEGER NOT NULL,
+                        FOREIGN KEY(creditDocumentId) REFERENCES credit_documents(creditDocumentId) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_credit_document_items_creditDocumentId ON credit_document_items(creditDocumentId)"
                 )
             }
         }
