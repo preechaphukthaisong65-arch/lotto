@@ -1,6 +1,6 @@
 # LOTTO — Software Requirements Specification (SRS)
 
-Version: 0.2  
+Version: 0.3  
 Date: 6 November 2026  
 Platform: Android  
 Architecture: Offline-first / Local Database  
@@ -35,7 +35,25 @@ Build an Android application for managing lottery-period records, sales document
 - Period data must remain isolated and queryable historically.
 - Initial operational targets: close sales at 14:00 and prepare/open the next period at 18:00, subject to configurable calendar rules.
 - A closed period rejects new sales and backdated transactions.
+- Draw dates are not assumed to follow a fixed calendar pattern. The upcoming draw date must be checked against both LotteryChecks and HuayReview calendar information.
+- A draw date is confirmed only when both sources provide a valid upcoming date for the same draw period and the dates match. A single-source date is provisional; a disagreement or unavailable/malformed calendar source is unconfirmed. The app must never infer or invent a date from historical patterns.
+- The app must aim to notify the user at least 7 calendar days before each confirmed draw date. If a date first becomes confirmed fewer than 7 days before the draw, notify immediately and state the remaining lead time; do not imply that the 7-day notice was achieved.
+- Recheck upcoming calendar information at least once per day when network access is available. Calendar checks are user-data-free and must not transmit customer, sales, credit, payment, or receipt data. Cached calendar information remains viewable offline but cannot be treated as a fresh check.
+- If both sources later agree on a changed draw date, update the upcoming period date with an auditable change record and notify the user of the previous and new dates. Never silently change a confirmed date. If sources disagree about a change, retain the last confirmed date as historical information, mark the current schedule unconfirmed, and notify the user to verify it.
+- Notification delivery depends on Android notification permission and device scheduling constraints. If notifications are unavailable or denied, show the reminder and its status in the app. Calendar source access must use documented/publicly accessible information and comply with each source's terms; do not assume the result API provides future calendar dates.
 - Public draw-calendar import is optional and must never upload transaction data.
+
+
+### 4.1 Upcoming draw calendar and advance reminders
+- Treat LotteryChecks and HuayReview as independent calendar sources, separate from their result-data checks. Do not use a result endpoint as a future-calendar endpoint unless its documented contract explicitly supports future draw dates.
+- For each upcoming draw period, store the draw date, each source's reported date, source reference/URL, retrieval timestamp, validation status, and confirmation status locally.
+- Calendar confirmation requires both sources to identify the same draw period and the same valid future date. If only one source has a usable date, label it provisional. If dates differ, a source is unavailable, or data is malformed/ambiguous, label the schedule unconfirmed and show the discrepancy or failure reason.
+- Do not create or shift a draw period from an inferred recurring pattern. Do not silently overwrite a previously confirmed date.
+- Schedule a reminder for 7 calendar days before the confirmed draw date. If confirmation occurs inside that 7-day window, issue an immediate notice stating the actual remaining time. A later confirmed date change must cancel/recalculate the pending reminder and issue a change notice that identifies both dates.
+- When the sources disagree about a changed date, do not automatically choose either date. Preserve the last confirmed date and its audit history, mark the current schedule unconfirmed, and alert the user that manual checking against the official GLO announcement is required. The app does not retrieve GLO data.
+- Refresh calendar sources at least daily when online, subject to source rate limits and Android background-work constraints. Provide a manual refresh action. Never promise exact delivery time when Android has deferred background work or notifications are disabled.
+- Offline mode may display the last cached calendar and its last-checked timestamp. Offline data must be visibly marked as cached/stale and must not be represented as a fresh two-source confirmation.
+- Calendar retrieval is strictly public-data-only. No private app data may be transmitted. Source parsing must be isolated from result parsing, validated, auditable, and disabled if compliant public access is unavailable.
 
 ## 5. Sales categories and entry
 Four sale categories are supported: THREE_TOP (last 3 digits of the published first-prize number), THREE_TOAD (permutation of THREE_TOP), TWO_TOP (last 2 digits of the published first-prize number), and TWO_BOTTOM (published last-two result). Numbers are text, with exact category digit length and leading zeroes preserved. GLO front-three and last-three prize categories are never used.
@@ -95,15 +113,18 @@ Implemented protections:
 - In-app PIN enrollment, user accounts, roles, and per-module permissions are explicitly out of scope. The backup passphrase is separate from device screen-lock security.
 
 ## 15. Acceptance tests
-Install/launch; create period; accept only TWO_TOP, TWO_BOTTOM, THREE_TOP, and THREE_TOAD sales with matching digit lengths; reject all unsupported categories and wrong digit lengths; preserve leading zeroes; enforce independent limits and blocked numbers; auto-label half-payout; cash/credit customers; partial/full payments; receipt generation; immutable confirmed bills; cancellation audit, duplicate-cancel rejection, cancelled-bill exclusion from limits/reports/credit/results; LotteryChecks and HuayReview result retrieval and exact draw-date validation; matching, mismatch, and unavailable-source states; manual GLO verification only after mismatch; append-only source audit; result caching and offline access; settlement gating; payout totals; reports; backup/restore; airplane-mode core operation; process death/restart; and failure recovery on a physical Android device.
+Install/launch; create period; upcoming calendar retrieval from both sources; same-date confirmation; one-source provisional state; date disagreement; missing/malformed/unavailable calendar source; no inferred date creation; daily refresh and rate-limit handling; 7-day reminder; late confirmation inside the 7-day window; confirmed date-change audit and reminder rescheduling; notification permission denied/in-app fallback; cached calendar visibility and stale labeling offline; create period; accept only TWO_TOP, TWO_BOTTOM, THREE_TOP, and THREE_TOAD sales with matching digit lengths; reject all unsupported categories and wrong digit lengths; preserve leading zeroes; enforce independent limits and blocked numbers; auto-label half-payout; cash/credit customers; partial/full payments; receipt generation; immutable confirmed bills; cancellation audit, duplicate-cancel rejection, cancelled-bill exclusion from limits/reports/credit/results; LotteryChecks and HuayReview result retrieval and exact draw-date validation; matching, mismatch, and unavailable-source states; manual GLO verification only after mismatch; append-only source audit; result caching and offline access; settlement gating; payout totals; reports; backup/restore; airplane-mode core operation; process death/restart; and failure recovery on a physical Android device.
 
 Phase-7 automated acceptance coverage includes encryption/decryption round trip, wrong-passphrase rejection, tamper detection, and minimum passphrase length. Restore validation additionally checks archive paths, archive size, SQLite integrity, foreign keys, schema version, required tables, and rollback on replacement failure. Manual cross-device restore and physical-device interruption testing remain required.
 
 ## 16. Remaining implementation gates
-1. Complete live real-network integration tests for the LotteryChecks and HuayReview request/response contracts, including missing draws, malformed data, rate limits, and source outages.
-2. Define and implement cash-refund accounting when a cash bill is cancelled after money has physically changed hands.
-3. Verify payout totals and sales-after-payout report reconciliation end to end using representative sale/result fixtures.
-4. Preserve LotteryChecks attribution/backlinks and API rate limits, and HuayReview CC BY 4.0 attribution/license/change notices. Review all applicable legal and commercial-use requirements before distribution.
+1. Verify whether LotteryChecks and HuayReview expose stable, publicly accessible future draw-calendar data and document the permitted retrieval method for each. Do not assume either result API supports future calendar dates; do not scrape or reuse page content contrary to source terms.
+2. Implement independent calendar-source clients, local calendar audit/persistence, two-source date comparison, daily refresh, and 7-day Android reminders with permission-denied/in-app fallback.
+3. Complete calendar acceptance tests for matching, mismatch, missing dates, malformed data, outages, date changes, stale/offline cache, late confirmation, and notification scheduling.
+4. Complete live real-network integration tests for the LotteryChecks and HuayReview request/response contracts, including missing draws, malformed data, rate limits, and source outages.
+5. Define and implement cash-refund accounting when a cash bill is cancelled after money has physically changed hands.
+6. Verify payout totals and sales-after-payout report reconciliation end to end using representative sale/result fixtures.
+7. Preserve LotteryChecks attribution/backlinks and API rate limits, and HuayReview CC BY 4.0 attribution/license/change notices. Review all applicable legal and commercial-use requirements before distribution.
 
 This project is a non-commercial research prototype. It retrieves public results from LotteryChecks and HuayReview under their published reuse terms and attribution requirements. The app does not retrieve GLO data directly; the user independently consults the GLO website when a manual check is required. Any wagering, payout, or related functionality must undergo applicable legal/compliance review before real-world operational use, regardless of commercial intent. Current payout summaries are deterministic calculations from saved results and rate snapshots, but must not be represented as net profit or a final cash ledger until cash-refund handling is complete. Commercial distribution or use is outside the current project scope and requires a separate license review.
 
