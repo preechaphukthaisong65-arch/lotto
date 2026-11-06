@@ -764,6 +764,7 @@ class MainActivity : Activity() {
                     addText(currentBody, "ยกเลิกเมื่อ: ${SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale("th", "TH")).format(Date(cancellation.cancelledAtEpochMillis))}", 13, ink)
                     addText(currentBody, "เหตุผลการยกเลิก: ${cancellation.reason}", 13, ink)
                     addText(currentBody, "ยอดบิลเดิมที่ยกเลิก: ${formatMoney(cancellation.originalAmountSatang)}", 13, ink)
+                    addText(currentBody, "เงินสดที่คืนจริง: ${formatMoney(cancellation.cashRefundedSatang)}", 13, ink)
                 }
                 addText(currentBody, "งวด: ${period?.title ?: "ไม่ทราบงวด"} • สถานะงวด: ${period?.status ?: "ไม่ทราบ"}", 14, ink)
                 addText(currentBody, "วันที่: ${SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale("th", "TH")).format(Date(document.createdAtEpochMillis))}", 14, ink)
@@ -820,6 +821,11 @@ class MainActivity : Activity() {
             minLines = 2
             gravity = android.view.Gravity.TOP
         }
+        val cashRefund = EditText(this).apply {
+            hint = "ยอดเงินสดที่คืนจริง (บาท) — 0 หากไม่ได้รับ/ไม่ได้คืน"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setText("0.00")
+        }
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
@@ -829,10 +835,18 @@ class MainActivity : Activity() {
                 setTextColor(navy)
             })
             addView(reason)
+            if (document.customerType == "CASH") {
+                addView(TextView(this@MainActivity).apply {
+                    text = "บันทึกเฉพาะเงินสดที่คืนให้ลูกค้าจริง ไม่ใช่ยอดบิลที่ยกเลิก และไม่ควรกรอกยอดที่ยังไม่ได้คืน"
+                    textSize = 12f
+                    setTextColor(0xFF526171.toInt())
+                })
+                addView(cashRefund)
+            }
         }
         val dialog = AlertDialog.Builder(this)
             .setTitle("ยืนยันยกเลิกบิล")
-            .setMessage("บิลเดิมจะไม่ถูกลบ แต่จะถูกทำเครื่องหมายยกเลิกและไม่นำไปคิดยอดขาย วงเงิน ลูกหนี้ หรือผลรางวัล • ขั้นตอนนี้ยังไม่บันทึกการคืนเงินจริง")
+            .setMessage("บิลเดิมจะไม่ถูกลบและจะถูกตัดออกจากยอดขาย/วงเงิน/ลูกหนี้/ผลรางวัล ระบบจะบันทึกยอดเงินสดที่คืนจริงแยกต่างหาก")
             .setView(form)
             .setNegativeButton("กลับ", null)
             .setPositiveButton("ยืนยันยกเลิก", null)
@@ -844,15 +858,26 @@ class MainActivity : Activity() {
                     reason.error = "กรุณาระบุเหตุผลการยกเลิก"
                     return@setOnClickListener
                 }
+                val refundedSatang = try {
+                    if (document.customerType == "CASH") SaleEntryParser.parseAmountSatang(cashRefund.text.toString())
+                    else 0L
+                } catch (e: Exception) {
+                    cashRefund.error = e.message ?: "ยอดคืนเงินไม่ถูกต้อง"
+                    return@setOnClickListener
+                }
+                if (refundedSatang < 0L || refundedSatang > document.totalAmountSatang) {
+                    cashRefund.error = "ยอดคืนต้องอยู่ระหว่าง 0 ถึง ${formatMoney(document.totalAmountSatang)}"
+                    return@setOnClickListener
+                }
                 val now = System.currentTimeMillis()
                 val cancellation = SaleCancellationEntity(
                     UUID.randomUUID().toString(), document.documentId,
-                    document.totalAmountSatang, note, now
+                    document.totalAmountSatang, note, now, refundedSatang
                 )
                 val audit = AuditEventEntity(
                     UUID.randomUUID().toString(), "SALE_CANCELLATION",
                     cancellation.cancellationId, "CANCELLED",
-                    "Bill ${document.documentId} cancelled; amount=${document.totalAmountSatang}; reason=$note",
+                    "Bill ${document.documentId} cancelled; amount=${document.totalAmountSatang}; cashRefunded=$refundedSatang; reason=$note",
                     now
                 )
                 io.execute {
@@ -1686,7 +1711,11 @@ class MainActivity : Activity() {
                                 addText(results, "เงินเชื่อ: ${formatMoney(report.creditSalesSatang)}", 14, ink)
                                 addText(results, "รับชำระแล้ว: ${formatMoney(report.paymentsReceivedSatang)}", 14, ink)
                                 addText(results, "ยอดค้างเงินเชื่อ: ${formatMoney(report.outstandingCreditSatang)}", 14, ink)
+                                val cashRefunded = cancellations.fold(0L) { total, item ->
+                                    Math.addExact(total, item.cashRefundedSatang)
+                                }
                                 addText(results, "บิลที่ยกเลิก: ${cancellations.size} ฉบับ • ยอดเดิมรวม ${formatMoney(cancelledOriginalAmount)}", 14, ink)
+                                addText(results, "เงินสดคืนจากบิลที่ยกเลิก: ${formatMoney(cashRefunded)} (แยกจากยอดขายและยอดจ่ายรางวัล)", 14, ink)
                                 addText(results, "เลขจ่ายครึ่ง: ${report.halfPayoutLineCount} รายการ • ยอดขาย ${formatMoney(report.halfPayoutAmountSatang)}", 14, ink)
                                 if (payoutSummary != null) {
                                     addText(results, "ยอดจ่ายรางวัลรวม: ${formatMoney(payoutSummary.totalPayoutSatang)}", 16, navy)
