@@ -1436,8 +1436,11 @@ class MainActivity : Activity() {
             runOnUiThread {
                 val lc = sourceChecks["LOTTERYCHECKS"]
                 val hr = sourceChecks["HUAYREVIEW"]
-                if (lc == null || hr == null) {
-                    addText(resultList, "สถานะตรวจผล: ยังตรวจสอบจากสองเว็บไซต์ไม่ครบ • ระงับการคำนวณจ่าย", 13, 0xFF9B2C2C.toInt())
+                if (lc == null || hr == null || lc.checkStatus != "SUCCESS" || hr.checkStatus != "SUCCESS") {
+                    addText(resultList, "สถานะตรวจผล: มีเว็บไซต์ตรวจสอบไม่สำเร็จหรือยังตรวจไม่ครบ • ระงับการคำนวณจ่าย", 13, 0xFF9B2C2C.toInt())
+                    listOfNotNull(lc, hr).filter { it.checkStatus == "FAILED" }.forEach {
+                        addText(resultList, "${it.sourceId}: ${it.errorMessage}", 12, 0xFF9B2C2C.toInt())
+                    }
                 } else {
                     addButton(resultList, "LotteryChecks • แหล่งข้อมูลผลรางวัล") {
                         startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://lotterychecks.com/")))
