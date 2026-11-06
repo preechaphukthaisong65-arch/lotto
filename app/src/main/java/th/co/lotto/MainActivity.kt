@@ -342,9 +342,27 @@ class MainActivity : Activity() {
                     Toast.makeText(this, "ลูกค้าเงินเชื่อต้องกรอกเบอร์โทรและข้อมูลระบุตัวตน", Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
+                val now = System.currentTimeMillis()
+                val customer = CustomerEntity(
+                    UUID.randomUUID().toString(), n, p.ifBlank { null },
+                    note.text.toString().trim().ifBlank { null }, t, now
+                )
+                val audit = AuditEventEntity(
+                    UUID.randomUUID().toString(), "CUSTOMER", customer.customerId,
+                    "CREATED", "Customer record created; type=$t", now
+                )
                 io.execute {
-                    database.lottoDao().insertCustomer(CustomerEntity(UUID.randomUUID().toString(), n, p.ifBlank { null }, note.text.toString().trim().ifBlank { null }, t, System.currentTimeMillis()))
-                    runOnUiThread { Toast.makeText(this, "บันทึกลูกค้าแล้ว", Toast.LENGTH_SHORT).show(); showCustomers() }
+                    try {
+                        database.lottoDao().postCustomer(customer, audit)
+                        runOnUiThread {
+                            Toast.makeText(this, "บันทึกลูกค้าแล้ว", Toast.LENGTH_SHORT).show()
+                            showCustomers()
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread {
+                            Toast.makeText(this, "บันทึกลูกค้าไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
                 }
                 dialog.dismiss()
             }
