@@ -116,11 +116,13 @@ object DrawCalendarService {
             val prefs = context.getSharedPreferences("draw_calendar_reminders", Context.MODE_PRIVATE)
             val manualSignature = prefs.getString("manual_signature", null)
             val manualDate = prefs.getString("manual_date", null)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-            if (manualSignature == signature && manualDate != null && !manualDate.isBefore(today)) {
-                return DrawCalendarState("USER_CONFIRMED", lottery.dates, huay.dates, listOf(manualDate), latestTime,
+            if (manualSignature == signature && manualDate != null &&
+                manualDate.isAfter(confirmed.lastOrNull() ?: today)) {
+                return DrawCalendarState("USER_CONFIRMED", lottery.dates, huay.dates,
+                    (confirmed + manualDate).distinct(), latestTime,
                     "ผู้ใช้ยืนยันวันงวด $manualDate หลังตรวจสอบความขัดแย้งของสองเว็บไซต์")
             }
-            return DrawCalendarState("DISAGREEMENT", lottery.dates, huay.dates, emptyList(), latestTime,
+            return DrawCalendarState("DISAGREEMENT", lottery.dates, huay.dates, confirmed, latestTime,
                 "กำหนดการจากสองเว็บไซต์ไม่ตรงกัน ต้องตรวจสอบและยืนยันวันด้วยตนเอง")
         }
         return DrawCalendarState("CONFIRMED", lottery.dates, huay.dates, confirmed, latestTime,
@@ -137,7 +139,11 @@ object DrawCalendarService {
         }
         val lottery = CalendarAuditLog.latest(context, "LOTTERYCHECKS") ?: error("ยังไม่มีข้อมูลจาก LotteryChecks")
         val huay = CalendarAuditLog.latest(context, "HUAYREVIEW") ?: error("ยังไม่มีข้อมูลจาก HuayReview")
-        require(date.isAfter(LocalDate.now(BANGKOK))) { "วันออกรางวัลต้องเป็นวันในอนาคต" }
+        val currentState = readState(context)
+        val lastAgreedDate = currentState.confirmedDates.lastOrNull()
+        require(date.isAfter(lastAgreedDate ?: LocalDate.now(BANGKOK))) {
+            "วันที่ยืนยันต้องอยู่หลังงวดล่าสุดที่ทั้งสองเว็บไซต์ระบุตรงกัน"
+        }
         val signature = mismatchSignature(lottery, huay)
         val now = System.currentTimeMillis()
         context.getSharedPreferences("draw_calendar_reminders", Context.MODE_PRIVATE).edit()
@@ -325,7 +331,8 @@ object DrawCalendarReminder {
         ) return
         val today = LocalDate.now(BANGKOK)
         val prefs = context.getSharedPreferences("draw_calendar_reminders", Context.MODE_PRIVATE)
-        if (state.status == "DISAGREEMENT") {
+        val isDisagreement = state.status == "DISAGREEMENT"
+        if (isDisagreement) {
             val signature = state.lotteryChecksDates.joinToString(",") + "|" + state.huayReviewDates.joinToString(",")
             if (signature != prefs.getString("last_mismatch_alert", null)) {
                 val mismatchIndex = (0 until maxOf(state.lotteryChecksDates.size, state.huayReviewDates.size))
@@ -336,22 +343,24 @@ object DrawCalendarReminder {
                     "งวดลำดับ ${mismatchIndex + 1} • LotteryChecks: $lotteryDate • HuayReview: $huayDate • กรุณาเปิดปฏิทินในแอปเพื่อตรวจสอบและยืนยันวัน")
                 prefs.edit().putString("last_mismatch_alert", signature).apply()
             }
-            return
+            if (state.confirmedDates.isEmpty()) return
         }
-        if (state.status != "CONFIRMED" && state.status != "USER_CONFIRMED") return
-        prefs.edit().remove("last_mismatch_alert").apply()
+        if (state.status != "CONFIRMED" && state.status != "USER_CONFIRMED" && !isDisagreement) return
         val current = state.confirmedDates.joinToString(",") { it.toString() }
-        val previous = prefs.getString("last_confirmed_dates", "").orEmpty()
-        if (previous.isNotBlank() && previous != current) {
-            val oldDate = previous.substringBefore(",")
-            val newDate = state.confirmedDates.firstOrNull()?.toString().orEmpty()
-            if (oldDate != newDate && newDate.isNotBlank()) {
-                post(context, 800001, "มีการเปลี่ยนวันออกรางวัล",
-                    "วันงวดถัดไปเปลี่ยนจาก $oldDate เป็น $newDate ตามสถานะ " +
-                        if (state.status == "USER_CONFIRMED") "ที่ผู้ใช้ยืนยัน" else "ที่ทั้งสองเว็บไซต์ยืนยันตรงกัน")
+        if (!isDisagreement) {
+            prefs.edit().remove("last_mismatch_alert").apply()
+            val previous = prefs.getString("last_confirmed_dates", "").orEmpty()
+            if (previous.isNotBlank() && previous != current) {
+                val oldDate = previous.substringBefore(",")
+                val newDate = state.confirmedDates.firstOrNull()?.toString().orEmpty()
+                if (oldDate != newDate && newDate.isNotBlank()) {
+                    post(context, 800001, "มีการเปลี่ยนวันออกรางวัล",
+                        "วันงวดถัดไปเปลี่ยนจาก $oldDate เป็น $newDate ตามสถานะ " +
+                            if (state.status == "USER_CONFIRMED") "ที่ผู้ใช้ยืนยัน" else "ที่ทั้งสองเว็บไซต์ยืนยันตรงกัน")
+                }
             }
+            prefs.edit().putString("last_confirmed_dates", current).apply()
         }
-        prefs.edit().putString("last_confirmed_dates", current).apply()
         state.confirmedDates.forEach { date ->
             val days = ChronoUnit.DAYS.between(today, date)
             val key = "reminded_$date"
