@@ -1021,7 +1021,7 @@ class MainActivity : Activity() {
                 }
                 val picker = Spinner(this).apply {
                     adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
-                        periods.map { "\${it.title} • \${when (it.status) { "CLOSED" -> "ปิดงวด"; "OPEN" -> "เปิดขาย"; else -> "เตรียมเปิด" }}" })
+                        periods.map { "${it.title} • ${when (it.status) { "CLOSED" -> "ปิดงวด"; "OPEN" -> "เปิดขาย"; else -> "เตรียมเปิด" }}" })
                 }
                 currentBody.addView(picker)
                 val resultList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -1035,8 +1035,8 @@ class MainActivity : Activity() {
                             results.forEach { result ->
                                 val verified = if (result.verifiedAtEpochMillis == null) "ยังไม่ยืนยัน" else
                                     "ยืนยันแล้ว " + SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(result.verifiedAtEpochMillis))
-                                addCard(resultList, "\${result.resultType}: \${result.winningNumber}",
-                                    "แหล่งที่มา: \${result.sourceLabel} • $verified") { }
+                                addCard(resultList, "${result.resultType}: ${result.winningNumber}",
+                                    "แหล่งที่มา: ${result.sourceLabel} • $verified") { }
                             }
                         }
                     }
@@ -1059,7 +1059,7 @@ class MainActivity : Activity() {
                         setPadding(dp(20), dp(8), dp(20), 0)
                         addView(type); addView(number); addView(source); addView(verified)
                     }
-                    val dialog = AlertDialog.Builder(this).setTitle("บันทึกผล • \${selected.title}").setView(form)
+                    val dialog = AlertDialog.Builder(this).setTitle("บันทึกผล • ${selected.title}").setView(form)
                         .setNegativeButton("กลับ", null).setPositiveButton("บันทึก", null).create()
                     dialog.setOnShowListener {
                         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -1089,7 +1089,7 @@ class MainActivity : Activity() {
                                         showResults()
                                     }
                                 } catch (e: Exception) {
-                                    runOnUiThread { Toast.makeText(this, "บันทึกผลไม่สำเร็จ: \${e.message}", Toast.LENGTH_LONG).show() }
+                                    runOnUiThread { Toast.makeText(this, "บันทึกผลไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
                                 }
                             }
                         }
@@ -1133,29 +1133,29 @@ class MainActivity : Activity() {
                                 java.time.ZoneId.of("Asia/Bangkok")
                             )
                             runOnUiThread {
-                                addText(results, "งวด: \${period.title}", 18, navy)
-                                addText(results, "จำนวนเอกสาร: \${report.documentCount} • รายการขาย: \${report.lineCount}", 14, ink)
-                                addText(results, "ยอดขายรวมจากเอกสาร: \${formatMoney(report.grossSalesSatang)}", 17, navy)
-                                addText(results, "เงินสด: \${formatMoney(report.cashSalesSatang)}", 14, ink)
-                                addText(results, "เงินเชื่อ: \${formatMoney(report.creditSalesSatang)}", 14, ink)
-                                addText(results, "รับชำระแล้ว: \${formatMoney(report.paymentsReceivedSatang)}", 14, ink)
-                                addText(results, "ยอดค้างเงินเชื่อ: \${formatMoney(report.outstandingCreditSatang)}", 14, ink)
-                                addText(results, "เลขจ่ายครึ่ง: \${report.halfPayoutLineCount} รายการ • ยอดขาย \${formatMoney(report.halfPayoutAmountSatang)}", 14, ink)
+                                addText(results, "งวด: ${period.title}", 18, navy)
+                                addText(results, "จำนวนเอกสาร: ${report.documentCount} • รายการขาย: ${report.lineCount}", 14, ink)
+                                addText(results, "ยอดขายรวมจากเอกสาร: ${formatMoney(report.grossSalesSatang)}", 17, navy)
+                                addText(results, "เงินสด: ${formatMoney(report.cashSalesSatang)}", 14, ink)
+                                addText(results, "เงินเชื่อ: ${formatMoney(report.creditSalesSatang)}", 14, ink)
+                                addText(results, "รับชำระแล้ว: ${formatMoney(report.paymentsReceivedSatang)}", 14, ink)
+                                addText(results, "ยอดค้างเงินเชื่อ: ${formatMoney(report.outstandingCreditSatang)}", 14, ink)
+                                addText(results, "เลขจ่ายครึ่ง: ${report.halfPayoutLineCount} รายการ • ยอดขาย ${formatMoney(report.halfPayoutAmountSatang)}", 14, ink)
                                 addText(results, "ยอดแยกประเภท", 16, navy)
                                 report.categoryTotalsSatang.forEach { (category, amount) ->
-                                    addText(results, "\${categoryLabel(category)}: \${formatMoney(amount)}", 14, ink)
+                                    addText(results, "${categoryLabel(category)}: ${formatMoney(amount)}", 14, ink)
                                 }
                                 addText(results, "ยอดขายรายวัน", 16, navy)
                                 report.dailyGrossSalesSatang.forEach { (date, amount) ->
-                                    addText(results, "$date • \${formatMoney(amount)}", 14, ink)
+                                    addText(results, "$date • ${formatMoney(amount)}", 14, ink)
                                 }
                                 if (report.correctionDocumentCount > 0) {
-                                    addText(results, "มีเอกสารแก้ไข \${report.correctionDocumentCount} ฉบับ • ยอดขายรวมข้างต้นนับรวมเอกสารแก้ไขด้วย และยังไม่หักกลบเป็นยอดสุทธิ", 13, 0xFF9B2C2C.toInt())
+                                    addText(results, "มีเอกสารแก้ไข ${report.correctionDocumentCount} ฉบับ • ยอดขายรวมข้างต้นนับรวมเอกสารแก้ไขด้วย และยังไม่หักกลบเป็นยอดสุทธิ", 13, 0xFF9B2C2C.toInt())
                                 }
                                 addText(results, "ยังไม่คำนวณยอดจ่ายรางวัล กำไร หรือยอดสุทธิ จนกว่าจะกำหนดสูตรและกฎบัญชีตาม SRS 0.2", 13, 0xFF9B2C2C.toInt())
                             }
                         } catch (e: Exception) {
-                            runOnUiThread { addText(results, "สร้างรายงานไม่สำเร็จ: \${e.message}", 14, 0xFF9B2C2C.toInt()) }
+                            runOnUiThread { addText(results, "สร้างรายงานไม่สำเร็จ: ${e.message}", 14, 0xFF9B2C2C.toInt()) }
                         }
                     }
                 }

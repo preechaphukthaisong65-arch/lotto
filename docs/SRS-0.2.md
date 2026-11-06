@@ -54,7 +54,7 @@ Saved source documents cannot be edited, deleted, or cancelled. Corrections are 
 After a successful sale commit, generate a receipt image locally and store it on-device, linked to its source document. Include document ID, period, timestamp, number/category/amount lines, total, and half-payout labels where applicable. Receipt generation failure must be recoverable from the source document without duplicating the sale.
 
 ## 10. Results and settlement
-Results are entered/imported with source and verification metadata. Settlement is calculated from original documents and approved rule configuration, then saved as a period report. Exact payout rates, half-payout calculation, legal review, and result-source selection are unresolved gates.
+Results are entered/imported with source and verification metadata. Settlement is calculated from original documents and approved rule configuration, then saved as a period report. Payout rates are user-configurable in Settings and must not be hardcoded: 2-digit top and bottom share one configurable rate; 3-digit top, 3-digit bottom, and 3-digit permutation/โต๊ด each have independent configurable rates. Users may change these rates for future periods. The rate values and configuration version used for a settlement must be snapshotted with the period settlement so later setting changes cannot alter historical results. Example defaults for initial setup may be 2-digit 70 baht per baht and 3-digit straight 500 baht per baht; 3-digit permutation/โต๊ด 100 baht per baht. These examples are editable and are not immutable business constants. Exact half-payout calculation, legal review, and result-source selection remain unresolved gates.
 
 ## 11. Reports
 Period/day sales, category totals, cash/credit breakdown, receivables, payments, outstanding balances, half-payout entries, winning entries, payout totals, and period net totals. Reports are derived from source ledgers, not manually re-entered totals.
@@ -72,12 +72,10 @@ PIN-gated access for configured sensitive actions. Restrict access by role. Pres
 Install/launch; create period; all entry types; variable amounts; limit enforcement; half-payout labeling; cash/credit customers; partial/full payments; receipt image generation; immutable documents; settlement; reports; backup/restore; airplane-mode operation; process death/restart; and failure recovery on a physical Android device.
 
 ## 16. Unresolved decisions — do not invent
-1. Payout rates by category.
-2. Exact half-payout formula and precedence.
-3. Limit aggregation rules across top/bottom/toad.
-4. Correction-document workflow and linking rules.
-5. Authoritative result source and verification process.
-6. Accounting report definitions.
-7. PIN roles and per-module permissions.
+1. Exact half-payout formula and precedence.
+2. Limit aggregation rules across top/bottom/toad.
+3. Authoritative result source and verification process.
+4. Accounting report definitions and correction offsets.
+5. PIN roles and per-module permissions.
 
 Any wagering, payout, or related functionality must undergo applicable legal/compliance review before operational release. Until decisions are approved, these calculations must remain disabled or clearly marked unconfigured.
