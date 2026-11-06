@@ -8,7 +8,7 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "draw_source_checks",
     foreignKeys = [ForeignKey(entity = DrawPeriodEntity::class, parentColumns = ["periodId"], childColumns = ["periodId"], onDelete = ForeignKey.RESTRICT)],
-    indices = [Index(value = ["periodId", "sourceId"]), Index(value = ["periodId", "fetchedAtEpochMillis"])]
+    indices = [Index(value = ["periodId"]), Index(value = ["periodId", "sourceId"]), Index(value = ["periodId", "fetchedAtEpochMillis"])]
 )
 data class DrawSourceCheckEntity(
     @PrimaryKey val checkId: String,
