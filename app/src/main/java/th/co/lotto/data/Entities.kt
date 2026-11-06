@@ -28,8 +28,8 @@ data class PayoutRateSettingsEntity(
     val threeToadRateHundredths: Long,
     val configVersion: Long,
     val updatedAtEpochMillis: Long,
-    val twoTopRateHundredths: Long = twoDigitRateHundredths,
-    val twoBottomRateHundredths: Long = twoDigitRateHundredths
+    @ColumnInfo(defaultValue = "7000") val twoTopRateHundredths: Long = twoDigitRateHundredths,
+    @ColumnInfo(defaultValue = "7000") val twoBottomRateHundredths: Long = twoDigitRateHundredths
 )
 
 @Entity(tableName = "customers", indices = [Index(value = ["phone"])])
