@@ -3,7 +3,10 @@ package th.co.lotto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class GloResultClientTest {
     private val validResponse = """
         {
@@ -40,9 +43,9 @@ class GloResultClientTest {
 
     @Test
     fun preservesLeadingZeroesInThreeDigitTop() {
-        val response = validResponse.replace("639214", "004615")
+        val response = validResponse.replace("639214", "123004")
         val result = GloResultClient.parseResponse(response, "2026-07-16")
-        assertEquals("615", result.threeTopNumber)
+        assertEquals("004", result.threeTopNumber)
     }
 
     @Test
