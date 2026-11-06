@@ -15,6 +15,15 @@ class LocalBackupCryptoTest {
     }
 
     @Test
+    fun eachBackupUsesFreshSaltAndNonce() {
+        val payload = "same local backup".toByteArray()
+        val passphrase = "correct horse battery".toCharArray()
+        val first = LocalBackupManager.encrypt(payload, passphrase)
+        val second = LocalBackupManager.encrypt(payload, passphrase)
+        assertNotEquals(first.toList(), second.toList())
+    }
+
+    @Test
     fun wrongPassphraseIsRejected() {
         val encrypted = LocalBackupManager.encrypt(byteArrayOf(1, 2, 3), "correct horse battery".toCharArray())
         assertThrows(IllegalArgumentException::class.java) {
