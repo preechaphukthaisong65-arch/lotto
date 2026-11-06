@@ -26,6 +26,7 @@ import th.co.lotto.data.SaleLineEntity
 import th.co.lotto.data.AuditEventEntity
 import th.co.lotto.data.PaymentEntryEntity
 import th.co.lotto.data.NumberLimitRuleEntity
+import th.co.lotto.data.SaleCancellationEntity
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.UUID
@@ -629,11 +630,13 @@ class MainActivity : Activity() {
                         val documents = dao.searchSales(periodId, query)
                         val periodTitles = documents.associate { doc -> doc.periodId to (dao.getPeriod(doc.periodId)?.title ?: "ไม่ทราบชื่องวด") }
                         val halfCounts = documents.associate { doc -> doc.documentId to dao.getLinesForDocument(doc.documentId).count { it.halfPayout } }
+                        val cancellations = documents.associate { doc -> doc.documentId to dao.getSaleCancellation(doc.documentId) }
                         runOnUiThread {
                             if (documents.isEmpty()) addText(results, "ไม่พบเอกสารขาย", 14, ink)
                             documents.forEach { doc ->
                                 val periodTitle = periodTitles[doc.periodId] ?: "ไม่ทราบชื่องวด"
-                                val label = if (doc.correctionOfDocumentId == null) "บิลต้นฉบับ" else "เอกสารอ้างอิงบิล ${doc.correctionOfDocumentId.take(8)}"
+                                val cancellation = cancellations[doc.documentId]
+                                val label = if (cancellation != null) "ยกเลิกแล้ว" else "บิลยืนยันแล้ว"
                                 val halfCount = halfCounts[doc.documentId] ?: 0
                                 val halfLabel = if (halfCount > 0) " • มีเลขจ่ายครึ่ง $halfCount รายการ" else " • ไม่มีเลขจ่ายครึ่ง"
                                 addCard(results, "บิล ${doc.documentId.take(8)} • ${formatMoney(doc.totalAmountSatang)}",
@@ -657,11 +660,20 @@ class MainActivity : Activity() {
             val period = dao.getPeriod(document.periodId)
             val customer = document.customerId?.let { dao.getCustomer(it) }
             val lines = dao.getLinesForDocument(documentId)
+            val cancellation = dao.getSaleCancellation(documentId)
+            val canCancel = dao.getDrawResults(document.periodId).isEmpty() &&
+                dao.getSettlementSnapshot(document.periodId) == null
             val receiptFile = java.io.File(java.io.File(filesDir, "receipts"), "${document.documentId}.png")
             runOnUiThread {
                 base("รายละเอียดบิล")
                 addText(currentBody, "เลขที่เอกสาร: ${document.documentId}", 12, ink)
-                addText(currentBody, "งวด: ${period?.title ?: "ไม่ทราบงวด"} • สถานะ: ${period?.status ?: "ไม่ทราบ"}", 14, ink)
+                addText(currentBody, "สถานะบิล: ${if (cancellation == null) "ยืนยันแล้ว" else "ยกเลิกแล้ว"}", 15, if (cancellation == null) navy else 0xFF9B2C2C.toInt())
+                if (cancellation != null) {
+                    addText(currentBody, "ยกเลิกเมื่อ: ${SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale("th", "TH")).format(Date(cancellation.cancelledAtEpochMillis))}", 13, ink)
+                    addText(currentBody, "เหตุผลการยกเลิก: ${cancellation.reason}", 13, ink)
+                    addText(currentBody, "ยอดบิลเดิมที่ยกเลิก: ${formatMoney(cancellation.originalAmountSatang)}", 13, ink)
+                }
+                addText(currentBody, "งวด: ${period?.title ?: "ไม่ทราบงวด"} • สถานะงวด: ${period?.status ?: "ไม่ทราบ"}", 14, ink)
                 addText(currentBody, "วันที่: ${SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale("th", "TH")).format(Date(document.createdAtEpochMillis))}", 14, ink)
                 addText(currentBody, "ประเภทลูกค้า: ${document.customerType}${customer?.let { " • ${it.displayName}" } ?: ""}", 14, ink)
                 if (document.correctionOfDocumentId != null) addText(currentBody, "อ้างอิงบิลต้นฉบับ: ${document.correctionOfDocumentId}", 12, ink)
@@ -700,12 +712,72 @@ class MainActivity : Activity() {
                         }
                     }
                 }
-                if (period?.status == "OPEN" && document.correctionOfDocumentId == null) {
-                    addButton(currentBody, "สร้างเอกสารใหม่อ้างอิงบิลนี้") { createSaleDialog(document.documentId) }
+                if (cancellation == null && canCancel) {
+                    addButton(currentBody, "ยกเลิกบิลนี้") { cancelSaleDialog(document) }
                 }
                 addButton(currentBody, "กลับประวัติการขาย") { showSalesHistory() }
             }
         }
+    }
+
+    private fun cancelSaleDialog(document: SaleDocumentEntity) {
+        val reason = EditText(this).apply {
+            hint = "ระบุเหตุผลที่ยกเลิกบิล (จำเป็น)"
+            minLines = 2
+            gravity = android.view.Gravity.TOP
+        }
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), 0)
+            addView(TextView(this@MainActivity).apply {
+                text = "บิล ${document.documentId.take(8)} • ${formatMoney(document.totalAmountSatang)} บาท"
+                textSize = 15f
+                setTextColor(navy)
+            })
+            addView(reason)
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("ยืนยันยกเลิกบิล")
+            .setMessage("บิลเดิมจะไม่ถูกลบ แต่จะถูกทำเครื่องหมายยกเลิกและไม่นำไปคิดยอดขาย วงเงิน ลูกหนี้ หรือผลรางวัล")
+            .setView(form)
+            .setNegativeButton("กลับ", null)
+            .setPositiveButton("ยืนยันยกเลิก", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val note = reason.text.toString().trim()
+                if (note.isBlank()) {
+                    reason.error = "กรุณาระบุเหตุผลการยกเลิก"
+                    return@setOnClickListener
+                }
+                val now = System.currentTimeMillis()
+                val cancellation = SaleCancellationEntity(
+                    UUID.randomUUID().toString(), document.documentId,
+                    document.totalAmountSatang, note, now
+                )
+                val audit = AuditEventEntity(
+                    UUID.randomUUID().toString(), "SALE_CANCELLATION",
+                    cancellation.cancellationId, "CANCELLED",
+                    "Bill ${document.documentId} cancelled; amount=${document.totalAmountSatang}; reason=$note",
+                    now
+                )
+                io.execute {
+                    try {
+                        database.lottoDao().cancelSaleDocument(cancellation, audit)
+                        runOnUiThread {
+                            Toast.makeText(this, "ยกเลิกบิลและบันทึกประวัติแล้ว", Toast.LENGTH_LONG).show()
+                            dialog.dismiss()
+                            showSaleDetail(document.documentId)
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread {
+                            Toast.makeText(this, "ยกเลิกบิลไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
+        }
+        dialog.show()
     }
 
     private fun showCreditLedger() {
