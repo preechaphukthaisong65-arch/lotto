@@ -17,6 +17,7 @@ Lotto is being developed as an Android-only, offline-first application. The on-d
 - Encrypted local backup/restore is implemented with a user-supplied passphrase; it packages the SQLite database and receipt images, validates the archive/database before replacement, and includes rollback protection.
 - No in-app PIN, user accounts, staff roles, or per-module permissions. Device screen lock is the device-level protection.
 - Final physical-device and airplane-mode acceptance testing is still required.
+- Production release gate: verify commercial-use permission for GLO result data; the GLO Data Catalog currently lists a Creative Commons Non-Commercial license for the result dataset.
 - Approved half-payout rule: retain the full recorded stake and apply 50% of the configured payout rate. Final payout calculations remain disabled until their end-to-end accounting implementation is verified.
 - Confirmed sales are immutable. Cancellation is a separate auditable event with timestamp and reason; a replacement purchase is a new sale document. Cancelled bills remain visible in history but are excluded from active totals.
 
