@@ -114,11 +114,13 @@ class LottoDatabaseIntegrityTest {
     @Test
     fun saleHistoryCanSearchByDocumentOrNumberAndFilterByPeriod() {
         dao.insertPeriod(period("period-1"))
-        dao.insertPeriod(period("period-2"))
         val first = SaleDocumentEntity("sale-123", "period-1", null, "CASH", 2_000L, 10L, "Asia/Bangkok")
         val second = SaleDocumentEntity("sale-456", "period-2", null, "CASH", 3_000L, 20L, "Asia/Bangkok")
         dao.postSale(first, listOf(SaleLineEntity("line-1", "sale-123", "period-1", "12", "TWO_TOP", 2_000L, false)),
             AuditEventEntity("event-1", "SALE_DOCUMENT", "sale-123", "POSTED", "test", 10L))
+        database.openHelper.writableDatabase.execSQL("UPDATE draw_periods SET status = 'CLOSED' WHERE periodId = 'period-1'")
+        dao.insertPeriod(period("period-2"))
+        val second = SaleDocumentEntity("sale-456", "period-2", null, "CASH", 3_000L, 20L, "Asia/Bangkok")
         dao.postSale(second, listOf(SaleLineEntity("line-2", "sale-456", "period-2", "123", "THREE_TOAD", 3_000L, true)),
             AuditEventEntity("event-2", "SALE_DOCUMENT", "sale-456", "POSTED", "test", 20L))
 
@@ -162,10 +164,11 @@ class LottoDatabaseIntegrityTest {
     @Test
     fun linkedCorrectionCannotReferenceAnotherPeriod() {
         dao.insertPeriod(period("period-1"))
-        dao.insertPeriod(period("period-2"))
         val original = SaleDocumentEntity("sale-original", "period-1", null, "CASH", 1_000L, 10L, "Asia/Bangkok")
         dao.postSale(original, listOf(SaleLineEntity("line-original", "sale-original", "period-1", "12", "TWO_TOP", 1_000L, false)),
             AuditEventEntity("event-original", "SALE_DOCUMENT", "sale-original", "POSTED", "test", 10L))
+        database.openHelper.writableDatabase.execSQL("UPDATE draw_periods SET status = 'CLOSED' WHERE periodId = 'period-1'")
+        dao.insertPeriod(period("period-2"))
         val correction = SaleDocumentEntity("sale-correction", "period-2", null, "CASH", 2_000L, 20L,
             "Asia/Bangkok", "sale-original")
         assertThrows(IllegalArgumentException::class.java) {
