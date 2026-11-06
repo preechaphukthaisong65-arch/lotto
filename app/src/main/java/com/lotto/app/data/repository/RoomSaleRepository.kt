@@ -1,19 +1,15 @@
 package com.lotto.app.data.repository
 
+import com.lotto.app.data.local.LottoDatabase
 import com.lotto.app.data.local.dao.SaleDao
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
 import com.lotto.app.domain.model.SaleDraft
 
-class RoomSaleRepository(
-    private val saleDao: SaleDao
-) : SaleRepository {
-
+class RoomSaleRepository(private val saleDao: SaleDao) : SaleRepository {
     override suspend fun saveConfirmedSale(draft: SaleDraft): Long {
         require(draft.totalAmount > 0L) { "ยอดขายต้องมากกว่า 0 บาท" }
-        require(draft.cashAmount >= 0L && draft.creditAmount >= 0L) {
-            "ยอดชำระต้องไม่ติดลบ"
-        }
+        require(draft.cashAmount >= 0L && draft.creditAmount >= 0L) { "ยอดชำระต้องไม่ติดลบ" }
         require(draft.cashAmount + draft.creditAmount == draft.totalAmount) {
             "ยอดเงินสดและเงินเชื่อต้องรวมกันเท่ากับยอดขาย"
         }
@@ -23,13 +19,14 @@ class RoomSaleRepository(
             "ผลรวมรายการซื้อไม่ตรงกับยอดขาย"
         }
 
+        val createdAt = System.currentTimeMillis()
         val sale = SaleEntity(
             customerFirstName = draft.customerFirstName.trim(),
             customerLastName = draft.customerLastName.trim(),
             totalAmount = draft.totalAmount,
             cashAmount = draft.cashAmount,
             creditAmount = draft.creditAmount,
-            createdAt = System.currentTimeMillis()
+            createdAt = createdAt
         )
         val items = draft.items.map {
             SaleItemEntity(
@@ -44,4 +41,10 @@ class RoomSaleRepository(
     }
 
     override suspend fun getAllSales(): List<SaleEntity> = saleDao.getAllSales()
+
+    override suspend fun cleanupExpiredPaidDocuments(now: Long): Int {
+        val retentionMillis = LottoDatabase.PAID_DOCUMENT_RETENTION_DAYS *
+            LottoDatabase.MILLIS_PER_DAY
+        return saleDao.deleteExpiredPaidDocuments(now - retentionMillis)
+    }
 }
