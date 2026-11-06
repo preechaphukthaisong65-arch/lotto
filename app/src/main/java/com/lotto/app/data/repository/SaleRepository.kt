@@ -5,9 +5,6 @@ import com.lotto.app.domain.model.SaleDraft
 
 interface SaleRepository {
     suspend fun saveConfirmedSale(draft: SaleDraft): Long
-
-    /**
-     * Returns every sale document, including cash, credit, and split-payment sales.
-     */
     suspend fun getAllSales(): List<SaleEntity>
+    suspend fun cleanupExpiredPaidDocuments(now: Long = System.currentTimeMillis()): Int
 }
