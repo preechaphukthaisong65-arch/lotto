@@ -63,7 +63,9 @@ class LottoDatabaseIntegrityTest {
 
     @Test
     fun settlementSnapshotRequiresClosedPeriodAndIsImmutable() {
-        dao.insertPeriod(period("period-settlement"))
+        val drawMillis = java.time.LocalDate.parse("2026-11-01")
+            .atStartOfDay(java.time.ZoneId.of("Asia/Bangkok")).toInstant().toEpochMilli()
+        dao.insertPeriod(period("period-settlement").copy(drawDateEpochMillis = drawMillis))
         val settings = PayoutRateSettingsEntity(1, 7_000L, 50_000L, 50_000L, 10_000L, 1L, 1L)
         dao.insertPayoutRateSettings(settings)
         val openSnapshot = SettlementSnapshotEntity("settlement-open", "period-settlement",
@@ -73,9 +75,16 @@ class LottoDatabaseIntegrityTest {
             dao.createSettlementSnapshot(openSnapshot, openAudit)
         }
         database.openHelper.writableDatabase.execSQL("UPDATE draw_periods SET status = 'CLOSED' WHERE periodId = 'period-settlement'")
-        dao.postDrawResult(
-            DrawResultEntity("settlement-result", "period-settlement", "THREE_TOP", "123", "GLO", 3L, 3L),
-            AuditEventEntity("settlement-result-audit", "DRAW_RESULT", "settlement-result", "POSTED", "test", 3L)
+        dao.insertDrawSourceCheck(DrawSourceCheckEntity("lc-settlement", "period-settlement", "LOTTERYCHECKS",
+            "2026-11-01", "000123", "123", "45", "https://lotterychecks.com", 10L))
+        dao.insertDrawSourceCheck(DrawSourceCheckEntity("hr-settlement", "period-settlement", "HUAYREVIEW",
+            "2026-11-01", "000123", "123", "45", "https://huayreview.net", 11L))
+        dao.postComparedResults(
+            "period-settlement",
+            DrawResultEntity("settlement-result", "period-settlement", "THREE_TOP", "123", "AUTO-COMPARED test", 12L, 12L),
+            DrawResultEntity("settlement-bottom", "period-settlement", "TWO_BOTTOM", "45", "AUTO-COMPARED test", 12L, 12L),
+            AuditEventEntity("settlement-result-audit", "DRAW_RESULT", "settlement-result", "POSTED", "test", 12L),
+            AuditEventEntity("settlement-bottom-audit", "DRAW_RESULT", "settlement-bottom", "POSTED", "test", 12L)
         )
         dao.createSettlementSnapshot(openSnapshot, openAudit)
         assertEquals(1L, dao.getSettlementSnapshot("period-settlement")?.payoutConfigVersion)
@@ -216,9 +225,11 @@ class LottoDatabaseIntegrityTest {
 
     @Test
     fun drawResultsRequireClosedPeriodAndAreImmutableWithAudit() {
-        dao.insertPeriod(period("period-1"))
+        val drawMillis = java.time.LocalDate.parse("2026-11-01")
+            .atStartOfDay(java.time.ZoneId.of("Asia/Bangkok")).toInstant().toEpochMilli()
+        dao.insertPeriod(period("period-1").copy(drawDateEpochMillis = drawMillis))
         val openResult = DrawResultEntity(
-            "result-open", "period-1", "THREE_TOP", "12", "GLO", null, 10L
+            "result-open", "period-1", "THREE_TOP", "12", "AUTO-COMPARED test", null, 10L
         )
         val openAudit = AuditEventEntity(
             "result-open-event", "DRAW_RESULT", "result-open", "POSTED", "test", 10L
@@ -227,7 +238,11 @@ class LottoDatabaseIntegrityTest {
             dao.postDrawResult(openResult, openAudit)
         }
         database.openHelper.writableDatabase.execSQL("UPDATE draw_periods SET status = 'CLOSED' WHERE periodId = 'period-1'")
-        val result = openResult.copy(resultId = "result-closed", winningNumber = "123", sourceLabel = "GLO", verifiedAtEpochMillis = 20L, importedAtEpochMillis = 20L)
+        dao.insertDrawSourceCheck(DrawSourceCheckEntity("lc-result", "period-1", "LOTTERYCHECKS",
+            "2026-11-01", "000123", "123", "45", "https://lotterychecks.com", 18L))
+        dao.insertDrawSourceCheck(DrawSourceCheckEntity("hr-result", "period-1", "HUAYREVIEW",
+            "2026-11-01", "000123", "123", "45", "https://huayreview.net", 19L))
+        val result = openResult.copy(resultId = "result-closed", winningNumber = "123", sourceLabel = "AUTO-COMPARED test", verifiedAtEpochMillis = 20L, importedAtEpochMillis = 20L)
         val audit = openAudit.copy(eventId = "result-event", entityId = "result-closed", createdAtEpochMillis = 20L)
         dao.postDrawResult(result, audit)
         assertEquals(1, dao.getDrawResults("period-1").size)
