@@ -121,6 +121,15 @@ abstract class LottoDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE settlement_snapshots ADD COLUMN twoTopRateHundredths INTEGER NOT NULL DEFAULT 7000")
                 db.execSQL("ALTER TABLE settlement_snapshots ADD COLUMN twoBottomRateHundredths INTEGER NOT NULL DEFAULT 7000")
                 db.execSQL("UPDATE settlement_snapshots SET twoTopRateHundredths = twoDigitRateHundredths, twoBottomRateHundredths = twoDigitRateHundredths")
+                // Replace pre-v9 category guards so existing installations can accept the two new categories.
+                listOf(
+                    "validate_sale_line_category_insert",
+                    "validate_limit_rule_category_insert",
+                    "validate_limit_rule_category_update",
+                    "validate_number_block_category_insert",
+                    "validate_number_block_category_update",
+                    "validate_draw_result_category_insert"
+                ).forEach { trigger -> db.execSQL("DROP TRIGGER IF EXISTS $trigger") }
                 installIntegrityGuards(db)
             }
         }
@@ -200,7 +209,7 @@ abstract class LottoDatabase : RoomDatabase() {
                   OR length(NEW.numberText) != CASE WHEN NEW.betCategory IN ('TWO_TOP', 'TWO_BOTTOM') THEN 2 ELSE 3 END
                   OR NEW.numberText GLOB '*[^0-9]*'
                 BEGIN
-                    SELECT RAISE(ABORT, 'Only three-digit top and toad sale lines are supported');
+                    SELECT RAISE(ABORT, 'Only two-digit top/bottom and three-digit top/toad sale lines are supported');
                 END
             """.trimIndent())
             db.execSQL("""
@@ -211,7 +220,7 @@ abstract class LottoDatabase : RoomDatabase() {
                   OR NEW.betCategory NOT IN ('TWO_TOP', 'TWO_BOTTOM', 'THREE_TOP', 'THREE_TOAD')
                   OR NEW.numberText GLOB '*[^0-9]*'
                 BEGIN
-                    SELECT RAISE(ABORT, 'Only three-digit top and toad limits are supported');
+                    SELECT RAISE(ABORT, 'Only supported two-digit and three-digit limit categories are allowed');
                 END
             """.trimIndent())
             db.execSQL("""
@@ -232,7 +241,7 @@ abstract class LottoDatabase : RoomDatabase() {
                   OR NEW.blockCategory NOT IN ('TWO_TOP', 'TWO_BOTTOM', 'THREE_TOP', 'THREE_TOAD')
                   OR NEW.numberText GLOB '*[^0-9]*'
                 BEGIN
-                    SELECT RAISE(ABORT, 'Only three-digit top and toad blocked numbers are supported');
+                    SELECT RAISE(ABORT, 'Only supported two-digit and three-digit blocked-number categories are allowed');
                 END
             """.trimIndent())
             db.execSQL("""
@@ -263,7 +272,7 @@ abstract class LottoDatabase : RoomDatabase() {
                   OR length(NEW.winningNumber) != CASE WHEN NEW.resultType IN ('TWO_BOTTOM', '2 ตัวล่าง') THEN 2 ELSE 3 END
                   OR NEW.winningNumber GLOB '*[^0-9]*'
                 BEGIN
-                    SELECT RAISE(ABORT, 'Only official three-digit top results are supported');
+                    SELECT RAISE(ABORT, 'Only official first-prize top and last-two results are supported');
                 END
             """.trimIndent())
             db.execSQL("""
