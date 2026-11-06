@@ -1165,6 +1165,7 @@ class MainActivity : Activity() {
                                     runOnUiThread { Toast.makeText(this, "งวดนี้บันทึกอัตราจ่ายไว้แล้ว • รุ่น ${existing.payoutConfigVersion}", Toast.LENGTH_LONG).show() }
                                 } else {
                                     val rates = dao.getPayoutRateSettings() ?: error("กรุณาตั้งค่าอัตราจ่ายก่อน")
+                                    require(dao.isResultVerificationComplete(selectedPeriod.periodId)) { "ผลยังไม่ผ่านการตรวจสอบจากสองเว็บไซต์หรือการยืนยันด้วยตนเอง" }
                                     require(dao.getDrawResults(selectedPeriod.periodId).isNotEmpty()) { "กรุณาบันทึกผลหวยก่อน" }
                                     val now = System.currentTimeMillis()
                                     val snapshot = th.co.lotto.data.SettlementSnapshotEntity(
@@ -1395,6 +1396,9 @@ class MainActivity : Activity() {
         io.execute {
             val dao = database.lottoDao()
             val results = dao.getDrawResults(periodId)
+            val sourceChecks = dao.getDrawSourceChecks(periodId).groupBy { it.sourceId }
+                .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
+            val verificationComplete = dao.isResultVerificationComplete(periodId)
             val snapshot = dao.getSettlementSnapshot(periodId)
             val documents = dao.getSalesForPeriod(periodId)
             val saleLines = documents.flatMap { dao.getLinesForDocument(it.documentId) }
@@ -1402,10 +1406,23 @@ class MainActivity : Activity() {
             val grossSales = documents.fold(0L) { total, document ->
                 Math.addExact(total, document.totalAmountSatang)
             }
-            val payoutSummary = snapshot?.let {
+            val payoutSummary = if (verificationComplete) snapshot?.let {
                 runCatching { PayoutCalculator.calculatePeriod(matches, it, grossSales) }.getOrNull()
-            }
+            } else null
             runOnUiThread {
+                val lc = sourceChecks["LOTTERYCHECKS"]
+                val hr = sourceChecks["HUAYREVIEW"]
+                if (lc == null || hr == null) {
+                    addText(resultList, "สถานะตรวจผล: ยังตรวจสอบจากสองเว็บไซต์ไม่ครบ • ระงับการคำนวณจ่าย", 13, 0xFF9B2C2C.toInt())
+                } else {
+                    addText(resultList, "LotteryChecks: ${lc.firstPrizeNumber} / ${lc.twoBottomNumber} • HuayReview: ${hr.firstPrizeNumber} / ${hr.twoBottomNumber}", 12, ink)
+                    if (lc.firstPrizeNumber != hr.firstPrizeNumber || lc.twoBottomNumber != hr.twoBottomNumber) {
+                        addText(resultList, if (verificationComplete) "ผลไม่ตรงกัน แต่ผู้ใช้ตรวจสอบ GLO และยืนยันผลแล้ว" else "ผลสองเว็บไซต์ไม่ตรงกัน • ระงับการคำนวณจ่ายและสรุปยอด", 13, 0xFF9B2C2C.toInt())
+                    } else {
+                        addText(resultList, if (verificationComplete) "ผลสองเว็บไซต์ตรงกัน • ยืนยันอัตโนมัติแล้ว" else "ผลตรงกัน แต่ยังไม่มีผลยืนยันที่บันทึก", 13, navy)
+                    }
+                }
+                if (!verificationComplete) addText(resultList, "ยังไม่อนุญาตให้คำนวณจ่ายหรือสรุปยอด", 13, 0xFF9B2C2C.toInt())
                 if (snapshot == null) {
                     addText(resultList, "อัตราจ่ายงวดนี้: ยังไม่ได้บันทึก snapshot", 12, 0xFF9B2C2C.toInt())
                 } else {
