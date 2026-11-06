@@ -96,3 +96,9 @@ Phase-7 automated acceptance coverage includes encryption/decryption round trip,
 5. PIN roles and per-module permissions.
 
 Any wagering, payout, or related functionality must undergo applicable legal/compliance review before operational release. Until decisions are approved, these calculations must remain disabled or clearly marked unconfigured.
+
+## 17. Build and delivery
+- GitHub Actions runs Android lint, Room/database unit tests, and debug APK assembly on the offline development branch.
+- The workflow verifies that the APK exists and is non-empty, generates a SHA-256 checksum, and records the source commit, branch, and workflow run in build metadata.
+- The APK, checksum, build metadata, and Room schema snapshots are uploaded as one short-retention test artifact.
+- Debug APKs are test builds only. A signed production release, key custody, and release signing process are not enabled in this phase.
