@@ -173,13 +173,6 @@ abstract class LottoDao {
         require(document.correctionOfDocumentId == null) {
             "Editing or correcting a confirmed bill is disabled; cancel it and create a new bill"
         }
-        document.correctionOfDocumentId?.let { originalId ->
-            val original = getSaleDocument(originalId) ?: error("Original sale document not found")
-            require(original.periodId == document.periodId) { "Correction must stay in the original draw period" }
-            require(original.correctionOfDocumentId == null) { "A correction document cannot be used as an original" }
-            require(original.documentId != document.documentId) { "A document cannot reference itself" }
-        }
-
         when (document.customerType) {
             "CASH" -> {
                 if (document.customerId != null) {
@@ -200,7 +193,7 @@ abstract class LottoDao {
 
         // Explicitly rejected numbers are separate from monetary limit rules.
         lines.forEach { line ->
-            val blockCategory = if (line.numberText.length == 2) "TWO_DIGIT" else line.betCategory
+            val blockCategory = line.betCategory
             require(getActiveNumberBlockRule(document.periodId, blockCategory, line.numberText) == null) {
                 "Number is not accepted: ${line.numberText} / $blockCategory"
             }
@@ -210,13 +203,9 @@ abstract class LottoDao {
         val incomingByNumberAndCategory = lines.groupBy { it.numberText to it.betCategory }
         incomingByNumberAndCategory.forEach { (key, groupedLines) ->
             val (number, category) = key
-            require(number.length == 2 || number.length == 3) { "Number must contain 2 or 3 digits" }
+            require(number.length == 3) { "Number must contain exactly 3 digits" }
             require(number.all { it in '0'..'9' }) { "Number must contain ASCII digits only" }
-            val validCategories = if (number.length == 3) {
-                setOf("THREE_TOP", "THREE_TOAD")
-            } else {
-                emptySet()
-            }
+            val validCategories = setOf("THREE_TOP", "THREE_TOAD")
             require(category in validCategories) { "Category does not match number length" }
 
             val rule = getNumberLimitRule(document.periodId, number.length, category, number)
