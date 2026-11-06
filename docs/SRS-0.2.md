@@ -14,7 +14,7 @@ Build an Android application for managing lottery-period records, sales document
 - SQLite database stored on the Android device is the system of record.
 - No cloud database, backend server, account service, or synchronization.
 - No customer or transaction data may be transmitted to external services.
-- Network access, if later introduced, is restricted to explicitly requested public calendar/result sources and must not include private transaction data.
+- Network access is restricted to explicitly requested public GLO result retrieval and must not include private transaction data.
 - Cached public data must remain usable offline.
 - GitHub Actions is build automation only; it is not an application backend.
 
@@ -63,7 +63,7 @@ Payout rates are editable in Settings and are independent for THREE_TOP and THRE
 Approved half-payout formula: retain the full actual stake and apply 50% of the normal configured payout rate to that line. Example: 100 baht at 70x uses 35x and pays 3,500 baht. Do not reduce the recorded stake. End-to-end payout settlement remains gated on verified rounding, cancellation/refund accounting, and report reconciliation tests.
 
 ## 11. Reports
-Reports are derived from source ledgers. Cancelled bills remain visible in history and cancellation reports but are excluded from active sales, limits, credit balances, and result matching. Period/day reports include active sales, category totals (THREE_TOP and THREE_TOAD), cash/credit breakdown, receivables, payments, outstanding balances, and half-payout entries. Cancelled bill history is inspectable in sales history with its reason, timestamp, and original amount. CSV export includes active sales only. Final payout and net totals remain disabled until the settlement and refund accounting gates pass.
+Reports are derived from source ledgers. Cancelled bills remain visible in sales history and period cancellation summaries but are excluded from active sales, limits, credit balances, and result matching. Period/day reports include active sales, category totals (THREE_TOP and THREE_TOAD), cash/credit breakdown, receivables, payments, outstanding balances, and half-payout entries. Cancelled bill history is inspectable in sales history with its reason, timestamp, and original amount. CSV export includes active sales only. Final payout and net totals remain disabled until the settlement and refund accounting gates pass.
 
 ## 12. Storage and reliability
 Use Room/SQLite with foreign keys, indexes, transactions, stable IDs, duplicate protection, integrity checks, and local persistence across app restarts. Handle interrupted writes, low storage, corrupt database, incorrect period/customer selection, device clock drift, and restore failures.
@@ -95,7 +95,7 @@ Install/launch; create period; accept only THREE_TOP and THREE_TOAD sales; rejec
 Phase-7 automated acceptance coverage includes encryption/decryption round trip, wrong-passphrase rejection, tamper detection, and minimum passphrase length. Restore validation additionally checks archive paths, archive size, SQLite integrity, foreign keys, schema version, required tables, and rollback on replacement failure. Manual cross-device restore and physical-device interruption testing remain required.
 
 ## 16. Remaining implementation gates
-1. Verify the live GLO API request/response contract and complete real-network integration tests.
+1. Complete live real-network integration tests for the GLO API request/response contract.
 2. Define and implement cash-refund accounting when a cash bill is cancelled after money has physically changed hands.
 3. Verify payout rounding, settlement totals, and report reconciliation end to end.
 4. Confirm permission to use GLO open-result data in a commercial workflow; the GLO Data Catalog currently lists a Creative Commons Non-Commercial license for the result dataset.
