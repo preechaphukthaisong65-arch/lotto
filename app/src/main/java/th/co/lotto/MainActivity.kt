@@ -797,8 +797,9 @@ class MainActivity : Activity() {
                             remaining == 0L -> "เต็มแล้ว"
                             else -> "ยังรับได้"
                         }
+                        val payoutStatus = if (rule.halfPayout) " • จ่ายครึ่งอัตโนมัติ" else " • จ่ายเต็ม"
                         addCard(currentBody, "${rule.numberText} • ${categoryLabel(rule.betCategory)}",
-                            "วงเงิน ${formatMoney(rule.maximumAmountSatang)} • ขายแล้ว ${formatMoney(sold)} • คงเหลือ ${formatMoney(remaining)} • $status") {
+                            "วงเงิน ${formatMoney(rule.maximumAmountSatang)} • ขายแล้ว ${formatMoney(sold)} • คงเหลือ ${formatMoney(remaining)} • $status$payoutStatus") {
                             createLimitDialog(rule, period)
                         }
                     }
