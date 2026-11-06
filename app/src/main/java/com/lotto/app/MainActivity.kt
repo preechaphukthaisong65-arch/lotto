@@ -75,7 +75,9 @@ class MainActivity : ComponentActivity() {
                         )
                         AppScreen.TotalSales.name -> ReportDetailScreen(
                             title = "ยอดขายทั้งหมด",
-                            onBack = { currentScreen = AppScreen.Reports.name }
+                            onBack = { currentScreen = AppScreen.Reports.name },
+                            onOpenCurrentSales = { currentScreen = AppScreen.CurrentSales.name },
+                            onOpenSalesHistory = { currentScreen = AppScreen.SalesHistory.name }
                         )
                         AppScreen.CurrentSales.name -> ReportDetailScreen(
                             title = "ยอดขายงวดปัจจุบัน",
