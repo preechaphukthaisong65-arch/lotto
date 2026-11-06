@@ -149,6 +149,18 @@ abstract class LottoDao {
             else -> error("Unknown customer type")
         }
 
+        // Explicitly rejected numbers are separate from monetary limit rules.
+        lines.forEach { line ->
+            val blockCategory = when {
+                line.numberText.length == 2 -> "TWO_DIGIT"
+                line.betCategory == "THREE_TOAD" -> "THREE_TOAD"
+                else -> "THREE_STRAIGHT"
+            }
+            require(getActiveNumberBlockRule(document.periodId, blockCategory, line.numberText) == null) {
+                "Number is not accepted: ${line.numberText} / $blockCategory"
+            }
+        }
+
         // Aggregate each number/category once to avoid repeatedly adding a full batch.
         val incomingByNumberAndCategory = lines.groupBy { it.numberText to it.betCategory }
         incomingByNumberAndCategory.forEach { (key, groupedLines) ->
@@ -239,6 +251,88 @@ abstract class LottoDao {
 
     @Query("SELECT * FROM sale_documents WHERE customerId = :customerId AND customerType = 'CREDIT' ORDER BY createdAtEpochMillis DESC")
     abstract fun getCreditDocumentsForCustomer(customerId: String): List<SaleDocumentEntity>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract fun insertNumberBlockRule(rule: NumberBlockRuleEntity)
+
+    @Update
+    abstract fun updateNumberBlockRule(rule: NumberBlockRuleEntity)
+
+    @Query("""
+        SELECT * FROM number_block_rules
+        WHERE periodId = :periodId AND blockCategory = :blockCategory
+          AND numberText = :numberText LIMIT 1
+    """)
+    abstract fun getNumberBlockRule(
+        periodId: String, blockCategory: String, numberText: String
+    ): NumberBlockRuleEntity?
+
+    @Query("""
+        SELECT * FROM number_block_rules
+        WHERE periodId = :periodId AND blocked = 1
+        ORDER BY blockCategory, numberText
+    """)
+    abstract fun getActiveNumberBlockRules(periodId: String): List<NumberBlockRuleEntity>
+
+    @Query("""
+        SELECT * FROM number_block_rules
+        WHERE periodId = :periodId
+        ORDER BY blockCategory, numberText
+    """)
+    abstract fun getAllNumberBlockRules(periodId: String): List<NumberBlockRuleEntity>
+
+    @Query("""
+        SELECT * FROM number_block_rules
+        WHERE periodId = :periodId AND blockCategory = :blockCategory
+          AND numberText = :numberText AND blocked = 1 LIMIT 1
+    """)
+    abstract fun getActiveNumberBlockRule(
+        periodId: String, blockCategory: String, numberText: String
+    ): NumberBlockRuleEntity?
+
+    @Transaction
+    open fun setNumberBlocked(
+        ruleId: String,
+        periodId: String,
+        blockCategory: String,
+        numberText: String,
+        blocked: Boolean,
+        changedAtEpochMillis: Long,
+        auditEventId: String
+    ): Boolean {
+        require(ruleId.isNotBlank() && auditEventId.isNotBlank()) { "Rule and audit IDs are required" }
+        require(numberText.all { it in '0'..'9' } &&
+            ((blockCategory == "TWO_DIGIT" && numberText.length == 2) ||
+             ((blockCategory == "THREE_STRAIGHT" || blockCategory == "THREE_TOAD") && numberText.length == 3))) {
+            "Blocked number does not match its category"
+        }
+        val period = getPeriod(periodId) ?: error("Draw period not found")
+        require(period.status == "OPEN" || period.status == "PREPARED") {
+            "Blocked numbers can only be changed for an open or prepared period"
+        }
+        val existing = getNumberBlockRule(periodId, blockCategory, numberText)
+        if (existing == null && !blocked) return false
+        if (existing != null && existing.blocked == blocked) return false
+
+        if (existing == null) {
+            insertNumberBlockRule(NumberBlockRuleEntity(
+                ruleId, periodId, blockCategory, numberText, true,
+                changedAtEpochMillis, changedAtEpochMillis
+            ))
+        } else {
+            updateNumberBlockRule(existing.copy(
+                blocked = blocked,
+                updatedAtEpochMillis = changedAtEpochMillis
+            ))
+        }
+        insertAuditEvent(AuditEventEntity(
+            auditEventId, "NUMBER_BLOCK_RULE", existing?.ruleId ?: ruleId,
+            if (blocked) "BLOCKED" else "UNBLOCKED",
+            "$blockCategory:$numberText",
+            changedAtEpochMillis
+        ))
+        return true
+    }
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract fun insertLimitRule(rule: NumberLimitRuleEntity)
