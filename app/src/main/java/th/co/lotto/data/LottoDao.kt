@@ -665,12 +665,19 @@ abstract class LottoDao {
         val second = latest["HUAYREVIEW"] ?: return false
         if (first.drawDateIso != second.drawDateIso) return false
         val results = getDrawResults(periodId)
+        val latestCheckTime = maxOf(first.fetchedAtEpochMillis, second.fetchedAtEpochMillis)
         if (first.firstPrizeNumber == second.firstPrizeNumber && first.twoBottomNumber == second.twoBottomNumber) {
-            return results.any { it.resultType == "THREE_TOP" && it.sourceLabel.startsWith("AUTO-COMPARED") } &&
-                results.any { it.resultType == "TWO_BOTTOM" && it.sourceLabel.startsWith("AUTO-COMPARED") }
+            val top = results.firstOrNull { it.resultType == "THREE_TOP" } ?: return false
+            val bottom = results.firstOrNull { it.resultType == "TWO_BOTTOM" } ?: return false
+            return top.sourceLabel.startsWith("AUTO-COMPARED") &&
+                bottom.sourceLabel.startsWith("AUTO-COMPARED") &&
+                top.importedAtEpochMillis >= latestCheckTime && bottom.importedAtEpochMillis >= latestCheckTime
         }
-        return results.any { it.resultType == "THREE_TOP" && it.sourceLabel.startsWith("MANUAL-GLO") } &&
-            results.any { it.resultType == "TWO_BOTTOM" && it.sourceLabel.startsWith("MANUAL-GLO") }
+        val top = results.firstOrNull { it.resultType == "THREE_TOP" } ?: return false
+        val bottom = results.firstOrNull { it.resultType == "TWO_BOTTOM" } ?: return false
+        return top.sourceLabel.startsWith("MANUAL-GLO") &&
+            bottom.sourceLabel.startsWith("MANUAL-GLO") &&
+            top.importedAtEpochMillis >= latestCheckTime && bottom.importedAtEpochMillis >= latestCheckTime
     }
 
     @Query("SELECT * FROM draw_results WHERE periodId = :periodId ORDER BY importedAtEpochMillis DESC")
