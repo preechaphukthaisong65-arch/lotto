@@ -14,7 +14,7 @@ Build an Android application for managing lottery-period records, sales document
 - SQLite database stored on the Android device is the system of record.
 - No cloud database, backend server, account service, or synchronization.
 - No customer or transaction data may be transmitted to external services.
-- Network access is restricted to public draw-result retrieval from LotteryChecks and HuayReview. The app does not connect to GLO; the user may open GLO externally for manual verification. No private transaction data is transmitted.
+- Network access is restricted to public draw-result retrieval and public draw-calendar page retrieval from LotteryChecks and HuayReview. The app does not connect to GLO; the user may open GLO externally for manual verification. No private transaction data is transmitted.
 - Cached public data must remain usable offline.
 - GitHub Actions is build automation only; it is not an application backend.
 
@@ -52,7 +52,7 @@ Build an Android application for managing lottery-period records, sales document
 - Schedule a reminder for 7 calendar days before the confirmed draw date. If confirmation occurs inside that 7-day window, issue an immediate notice stating the actual remaining time. A later confirmed date change must cancel/recalculate the pending reminder and issue a change notice that identifies both dates.
 - When the sources disagree about a changed date, do not automatically choose either date. Preserve the last confirmed date and its audit history, mark the current schedule unconfirmed, and alert the user that manual checking against the official GLO announcement is required. The app does not retrieve GLO data.
 - Refresh calendar sources at least daily when online, subject to source rate limits and Android background-work constraints. Provide a manual refresh action. Never promise exact delivery time when Android has deferred background work or notifications are disabled.
-- Offline mode may display the last cached calendar and its last-checked timestamp. Offline data must be visibly marked as cached/stale and must not be represented as a fresh two-source confirmation.
+- Offline mode may display the last cached calendar and its last-checked timestamp. Offline data must be visibly marked as cached/stale and must not be represented as a fresh two-source confirmation. The app must check validated network connectivity before presenting any calendar comparison as currently confirmed.
 - Calendar retrieval is strictly public-data-only. No private app data may be transmitted. Source parsing must be isolated from result parsing, validated, auditable, and disabled if compliant public access is unavailable.
 
 ## 5. Sales categories and entry
