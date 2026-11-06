@@ -5,16 +5,37 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.lotto.app.ui.HomeScreen
+import com.lotto.app.ui.sale.SaleScreen
+
+private enum class AppScreen {
+    Home,
+    Sale
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
+                var currentScreen by rememberSaveable { mutableStateOf(AppScreen.Home.name) }
                 Surface(modifier = Modifier) {
-                    HomeScreen()
+                    when (currentScreen) {
+                        AppScreen.Sale.name -> SaleScreen(
+                            onBack = { currentScreen = AppScreen.Home.name },
+                            onSave = {
+                                // Persistence and receipt generation will be connected later.
+                            }
+                        )
+                        else -> HomeScreen(
+                            onOpenSale = { currentScreen = AppScreen.Sale.name }
+                        )
+                    }
                 }
             }
         }
