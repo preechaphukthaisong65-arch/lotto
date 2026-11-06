@@ -1227,96 +1227,167 @@ class MainActivity : Activity() {
                         }
                     }
                 }
-                addButton(currentBody, "＋ ดึงผลรางวัลจากเว็บไซต์ GLO") {
+                addButton(currentBody, "ตรวจผลจาก LotteryChecks และ HuayReview") {
                     val selected = periods[picker.selectedItemPosition]
                     if (selected.status != "CLOSED") {
-                        Toast.makeText(this, "ต้องปิดงวดก่อนจึงจะดึงผลรางวัลได้", Toast.LENGTH_LONG).show()
-                        return@addButton
-                    }
-                    val drawDate = selected.drawDateEpochMillis
-                    if (drawDate == null) {
+                        Toast.makeText(this, "ต้องปิดงวดก่อนตรวจผลรางวัล", Toast.LENGTH_LONG).show()
+                    } else if (selected.drawDateEpochMillis == null) {
                         Toast.makeText(this, "กรุณากำหนดวันที่ออกรางวัลของงวดนี้ก่อน", Toast.LENGTH_LONG).show()
-                        return@addButton
-                    }
-                    io.execute {
-                        try {
-                            require(dao.getDrawResults(selected.periodId).none { it.resultType == "THREE_TOP" || it.resultType == "TWO_BOTTOM" }) {
-                                "งวดนี้มีผลรางวัลจาก GLO บันทึกไว้แล้ว ไม่สามารถนำเข้าซ้ำ"
-                            }
-                            val official = GloResultClient().fetchTopResult(drawDate)
-                            val now = official.fetchedAtEpochMillis
-                            val result = th.co.lotto.data.DrawResultEntity(
-                                UUID.randomUUID().toString(),
-                                selected.periodId,
-                                "THREE_TOP",
-                                official.threeTopNumber,
-                                "GLO Official API • ${official.sourceUrl} • รางวัลที่ 1 ${official.firstPrizeNumber}",
-                                now,
-                                now
-                            )
-                            val audit = AuditEventEntity(
-                                UUID.randomUUID().toString(),
-                                "DRAW_RESULT",
-                                result.resultId,
-                                "POSTED",
-                                "GLO draw ${official.drawDateIso}; first prize ${official.firstPrizeNumber}; THREE_TOP ${official.threeTopNumber}; fetchedAt=$now",
-                                now
-                            )
-                            val bottomResult = th.co.lotto.data.DrawResultEntity(
-                                UUID.randomUUID().toString(), selected.periodId, "TWO_BOTTOM",
-                                official.twoBottomNumber,
-                                "GLO Official API • ${official.sourceUrl} • เลขท้าย 2 ตัว",
-                                now, now
-                            )
-                            val bottomAudit = AuditEventEntity(
-                                UUID.randomUUID().toString(), "DRAW_RESULT", bottomResult.resultId, "POSTED",
-                                "GLO draw ${official.drawDateIso}; TWO_BOTTOM ${official.twoBottomNumber}; fetchedAt=$now",
-                                now
-                            )
-                            dao.postGloResults(result, bottomResult, audit, bottomAudit)
-                            val snapshotMessage = try {
-                                val rates = dao.getPayoutRateSettings()
-                                if (rates == null) {
-                                    "ยังไม่ได้ตั้งค่าอัตราจ่าย จึงยังไม่สร้าง snapshot"
-                                } else {
-                                    val snapshotNow = System.currentTimeMillis()
-                                    val snapshot = th.co.lotto.data.SettlementSnapshotEntity(
-                                        UUID.randomUUID().toString(), selected.periodId,
-                                        rates.twoDigitRateHundredths, rates.threeTopRateHundredths,
-                                         rates.threeBottomRateHundredths, rates.threeToadRateHundredths,
-                                         rates.configVersion, snapshotNow,
-                                         twoTopRateHundredths = rates.twoTopRateHundredths,
-                                         twoBottomRateHundredths = rates.twoBottomRateHundredths
-                                    )
-                                    val snapshotAudit = AuditEventEntity(
-                                        UUID.randomUUID().toString(), "SETTLEMENT", snapshot.settlementId,
-                                        "SNAPSHOTTED", "Automatic payout-rate snapshot after GLO result import; version=${rates.configVersion}",
-                                        snapshotNow
-                                    )
-                                    dao.createSettlementSnapshot(snapshot, snapshotAudit)
-                                    "บันทึก snapshot อัตราจ่ายแล้ว"
-                                }
-                            } catch (snapshotError: Exception) {
-                                "ผล GLO บันทึกแล้ว แต่ snapshot ไม่สำเร็จ: ${snapshotError.message}"
-                            }
-                            runOnUiThread {
-                                Toast.makeText(this,
-                                    "นำเข้าผล GLO แล้ว • 3 ตัวบน ${official.threeTopNumber} • 2 ตัวล่าง ${official.twoBottomNumber} • $snapshotMessage",
-                                    Toast.LENGTH_LONG).show()
-                                showResults(selected.periodId)
-                            }
-                        } catch (e: Exception) {
-                            runOnUiThread {
-                                Toast.makeText(this, "ดึงผลจาก GLO ไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show()
-                            }
-                        }
+                    } else {
+                        resultList.removeAllViews()
+                        checkDrawSources(selected)
                     }
                 }
                 currentBody.addView(resultList)
                 periods.getOrNull(picker.selectedItemPosition)?.periodId?.let { renderSavedResults(it, resultList) }
-                addText(currentBody, "ผลรางวัลนำเข้าจาก GLO โดยตรงเท่านั้น • หาก GLO ไม่พร้อมใช้งาน ระบบจะไม่ใช้ผลจากเว็บอื่นแทน • ผลที่บันทึกแล้วใช้งานออฟไลน์ได้", 12, 0xFF526171.toInt())
+                addText(currentBody, "ระบบตรวจผลจาก LotteryChecks และ HuayReview เท่านั้น • GLO ไม่เชื่อมต่อกับแอป ผู้ใช้เปิดเว็บไซต์ GLO เองเมื่อสองแหล่งไม่ตรงกัน", 12, 0xFF526171.toInt())
             }
         }
+    }
+
+
+    private fun checkDrawSources(period: DrawPeriodEntity) {
+        val drawDate = period.drawDateEpochMillis ?: return
+        io.execute {
+            val dao = database.lottoDao()
+            val successes = mutableListOf<PublicDrawResult>()
+            val failures = mutableListOf<String>()
+            try { successes.add(LotteryChecksClient().fetch(drawDate)) }
+            catch (e: Exception) { failures.add("LotteryChecks: ${e.message ?: "ตรวจสอบไม่สำเร็จ"}") }
+            try { successes.add(HuayReviewClient().fetch(drawDate)) }
+            catch (e: Exception) { failures.add("HuayReview: ${e.message ?: "ตรวจสอบไม่สำเร็จ"}") }
+            try {
+                successes.forEach { result ->
+                    dao.insertDrawSourceCheck(th.co.lotto.data.DrawSourceCheckEntity(
+                        UUID.randomUUID().toString(), period.periodId, result.sourceId,
+                        result.drawDateIso, result.firstPrizeNumber, result.threeTopNumber,
+                        result.twoBottomNumber, result.sourceUrl, result.fetchedAtEpochMillis
+                    ))
+                }
+                val latest = dao.getDrawSourceChecks(period.periodId).groupBy { it.sourceId }
+                    .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
+                val first = latest["LOTTERYCHECKS"]
+                val second = latest["HUAYREVIEW"]
+                val comparable = first != null && second != null &&
+                    first.drawDateIso == second.drawDateIso &&
+                    first.fetchedAtEpochMillis >= System.currentTimeMillis() - 10 * 60 * 1000L &&
+                    second.fetchedAtEpochMillis >= System.currentTimeMillis() - 10 * 60 * 1000L
+                if (comparable && first!!.firstPrizeNumber == second!!.firstPrizeNumber &&
+                    first.twoBottomNumber == second.twoBottomNumber &&
+                    dao.getDrawResults(period.periodId).isEmpty()) {
+                    val now = System.currentTimeMillis()
+                    val top = th.co.lotto.data.DrawResultEntity(
+                        UUID.randomUUID().toString(), period.periodId, "THREE_TOP", first.threeTopNumber,
+                        "AUTO-COMPARED • LotteryChecks + HuayReview • ${first.drawDateIso}", now, now
+                    )
+                    val bottom = th.co.lotto.data.DrawResultEntity(
+                        UUID.randomUUID().toString(), period.periodId, "TWO_BOTTOM", first.twoBottomNumber,
+                        "AUTO-COMPARED • LotteryChecks + HuayReview • ${first.drawDateIso}", now, now
+                    )
+                    val topAudit = AuditEventEntity(UUID.randomUUID().toString(), "DRAW_RESULT", top.resultId,
+                        "POSTED", "Two public sources matched; first prize=${first.firstPrizeNumber}; THREE_TOP=${first.threeTopNumber}", now)
+                    val bottomAudit = AuditEventEntity(UUID.randomUUID().toString(), "DRAW_RESULT", bottom.resultId,
+                        "POSTED", "Two public sources matched; TWO_BOTTOM=${first.twoBottomNumber}", now)
+                    dao.postComparedResults(period.periodId, top, bottom, topAudit, bottomAudit)
+                }
+                runOnUiThread {
+                    if (failures.isNotEmpty()) {
+                        Toast.makeText(this, failures.joinToString("\\n") + "\\nยังยืนยันผลไม่ได้และยังคำนวณจ่ายไม่ได้", Toast.LENGTH_LONG).show()
+                    } else if (first != null && second != null && first.drawDateIso == second.drawDateIso &&
+                        (first.firstPrizeNumber != second.firstPrizeNumber || first.twoBottomNumber != second.twoBottomNumber)) {
+                        showManualResultDialog(period, first.firstPrizeNumber, first.twoBottomNumber,
+                            second.firstPrizeNumber, second.twoBottomNumber)
+                    } else if (first != null && second != null &&
+                        first.firstPrizeNumber == second.firstPrizeNumber && first.twoBottomNumber == second.twoBottomNumber) {
+                        Toast.makeText(this, "ผลจากสองเว็บไซต์ตรงกัน • ยืนยันผลอัตโนมัติแล้ว", Toast.LENGTH_LONG).show()
+                    } else {
+                        Toast.makeText(this, "ยังตรวจสอบผลจากทั้งสองเว็บไซต์ไม่ครบ", Toast.LENGTH_LONG).show()
+                    }
+                    showResults(period.periodId)
+                }
+            } catch (e: Exception) {
+                runOnUiThread { Toast.makeText(this, "บันทึกผลตรวจสอบไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
+            }
+        }
+    }
+
+    private fun showManualResultDialog(
+        period: DrawPeriodEntity,
+        lotteryFirst: String,
+        lotteryBottom: String,
+        huayFirst: String,
+        huayBottom: String
+    ) {
+        val firstPrize = EditText(this).apply {
+            hint = "รางวัลที่ 1 (6 หลัก)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            filters = arrayOf(android.text.InputFilter.LengthFilter(6))
+        }
+        val lastTwo = EditText(this).apply {
+            hint = "เลขท้าย 2 ตัว (2 หลัก)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            filters = arrayOf(android.text.InputFilter.LengthFilter(2))
+        }
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), 0)
+            addView(TextView(this@MainActivity).apply {
+                text = "LotteryChecks: รางวัลที่ 1 $lotteryFirst • 2 ตัวล่าง $lotteryBottom\\nHuayReview: รางวัลที่ 1 $huayFirst • 2 ตัวล่าง $huayBottom"
+                textSize = 14f
+                setTextColor(0xFF9B2C2C.toInt())
+            })
+            val openGlo = android.widget.Button(this@MainActivity).apply {
+                text = "เปิดเว็บไซต์ GLO เพื่อตรวจสอบด้วยตนเอง"
+                setOnClickListener {
+                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.glo.or.th/mission/reward-payment/check-reward")))
+                }
+            }
+            addView(openGlo)
+            addView(firstPrize)
+            addView(lastTwo)
+            addView(TextView(this@MainActivity).apply {
+                text = "กรอกผลจากเว็บไซต์ GLO ที่คุณตรวจสอบเอง ระบบจะบันทึกเป็นการยืนยันด้วยตนเอง พร้อมประวัติและเวลา"
+                textSize = 12f
+                setTextColor(ink)
+            })
+        }
+        val dialog = AlertDialog.Builder(this).setTitle("ผลสองเว็บไซต์ไม่ตรงกัน")
+            .setMessage("ระงับการคำนวณจ่ายและสรุปยอด จนกว่าจะตรวจสอบผลจาก GLO ด้วยตนเอง")
+            .setView(form).setNegativeButton("ยังไม่ยืนยัน", null)
+            .setPositiveButton("ยืนยันผลที่ตรวจสอบแล้ว", null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val first = firstPrize.text.toString().trim()
+                val bottom = lastTwo.text.toString().trim()
+                if (first.length != 6 || !first.all { it in '0'..'9' }) {
+                    firstPrize.error = "กรอกรางวัลที่ 1 ให้ครบ 6 หลัก"
+                    return@setOnClickListener
+                }
+                if (bottom.length != 2 || !bottom.all { it in '0'..'9' }) {
+                    lastTwo.error = "กรอกเลขท้าย 2 ตัวให้ครบ 2 หลัก"
+                    return@setOnClickListener
+                }
+                val now = System.currentTimeMillis()
+                val topAudit = AuditEventEntity(UUID.randomUUID().toString(), "DRAW_RESULT", "pending",
+                    "MANUAL_VERIFIED", "Manual result verification", now)
+                val bottomAudit = AuditEventEntity(UUID.randomUUID().toString(), "DRAW_RESULT", "pending",
+                    "MANUAL_VERIFIED", "Manual result verification", now)
+                io.execute {
+                    try {
+                        database.lottoDao().postManualVerifiedResults(period.periodId, first, bottom,
+                            topAudit, bottomAudit, now)
+                        runOnUiThread {
+                            dialog.dismiss()
+                            Toast.makeText(this, "บันทึกผลที่ตรวจสอบด้วยตนเองแล้ว", Toast.LENGTH_LONG).show()
+                            showResults(period.periodId)
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread { Toast.makeText(this, "ยืนยันผลไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
+                    }
+                }
+            }
+        }
+        dialog.show()
     }
 
     private fun renderSavedResults(periodId: String, resultList: LinearLayout) {
