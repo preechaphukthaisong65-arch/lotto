@@ -1255,10 +1255,19 @@ class MainActivity : Activity() {
             val dao = database.lottoDao()
             val successes = mutableListOf<PublicDrawResult>()
             val failures = mutableListOf<String>()
+            val failureReasons = linkedMapOf<String, String>()
             try { successes.add(LotteryChecksClient().fetch(drawDate)) }
-            catch (e: Exception) { failures.add("LotteryChecks: ${e.message ?: "ตรวจสอบไม่สำเร็จ"}") }
+            catch (e: Exception) {
+                val reason = e.message ?: "ตรวจสอบไม่สำเร็จ"
+                failureReasons["LOTTERYCHECKS"] = reason
+                failures.add("LotteryChecks: $reason")
+            }
             try { successes.add(HuayReviewClient().fetch(drawDate)) }
-            catch (e: Exception) { failures.add("HuayReview: ${e.message ?: "ตรวจสอบไม่สำเร็จ"}") }
+            catch (e: Exception) {
+                val reason = e.message ?: "ตรวจสอบไม่สำเร็จ"
+                failureReasons["HUAYREVIEW"] = reason
+                failures.add("HuayReview: $reason")
+            }
             try {
                 successes.forEach { result ->
                     dao.insertDrawSourceCheck(th.co.lotto.data.DrawSourceCheckEntity(
@@ -1267,11 +1276,23 @@ class MainActivity : Activity() {
                         result.twoBottomNumber, result.sourceUrl, result.fetchedAtEpochMillis
                     ))
                 }
+                failureReasons.forEach { (sourceId, reason) ->
+                    val sourceUrl = if (sourceId == "LOTTERYCHECKS") "https://lotterychecks.com/" else
+                        "https://raw.githubusercontent.com/huayreview/thai-lottery-results/main/thai-lottery-results.json"
+                    dao.insertDrawSourceCheck(th.co.lotto.data.DrawSourceCheckEntity(
+                        UUID.randomUUID().toString(), period.periodId, sourceId,
+                        java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+                            timeZone = java.util.TimeZone.getTimeZone("Asia/Bangkok")
+                        }.format(Date(drawDate)),
+                        "", "", "", sourceUrl, System.currentTimeMillis(), "FAILED", reason.take(500)
+                    ))
+                }
                 val latest = dao.getDrawSourceChecks(period.periodId).groupBy { it.sourceId }
                     .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
                 val first = latest["LOTTERYCHECKS"]
                 val second = latest["HUAYREVIEW"]
                 val comparable = failures.isEmpty() && first != null && second != null &&
+                    first.checkStatus == "SUCCESS" && second.checkStatus == "SUCCESS" &&
                     first.drawDateIso == second.drawDateIso &&
                     first.fetchedAtEpochMillis >= System.currentTimeMillis() - 10 * 60 * 1000L &&
                     second.fetchedAtEpochMillis >= System.currentTimeMillis() - 10 * 60 * 1000L
