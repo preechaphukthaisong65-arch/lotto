@@ -15,7 +15,7 @@ data class DrawPeriodEntity(
     val createdAtEpochMillis: Long
 )
 
-@Entity(tableName = "customers", indices = [Index("phone")])
+@Entity(tableName = "customers", indices = [Index(value = ["phone"])])
 data class CustomerEntity(
     @PrimaryKey val customerId: String,
     val displayName: String,
@@ -31,7 +31,7 @@ data class CustomerEntity(
         ForeignKey(entity = DrawPeriodEntity::class, parentColumns = ["periodId"], childColumns = ["periodId"], onDelete = ForeignKey.RESTRICT),
         ForeignKey(entity = CustomerEntity::class, parentColumns = ["customerId"], childColumns = ["customerId"], onDelete = ForeignKey.RESTRICT)
     ],
-    indices = [Index("periodId"), Index("customerId"), Index("createdAtEpochMillis")]
+    indices = [Index(value = ["periodId"]), Index(value = ["customerId"]), Index(value = ["createdAtEpochMillis"])]
 )
 data class SaleDocumentEntity(
     @PrimaryKey val documentId: String,
@@ -47,7 +47,7 @@ data class SaleDocumentEntity(
 @Entity(
     tableName = "sale_lines",
     foreignKeys = [ForeignKey(entity = SaleDocumentEntity::class, parentColumns = ["documentId"], childColumns = ["documentId"], onDelete = ForeignKey.RESTRICT)],
-    indices = [Index("documentId"), Index(value = ["periodId", "numberText", "betCategory"])]
+    indices = [Index(value = ["documentId"]), Index(value = ["periodId", "numberText", "betCategory"])]
 )
 data class SaleLineEntity(
     @PrimaryKey val lineId: String,
@@ -65,7 +65,7 @@ data class SaleLineEntity(
         ForeignKey(entity = SaleDocumentEntity::class, parentColumns = ["documentId"], childColumns = ["documentId"], onDelete = ForeignKey.RESTRICT),
         ForeignKey(entity = CustomerEntity::class, parentColumns = ["customerId"], childColumns = ["customerId"], onDelete = ForeignKey.RESTRICT)
     ],
-    indices = [Index("documentId"), Index("customerId"), Index("paidAtEpochMillis")]
+    indices = [Index(value = ["documentId"]), Index(value = ["customerId"]), Index(value = ["paidAtEpochMillis"])]
 )
 data class PaymentEntryEntity(
     @PrimaryKey val paymentId: String,
@@ -88,7 +88,7 @@ data class NumberLimitRuleEntity(
     val enabled: Boolean
 )
 
-@Entity(tableName = "draw_results", indices = [Index("periodId")])
+@Entity(tableName = "draw_results", indices = [Index(value = ["periodId"])])
 data class DrawResultEntity(
     @PrimaryKey val resultId: String,
     val periodId: String,
@@ -99,7 +99,7 @@ data class DrawResultEntity(
     val importedAtEpochMillis: Long
 )
 
-@Entity(tableName = "audit_events", indices = [Index("entityId"), Index("createdAtEpochMillis")])
+@Entity(tableName = "audit_events", indices = [Index(value = ["entityId"]), Index(value = ["createdAtEpochMillis"])])
 data class AuditEventEntity(
     @PrimaryKey val eventId: String,
     val entityType: String,
