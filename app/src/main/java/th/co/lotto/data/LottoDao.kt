@@ -106,8 +106,26 @@ abstract class LottoDao {
         insertAuditEvent(audit)
     }
 
+    @Query("SELECT * FROM sale_documents WHERE documentId = :documentId LIMIT 1")
+    abstract fun getSaleDocument(documentId: String): SaleDocumentEntity?
+
+    @Query("SELECT COALESCE(SUM(amountSatang), 0) FROM payment_entries WHERE documentId = :documentId")
+    abstract fun getPaymentsTotalForDocument(documentId: String): Long
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract fun insertPayment(payment: PaymentEntryEntity)
+
+    @Transaction
+    open fun postPayment(payment: PaymentEntryEntity, audit: AuditEventEntity) {
+        require(payment.amountSatang > 0L) { "Payment must be positive" }
+        val document = getSaleDocument(payment.documentId) ?: error("Sale document not found")
+        require(document.customerType == "CREDIT") { "Payments can only be applied to credit documents" }
+        require(document.customerId == payment.customerId) { "Payment customer does not match sale document" }
+        val alreadyPaid = getPaymentsTotalForDocument(payment.documentId)
+        require(alreadyPaid + payment.amountSatang <= document.totalAmountSatang) { "Payment exceeds document balance" }
+        insertPayment(payment)
+        insertAuditEvent(audit)
+    }
 
     @Query("SELECT COALESCE(SUM(totalAmountSatang), 0) FROM sale_documents WHERE customerId = :customerId AND customerType = 'CREDIT'")
     abstract fun getCreditSalesTotal(customerId: String): Long
