@@ -573,6 +573,21 @@ abstract class LottoDao {
         require(result.sourceLabel.startsWith("AUTO-COMPARED") || result.sourceLabel.startsWith("MANUAL-GLO")) { "Result must be confirmed by matching public sources or manual GLO verification" }
         val period = getPeriod(result.periodId) ?: error("Draw period not found")
         require(period.status == "CLOSED") { "Results can only be recorded for a closed draw period" }
+        val latestChecks = getDrawSourceChecks(result.periodId).groupBy { it.sourceId }
+            .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
+        val sourceOne = latestChecks["LOTTERYCHECKS"] ?: error("LotteryChecks verification is required")
+        val sourceTwo = latestChecks["HUAYREVIEW"] ?: error("HuayReview verification is required")
+        require(sourceOne.drawDateIso == sourceTwo.drawDateIso &&
+            sourceOne.drawDateIso == expectedDrawDateIso(result.periodId)) { "Source checks are for a different draw date" }
+        if (result.sourceLabel.startsWith("AUTO-COMPARED")) {
+            require(sourceOne.firstPrizeNumber == sourceTwo.firstPrizeNumber &&
+                sourceOne.twoBottomNumber == sourceTwo.twoBottomNumber) { "Sources do not match" }
+            val expected = if (result.resultType == "THREE_TOP") sourceOne.threeTopNumber else sourceOne.twoBottomNumber
+            require(result.winningNumber == expected) { "Auto-confirmed result does not match the public sources" }
+        } else {
+            require(sourceOne.firstPrizeNumber != sourceTwo.firstPrizeNumber ||
+                sourceOne.twoBottomNumber != sourceTwo.twoBottomNumber) { "Manual adjudication is only allowed when sources disagree" }
+        }
         require(audit.eventId.isNotBlank() && audit.entityType == "DRAW_RESULT" &&
             audit.entityId == result.resultId && audit.action == "POSTED") {
             "Result audit event does not match the result"
