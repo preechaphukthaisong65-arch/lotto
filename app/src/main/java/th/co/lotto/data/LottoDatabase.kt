@@ -115,6 +115,8 @@ abstract class LottoDatabase : RoomDatabase() {
                 WHEN NOT EXISTS (SELECT 1 FROM draw_periods WHERE periodId = NEW.periodId)
                 BEGIN SELECT RAISE(ABORT, 'Draw result references an unknown period'); END
             """.trimIndent())
+            db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_draw_result_update BEFORE UPDATE ON draw_results BEGIN SELECT RAISE(ABORT, 'Draw results are immutable; record a new result event'); END")
+            db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_draw_result_delete BEFORE DELETE ON draw_results BEGIN SELECT RAISE(ABORT, 'Draw results are immutable'); END")
             db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS validate_sale_correction_reference_insert
                 BEFORE INSERT ON sale_documents
