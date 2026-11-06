@@ -37,8 +37,6 @@ import java.util.concurrent.Executors
 class MainActivity : Activity() {
     private val io = Executors.newSingleThreadExecutor()
     private val database get() = LottoDatabase.getInstance(applicationContext)
-    private var pendingBackupPassphrase: CharArray? = null
-    private val backupCreateRequest = 701
     private val backupRestoreRequest = 702
     private lateinit var root: LinearLayout
     private lateinit var currentBody: LinearLayout
@@ -1416,42 +1414,15 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode != RESULT_OK || data?.data == null) {
-            if (requestCode == backupCreateRequest) pendingBackupPassphrase?.fill(' ')
-            if (requestCode == backupCreateRequest) pendingBackupPassphrase = null
-            return
-        }
-        val uri = data.data ?: return
-        when (requestCode) {
-            backupCreateRequest -> {
-                val passphrase = pendingBackupPassphrase ?: return
-                pendingBackupPassphrase = null
-                io.execute {
-                    try {
-                        contentResolver.openOutputStream(uri, "w")?.use { output ->
-                            LocalBackupManager.writeEncryptedBackup(this, database, passphrase, output)
-                            output.flush()
-                        } ?: error("ไม่สามารถเขียนไฟล์สำรองได้")
-                        runOnUiThread {
-                            Toast.makeText(this, "สร้างไฟล์สำรองที่เข้ารหัสแล้ว", Toast.LENGTH_LONG).show()
-                        }
-                    } catch (e: Exception) {
-                        runOnUiThread {
-                            Toast.makeText(this, "สำรองข้อมูลไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show()
-                        }
-                    } finally {
-                        passphrase.fill(' ')
-                    }
-                }
-            }
-            backupRestoreRequest -> promptRestorePassphrase(uri)
-        }
+        if (requestCode != backupRestoreRequest || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        promptRestorePassphrase(uri)
     }
 
     private fun showBackup() {
         base("สำรองและกู้คืนข้อมูล")
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
-        addText(currentBody, "สำรองฐานข้อมูลและรูปใบเสร็จทั้งหมดเป็นไฟล์เดียว เข้ารหัส AES-256-GCM ก่อนบันทึก", 15, ink)
+        addText(currentBody, "สำรองฐานข้อมูลและรูปใบเสร็จทั้งหมดเป็นไฟล์เดียว เข้ารหัส AES-256-GCM แล้วบันทึกลงพื้นที่จัดเก็บในเครื่อง", 15, ink)
         addText(currentBody, "ใช้รหัสผ่านอย่างน้อย 10 ตัวอักษร ไฟล์สามารถย้ายไปอุปกรณ์อื่นและกู้คืนได้โดยใช้รหัสผ่านเดิม", 13, navy)
         addText(currentBody, "สำคัญ: หากลืมรหัสผ่าน จะไม่สามารถกู้คืนข้อมูลจากไฟล์สำรองได้ โปรดเก็บรหัสผ่านแยกจากโทรศัพท์", 13, 0xFF9B2C2C.toInt())
         addButton(currentBody, "สร้างไฟล์สำรองเข้ารหัส") { promptBackupPassphrase() }
@@ -1471,7 +1442,7 @@ class MainActivity : Activity() {
                 .show()
         }
         addText(currentBody, "การกู้คืนจะแทนที่ฐานข้อมูลและใบเสร็จปัจจุบัน หลังตรวจสอบไฟล์และฐานข้อมูลผ่านแล้วเท่านั้น", 12, 0xFF9B2C2C.toInt())
-        addText(currentBody, "ไม่มีการส่งข้อมูลขึ้น Cloud และไม่มีการเชื่อมต่อเซิร์ฟเวอร์", 12, 0xFF526171.toInt())
+        addText(currentBody, "ไฟล์สำรองจะถูกสร้างใน Downloads/Lotto (Android 10 ขึ้นไป) ไม่ส่งไฟล์ไปยัง Cloud โดยแอป", 12, 0xFF526171.toInt())
     }
 
     private fun promptBackupPassphrase() {
@@ -1500,21 +1471,67 @@ class MainActivity : Activity() {
                             Toast.makeText(this, "รหัสผ่านต้องตรงกันและมีอย่างน้อย 10 ตัวอักษร", Toast.LENGTH_LONG).show()
                             return@setOnClickListener
                         }
-                        pendingBackupPassphrase = a.toCharArray()
+                        val passphrase = a.toCharArray()
                         first.text.clear()
                         second.text.clear()
-                        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
-                        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = "application/octet-stream"
-                            putExtra(Intent.EXTRA_TITLE, "lotto-backup-$stamp.lotto")
-                        }
-                        startActivityForResult(intent, backupCreateRequest)
                         dialog.dismiss()
+                        saveBackupLocally(passphrase)
                     }
                 }
                 dialog.show()
             }
+    }
+
+    private fun saveBackupLocally(passphrase: CharArray) {
+        io.execute {
+            var createdUri: android.net.Uri? = null
+            try {
+                val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+                val fileName = "lotto-backup-$stamp.lotto"
+                val location: String
+                if (android.os.Build.VERSION.SDK_INT >= 29) {
+                    val values = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                        put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
+                        put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/Lotto")
+                        put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
+                    }
+                    val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                        ?: error("สร้างไฟล์ใน Downloads ไม่สำเร็จ")
+                    createdUri = uri
+                    contentResolver.openOutputStream(uri, "w")?.use { output ->
+                        LocalBackupManager.writeEncryptedBackup(this, database, passphrase, output)
+                    } ?: error("ไม่สามารถเขียนไฟล์สำรองได้")
+                    val published = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
+                    }
+                    require(contentResolver.update(uri, published, null, null) > 0) {
+                        "บันทึกไฟล์สำรองลง Downloads ไม่สำเร็จ"
+                    }
+                    location = "Downloads/Lotto/$fileName"
+                    createdUri = null
+                } else {
+                    val directory = getExternalFilesDir(android.os.Environment.DIRECTORY_DOCUMENTS)
+                        ?: java.io.File(filesDir, "backups")
+                    require(directory.exists() || directory.mkdirs()) { "สร้างโฟลเดอร์สำรองไม่สำเร็จ" }
+                    val file = java.io.File(directory, fileName)
+                    java.io.FileOutputStream(file).use { output ->
+                        LocalBackupManager.writeEncryptedBackup(this, database, passphrase, output)
+                    }
+                    location = file.absolutePath
+                }
+                runOnUiThread {
+                    Toast.makeText(this, "สำรองข้อมูลเข้ารหัสแล้ว: $location", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                createdUri?.let { contentResolver.delete(it, null, null) }
+                runOnUiThread {
+                    Toast.makeText(this, "สำรองข้อมูลไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                passphrase.fill(' ')
+            }
+        }
     }
 
     private fun promptRestorePassphrase(uri: android.net.Uri) {
