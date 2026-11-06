@@ -316,11 +316,26 @@ object DrawCalendarReminder {
         val manager = WorkManager.getInstance(context)
         val initial = OneTimeWorkRequestBuilder<DrawCalendarWorker>().setConstraints(constraints).build()
         manager.enqueueUniqueWork("lotto_draw_calendar_initial_refresh", ExistingWorkPolicy.KEEP, initial)
-        val request = PeriodicWorkRequestBuilder<DrawCalendarWorker>(24, TimeUnit.HOURS)
+        scheduleRefresh(context, 24)
+    }
+
+    fun scheduleRefresh(context: Context, intervalHours: Long) {
+        val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+        val request = PeriodicWorkRequestBuilder<DrawCalendarWorker>(intervalHours, TimeUnit.HOURS)
             .setConstraints(constraints).build()
-        manager.enqueueUniquePeriodicWork(
-            CALENDAR_WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            CALENDAR_WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request
         )
+    }
+
+    fun rescheduleForUpcomingDate(context: Context, state: DrawCalendarState) {
+        val today = LocalDate.now(BANGKOK)
+        val candidates = (state.confirmedDates + state.lotteryChecksDates + state.huayReviewDates)
+            .distinct().filter { !it.isBefore(today) }
+        val nearest = candidates.minOrNull()
+        val daysUntilDraw = nearest?.let { ChronoUnit.DAYS.between(today, it) }
+        // Check every 6 hours during the final 7 days; otherwise check once per day.
+        scheduleRefresh(context, if (daysUntilDraw != null && daysUntilDraw <= 7) 6 else 24)
     }
 
     fun deliverDueReminders(context: Context, state: DrawCalendarState) {
@@ -401,6 +416,7 @@ class DrawCalendarWorker(context: Context, params: WorkerParameters) : Worker(co
     override fun doWork(): Result = try {
         val state = DrawCalendarService.refresh(applicationContext)
         DrawCalendarReminder.deliverDueReminders(applicationContext, state)
+        DrawCalendarReminder.rescheduleForUpcomingDate(applicationContext, state)
         Result.success()
     } catch (_: Exception) {
         Result.retry()
