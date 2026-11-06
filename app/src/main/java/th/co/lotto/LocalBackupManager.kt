@@ -32,7 +32,7 @@ object LocalBackupManager {
     private const val saltSize = 16
     private const val nonceSize = 12
     private const val maxBackupBytes = 256 * 1024 * 1024
-    private const val currentSchemaVersion = 8
+    private const val currentSchemaVersion = 9
 
     fun writeEncryptedBackup(
         context: Context,
@@ -350,6 +350,20 @@ object LocalBackupManager {
                 null
             ).use { cursor -> while (cursor.moveToNext()) foundTables.add(cursor.getString(0)) }
             require(foundTables.containsAll(requiredTables)) { "ฐานข้อมูลในไฟล์สำรองไม่ใช่ฐานข้อมูล Lotto ที่สมบูรณ์" }
+            if (version >= 9) {
+                fun columns(table: String): Set<String> {
+                    val result = mutableSetOf<String>()
+                    sqlite.rawQuery("PRAGMA table_info($table)", null).use { cursor ->
+                        val nameIndex = cursor.getColumnIndexOrThrow("name")
+                        while (cursor.moveToNext()) result.add(cursor.getString(nameIndex))
+                    }
+                    return result
+                }
+                require(columns("payout_rate_settings").containsAll(setOf("twoTopRateHundredths", "twoBottomRateHundredths")) &&
+                    columns("settlement_snapshots").containsAll(setOf("twoTopRateHundredths", "twoBottomRateHundredths"))) {
+                    "ฐานข้อมูล Schema 9 ขาดคอลัมน์อัตราจ่ายเลข 2 ตัวบน/ล่าง"
+                }
+            }
         } finally {
             sqlite.close()
         }
