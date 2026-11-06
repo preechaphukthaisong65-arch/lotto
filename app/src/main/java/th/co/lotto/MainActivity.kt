@@ -1268,7 +1268,7 @@ class MainActivity : Activity() {
                     .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
                 val first = latest["LOTTERYCHECKS"]
                 val second = latest["HUAYREVIEW"]
-                val comparable = first != null && second != null &&
+                val comparable = failures.isEmpty() && first != null && second != null &&
                     first.drawDateIso == second.drawDateIso &&
                     first.fetchedAtEpochMillis >= System.currentTimeMillis() - 10 * 60 * 1000L &&
                     second.fetchedAtEpochMillis >= System.currentTimeMillis() - 10 * 60 * 1000L
@@ -1293,11 +1293,11 @@ class MainActivity : Activity() {
                 runOnUiThread {
                     if (failures.isNotEmpty()) {
                         Toast.makeText(this, failures.joinToString("\\n") + "\\nยังยืนยันผลไม่ได้และยังคำนวณจ่ายไม่ได้", Toast.LENGTH_LONG).show()
-                    } else if (first != null && second != null && first.drawDateIso == second.drawDateIso &&
+                    } else if (failures.isEmpty() && first != null && second != null && first.drawDateIso == second.drawDateIso &&
                         (first.firstPrizeNumber != second.firstPrizeNumber || first.twoBottomNumber != second.twoBottomNumber)) {
                         showManualResultDialog(period, first.firstPrizeNumber, first.twoBottomNumber,
                             second.firstPrizeNumber, second.twoBottomNumber)
-                    } else if (first != null && second != null &&
+                    } else if (failures.isEmpty() && first != null && second != null &&
                         first.firstPrizeNumber == second.firstPrizeNumber && first.twoBottomNumber == second.twoBottomNumber) {
                         Toast.makeText(this, "ผลจากสองเว็บไซต์ตรงกัน • ยืนยันผลอัตโนมัติแล้ว", Toast.LENGTH_LONG).show()
                     } else {
@@ -1369,7 +1369,7 @@ class MainActivity : Activity() {
                 }
                 val now = System.currentTimeMillis()
                 val topAudit = AuditEventEntity(UUID.randomUUID().toString(), "DRAW_RESULT", "pending",
-                    "MANUAL_VERIFIED", "Manual result verification", now)
+                    "POSTED", "Manual result verification", now)
                 val bottomAudit = AuditEventEntity(UUID.randomUUID().toString(), "DRAW_RESULT", "pending",
                     "MANUAL_VERIFIED", "Manual result verification", now)
                 io.execute {
