@@ -6,7 +6,7 @@ import org.junit.Test
 
 class SaleEntryParserTest {
     @Test
-    fun parsesOnlyThreeDigitTopAndToadAndPreservesLeadingZeros() {
+    fun parsesOnlyTopAndToadAndPreservesLeadingZeros() {
         val entries = SaleEntryParser.parse(
             """
             001,THREE_TOP,5
@@ -22,7 +22,7 @@ class SaleEntryParserTest {
 
     @Test
     fun ignoresBlankLinesAndAcceptsWholeBahtAmounts() {
-        val entries = SaleEntryParser.parse("\n12,TWO_TOP,20\n\n123,THREE_TOAD,10\n")
+        val entries = SaleEntryParser.parse("\n123,THREE_TOP,20\n\n123,THREE_TOAD,10\n")
         assertEquals(2, entries.size)
         assertEquals(3_000L, SaleEntryParser.totalSatang(entries))
     }
@@ -30,7 +30,7 @@ class SaleEntryParserTest {
     @Test
     fun rejectsAmountsWithMoreThanTwoDecimalPlacesInsteadOfRounding() {
         assertThrows(IllegalArgumentException::class.java) {
-            SaleEntryParser.parse("12,TWO_TOP,1.239")
+            SaleEntryParser.parse("123,THREE_TOP,1.239")
         }
     }
 
@@ -38,7 +38,7 @@ class SaleEntryParserTest {
     fun rejectsNegativeZeroAndMalformedAmounts() {
         listOf("-1", "0", "1e2", "1,000", ".50", "abc").forEach { amount ->
             assertThrows(IllegalArgumentException::class.java) {
-                SaleEntryParser.parse("12,TWO_TOP,$amount")
+                SaleEntryParser.parse("123,THREE_TOP,$amount")
             }
         }
     }
@@ -46,12 +46,11 @@ class SaleEntryParserTest {
     @Test
     fun rejectsInvalidNumberAndCategory() {
         listOf(
-            "1,TWO_TOP,10",
-            "1A,TWO_TOP,10",
+            "12,THREE_TOP,10",
+            "12A,THREE_TOP,10",
             "123,TWO_TOP,10",
-            "12,THREE_TOAD,10",
-            "12,TWO_TOP,10,HALF",
-            "12,TWO_TOP,10,EXTRA"
+            "123,THREE_BOTTOM,10",
+            "123,THREE_TOP,10,EXTRA"
         ).forEach { row ->
             assertThrows(IllegalArgumentException::class.java) {
                 SaleEntryParser.parse(row)
@@ -62,15 +61,14 @@ class SaleEntryParserTest {
     @Test
     fun rejectsEmptyInputAndIncorrectColumnCount() {
         assertThrows(IllegalArgumentException::class.java) { SaleEntryParser.parse("  \n") }
-        assertThrows(IllegalArgumentException::class.java) { SaleEntryParser.parse("12,TWO_TOP,10,HALF") }
-        assertThrows(IllegalArgumentException::class.java) { SaleEntryParser.parse("12,TWO_TOP,10,HALF,EXTRA") }
+        assertThrows(IllegalArgumentException::class.java) { SaleEntryParser.parse("123,THREE_TOP,10,EXTRA") }
     }
 
     @Test
     fun rejectsTotalOverflow() {
         val entries = listOf(
-            ParsedSaleEntry("12", "TWO_TOP", Long.MAX_VALUE),
-            ParsedSaleEntry("13", "TWO_TOP", 1L)
+            ParsedSaleEntry("123", "THREE_TOP", Long.MAX_VALUE),
+            ParsedSaleEntry("124", "THREE_TOP", 1L)
         )
         assertThrows(ArithmeticException::class.java) {
             SaleEntryParser.totalSatang(entries)
