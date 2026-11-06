@@ -181,8 +181,14 @@ abstract class LottoDao {
             }
         }
 
+        val persistedLines = lines.map { line ->
+            val rule = getLimitRuleForManagement(
+                document.periodId, line.numberText.length, line.betCategory, line.numberText
+            )
+            line.copy(halfPayout = rule?.halfPayout == true)
+        }
         insertSaleDocument(document)
-        insertSaleLines(lines)
+        insertSaleLines(persistedLines)
         insertAuditEvent(audit)
     }
 
@@ -379,7 +385,8 @@ abstract class LottoDao {
         } else {
             updateLimitRule(existing.copy(
                 maximumAmountSatang = rule.maximumAmountSatang,
-                enabled = rule.enabled
+                enabled = rule.enabled,
+                halfPayout = rule.halfPayout
             ))
         }
     }
