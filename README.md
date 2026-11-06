@@ -13,6 +13,7 @@ Lotto is being developed as an Android-only, offline-first application. The on-d
 - Room/SQLite local schema for periods, customers, sale documents/lines, payments, limits, results, and audit events.
 - Atomic sale-posting DAO method and database triggers protecting posted sale documents and lines from update/delete.
 - Sales are restricted to 3-digit top (ตรง) and 3-digit top permutation (โต๊ด), with separate limits. Credit/payment workflows, period limits, receipts, result matching, reports, and immutable payout-rate snapshots are implemented on the offline branch.
+- Draw results are retrieved directly from the official GLO result API; the app validates the requested draw date and first-prize number, stores its last three digits locally, and derives toad matches by permutation. GLO retrieval requires internet; saved results remain available offline.
 - Encrypted local backup/restore is implemented with a user-supplied passphrase; it packages the SQLite database and receipt images, validates the archive/database before replacement, and includes rollback protection.
 - No in-app PIN, user accounts, staff roles, or per-module permissions. Device screen lock is the device-level protection.
 - Final physical-device and airplane-mode acceptance testing is still required.
