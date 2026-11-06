@@ -745,46 +745,50 @@ class MainActivity : Activity() {
 
     private fun showBlockedNumbers() {
         base("จัดการเลขไม่รับ")
-        addButton(currentBody, "＋ เพิ่มเลขไม่รับ") { createBlockedNumberDialog() }
         addButton(currentBody, "กลับเลขอั้น/เลขเต็ม") { showLimits() }
         io.execute {
             val dao = database.lottoDao()
-            val period = dao.getOpenPeriod() ?: dao.getPreparedPeriod()
-            val rules = period?.let { dao.getAllNumberBlockRules(it.periodId) } ?: emptyList()
+            val periods = dao.getPeriods().filter { it.status == "OPEN" || it.status == "PREPARED" }
+            val rulesByPeriod = periods.associate { it.periodId to dao.getAllNumberBlockRules(it.periodId) }
             runOnUiThread {
-                addText(currentBody, period?.let { "งวด: ${it.title}" } ?: "ไม่มีงวดเปิดหรือเตรียมไว้", 14, ink)
-                if (rules.isEmpty()) addText(currentBody, "ยังไม่มีรายการเลขไม่รับในงวดนี้", 13, ink)
-                rules.forEach { rule ->
-                    val typeLabel = when (rule.blockCategory) {
-                        "TWO_DIGIT" -> "2 ตัว (บน/ล่าง)"
-                        "THREE_STRAIGHT" -> "3 ตัวเต็ง (บน/ล่าง)"
-                        "THREE_TOAD" -> "3 ตัวโต๊ด"
-                        else -> rule.blockCategory
-                    }
-                    val status = if (rule.blocked) "ไม่รับ" else "ปลดบล็อกแล้ว"
-                    addCard(currentBody, "${rule.numberText} • $typeLabel", status) {
-                        if (rule.blocked) {
-                            AlertDialog.Builder(this)
-                                .setTitle("ปลดเลขไม่รับ")
-                                .setMessage("ยืนยันเปิดรับเลข ${rule.numberText} ในประเภท $typeLabel หรือไม่?")
-                                .setNegativeButton("กลับ", null)
-                                .setPositiveButton("ยืนยันปลดบล็อก") { _, _ ->
-                                    io.execute {
-                                        try {
-                                            dao.setNumberBlocked(
-                                                rule.ruleId, rule.periodId, rule.blockCategory,
-                                                rule.numberText, false, System.currentTimeMillis(),
-                                                UUID.randomUUID().toString()
-                                            )
-                                            runOnUiThread {
-                                                Toast.makeText(this, "ปลดเลขไม่รับแล้ว", Toast.LENGTH_SHORT).show()
-                                                showBlockedNumbers()
+                if (periods.isEmpty()) addText(currentBody, "ไม่มีงวดเปิดหรือเตรียมไว้", 14, ink)
+                periods.forEach { period ->
+                    addText(currentBody, "งวด: ${period.title} • ${if (period.status == "OPEN") "เปิดรับขาย" else "เตรียมเปิด"}", 14, navy)
+                    addButton(currentBody, "＋ เพิ่มเลขไม่รับในงวดนี้") { createBlockedNumberDialog(period) }
+                    val rules = rulesByPeriod[period.periodId].orEmpty()
+                    if (rules.isEmpty()) addText(currentBody, "ยังไม่มีรายการเลขไม่รับ", 12, ink)
+                    rules.forEach { rule ->
+                        val typeLabel = when (rule.blockCategory) {
+                            "TWO_DIGIT" -> "2 ตัว (บน/ล่าง)"
+                            "THREE_STRAIGHT" -> "3 ตัวเต็ง (บน/ล่าง)"
+                            "THREE_TOAD" -> "3 ตัวโต๊ด"
+                            else -> rule.blockCategory
+                        }
+                        val status = if (rule.blocked) "ไม่รับ" else "ปลดบล็อกแล้ว"
+                        addCard(currentBody, "${rule.numberText} • $typeLabel", status) {
+                            if (rule.blocked) {
+                                AlertDialog.Builder(this)
+                                    .setTitle("ปลดเลขไม่รับ")
+                                    .setMessage("ยืนยันเปิดรับเลข ${rule.numberText} ในประเภท $typeLabel หรือไม่?")
+                                    .setNegativeButton("กลับ", null)
+                                    .setPositiveButton("ยืนยันปลดบล็อก") { _, _ ->
+                                        io.execute {
+                                            try {
+                                                dao.setNumberBlocked(
+                                                    rule.ruleId, rule.periodId, rule.blockCategory,
+                                                    rule.numberText, false, System.currentTimeMillis(),
+                                                    UUID.randomUUID().toString()
+                                                )
+                                                runOnUiThread {
+                                                    Toast.makeText(this, "ปลดเลขไม่รับแล้ว", Toast.LENGTH_SHORT).show()
+                                                    showBlockedNumbers()
+                                                }
+                                            } catch (e: Exception) {
+                                                runOnUiThread { Toast.makeText(this, "ทำรายการไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
                                             }
-                                        } catch (e: Exception) {
-                                            runOnUiThread { Toast.makeText(this, "ทำรายการไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
                                         }
-                                    }
-                                }.show()
+                                    }.show()
+                            }
                         }
                     }
                 }
@@ -792,7 +796,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun createBlockedNumberDialog() {
+    private fun createBlockedNumberDialog(targetPeriod: DrawPeriodEntity) {
         val number = EditText(this).apply {
             hint = "เลข 2 หรือ 3 หลัก"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
@@ -805,6 +809,11 @@ class MainActivity : Activity() {
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
+            addView(TextView(this@MainActivity).apply {
+                text = "งวด: ${targetPeriod.title}"
+                textSize = 13f
+                setTextColor(ink)
+            })
             addView(number)
             addView(category)
         }
@@ -824,10 +833,8 @@ class MainActivity : Activity() {
                 io.execute {
                     try {
                         val dao = database.lottoDao()
-                        val period = dao.getOpenPeriod() ?: dao.getPreparedPeriod()
-                            ?: error("ไม่มีงวดเปิดหรือเตรียมไว้")
                         val changed = dao.setNumberBlocked(
-                            UUID.randomUUID().toString(), period.periodId, blockCategory,
+                            UUID.randomUUID().toString(), targetPeriod.periodId, blockCategory,
                             value, true, System.currentTimeMillis(), UUID.randomUUID().toString()
                         )
                         runOnUiThread {
