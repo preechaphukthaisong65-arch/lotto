@@ -337,12 +337,13 @@ object LocalBackupManager {
             sqlite.rawQuery("PRAGMA foreign_key_check", null).use { cursor ->
                 require(!cursor.moveToFirst()) { "ฐานข้อมูลในไฟล์สำรองมี foreign key ผิดพลาด" }
             }
-            sqlite.rawQuery("PRAGMA user_version", null).use { cursor ->
+            val version = sqlite.rawQuery("PRAGMA user_version", null).use { cursor ->
                 require(cursor.moveToFirst()) { "ไม่พบเวอร์ชันฐานข้อมูล" }
-                val version = cursor.getInt(0)
-                require(version in 1..currentSchemaVersion) { "เวอร์ชันฐานข้อมูลไม่รองรับ: $version" }
+                cursor.getInt(0)
             }
-            val requiredTables = setOf("draw_periods", "sale_documents", "sale_lines", "audit_events")
+            require(version in 1..currentSchemaVersion) { "เวอร์ชันฐานข้อมูลไม่รองรับ: $version" }
+            val requiredTables = mutableSetOf("draw_periods", "sale_documents", "sale_lines", "audit_events")
+            if (version >= 8) requiredTables.add("sale_cancellations")
             val foundTables = mutableSetOf<String>()
             sqlite.rawQuery(
                 "SELECT name FROM sqlite_master WHERE type='table'",
