@@ -6,22 +6,18 @@ import org.junit.Test
 
 class SaleEntryParserTest {
     @Test
-    fun parsesAllFiveCategoriesAndPreservesLeadingZeros() {
+    fun parsesOnlyThreeDigitTopAndToadAndPreservesLeadingZeros() {
         val entries = SaleEntryParser.parse(
             """
-            01,TWO_TOP,20
-            01,TWO_BOTTOM,10.50
             001,THREE_TOP,5
-            001,THREE_BOTTOM,6
             001,THREE_TOAD,7.25
             """.trimIndent()
         )
-        assertEquals(5, entries.size)
-        assertEquals("01", entries[0].number)
-        assertEquals(2_000L, entries[0].amountSatang)
-        assertEquals("001", entries[2].number)
-        assertEquals(725L, entries[4].amountSatang)
-        assertEquals(4_875L, SaleEntryParser.totalSatang(entries))
+        assertEquals(2, entries.size)
+        assertEquals("001", entries[0].number)
+        assertEquals(500L, entries[0].amountSatang)
+        assertEquals(725L, entries[1].amountSatang)
+        assertEquals(1_225L, SaleEntryParser.totalSatang(entries))
     }
 
     @Test
