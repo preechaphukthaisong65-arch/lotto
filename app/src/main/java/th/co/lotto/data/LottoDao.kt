@@ -18,6 +18,12 @@ abstract class LottoDao {
     @Query("SELECT * FROM draw_periods WHERE periodId = :periodId LIMIT 1")
     abstract fun getPeriod(periodId: String): DrawPeriodEntity?
 
+    @Query("""
+        UPDATE draw_periods SET drawDateEpochMillis = :drawDateEpochMillis
+        WHERE periodId = :periodId AND status IN ('OPEN', 'PREPARED')
+    """)
+    abstract fun updateEditablePeriodDrawDate(periodId: String, drawDateEpochMillis: Long): Int
+
     @Query("SELECT * FROM draw_periods WHERE status = 'OPEN' ORDER BY createdAtEpochMillis DESC LIMIT 1")
     abstract fun getOpenPeriod(): DrawPeriodEntity?
 
