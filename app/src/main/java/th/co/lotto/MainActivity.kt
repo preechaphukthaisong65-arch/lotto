@@ -1347,6 +1347,14 @@ class MainActivity : Activity() {
                             }
                             val lines = documents.flatMap { dao.getLinesForDocument(it.documentId) }
                             val payments = documents.associate { it.documentId to dao.getPaymentsTotalForDocument(it.documentId) }
+                            val results = dao.getDrawResults(period.periodId)
+                            val snapshot = dao.getSettlementSnapshot(period.periodId)
+                            val matches = DrawResultMatcher.findMatches(results, lines)
+                            val payoutSummary = snapshot?.let {
+                                runCatching { PayoutCalculator.calculatePeriod(matches, it, documents.fold(0L) { total, doc ->
+                                    Math.addExact(total, doc.totalAmountSatang)
+                                }) }.getOrNull()
+                            }
                             val report = PeriodReportEngine.calculate(
                                 period.periodId, documents, lines, payments,
                                 java.time.ZoneId.of("Asia/Bangkok")
@@ -1361,6 +1369,12 @@ class MainActivity : Activity() {
                                 addText(results, "ยอดค้างเงินเชื่อ: ${formatMoney(report.outstandingCreditSatang)}", 14, ink)
                                 addText(results, "บิลที่ยกเลิก: ${cancellations.size} ฉบับ • ยอดเดิมรวม ${formatMoney(cancelledOriginalAmount)}", 14, ink)
                                 addText(results, "เลขจ่ายครึ่ง: ${report.halfPayoutLineCount} รายการ • ยอดขาย ${formatMoney(report.halfPayoutAmountSatang)}", 14, ink)
+                                if (payoutSummary != null) {
+                                    addText(results, "ยอดจ่ายรางวัลรวม: ${formatMoney(payoutSummary.totalPayoutSatang)}", 16, navy)
+                                    addText(results, "ยอดขายหลังหักรางวัล: ${formatMoney(payoutSummary.salesAfterPayoutSatang)}", 15, navy)
+                                } else {
+                                    addText(results, "ยังไม่มียอดจ่ายรางวัล • ต้องมีผล GLO และ snapshot อัตราจ่ายของงวด", 12, 0xFF9B2C2C.toInt())
+                                }
                                 addText(results, "ยอดแยกประเภท", 16, navy)
                                 report.categoryTotalsSatang.forEach { (category, amount) ->
                                     addText(results, "${categoryLabel(category)}: ${formatMoney(amount)}", 14, ink)
@@ -1370,7 +1384,7 @@ class MainActivity : Activity() {
                                     addText(results, "$date • ${formatMoney(amount)}", 14, ink)
                                 }
                                 addText(results, "ยอดขายรวมไม่รวมบิลที่ยกเลิก • ยอดบิลยกเลิกแสดงแยกด้านบน", 12, 0xFF526171.toInt())
-                                addText(results, "ยังไม่คำนวณยอดจ่ายรางวัลหรือยอดหลังหักรางวัล • รอการยืนยันการปัดเศษและวิธีบันทึกเงินคืนจากบิลเงินสดที่ยกเลิก", 13, 0xFF9B2C2C.toInt())
+                                addText(results, "ยอดหลังหักรางวัลไม่ใช่กำไรสุทธิ และยังไม่รวมการคืนเงินสดจากบิลที่ยกเลิก", 12, 0xFF9B2C2C.toInt())
                                 addButton(results, "ส่งออกรายงาน CSV") {
                                     val csv = buildString {
                                         appendLine("section,value")
@@ -1386,6 +1400,8 @@ class MainActivity : Activity() {
                                         appendLine("line_count,${report.lineCount}")
                                         appendLine("half_payout_line_count,${report.halfPayoutLineCount}")
                                         appendLine("half_payout_amount_satang,${report.halfPayoutAmountSatang}")
+                                        appendLine("payout_total_satang,${payoutSummary?.totalPayoutSatang ?: ""}")
+                                        appendLine("sales_after_payout_satang,${payoutSummary?.salesAfterPayoutSatang ?: ""}")
                                         report.categoryTotalsSatang.forEach { (category, amount) ->
                                             appendLine("category_${category},${amount}")
                                         }
