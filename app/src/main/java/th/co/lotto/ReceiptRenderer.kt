@@ -55,6 +55,8 @@ object ReceiptRenderer {
             val category = when (item.betCategory) {
                 "THREE_TOP" -> "3 ตัวบน"
                 "THREE_TOAD" -> "3 ตัวโต๊ด"
+                "TWO_TOP" -> "2 ตัวบน"
+                "TWO_BOTTOM" -> "2 ตัวล่าง"
                 else -> item.betCategory
             }
             val half = if (item.halfPayout) " • จ่ายครึ่ง" else ""
