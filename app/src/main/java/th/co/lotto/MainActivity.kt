@@ -240,9 +240,13 @@ class MainActivity : Activity() {
         val dateInput = EditText(this).apply {
             hint = "วันที่ออกรางวัล (dd/MM/yyyy)"
             inputType = android.text.InputType.TYPE_CLASS_DATETIME
+            state.confirmedDates.firstOrNull()?.let { date ->
+                val millis = date.atStartOfDay(java.time.ZoneId.of("Asia/Bangkok")).toInstant().toEpochMilli()
+                setText(SimpleDateFormat("dd/MM/yyyy", Locale("th", "TH")).format(Date(millis)))
+            }
         }
-        val sourceDetails = "LotteryChecks: " + (state.lotteryChecksDates.firstOrNull()?.toString() ?: "ไม่พบข้อมูล") +
-            "\nHuayReview: " + (state.huayReviewDates.firstOrNull()?.toString() ?: "ไม่พบข้อมูล") +
+        val sourceDetails = "LotteryChecks: " + (state.lotteryChecksDates.joinToString().ifBlank { "ไม่พบข้อมูล" }) +
+            "\nHuayReview: " + (state.huayReviewDates.joinToString().ifBlank { "ไม่พบข้อมูล" }) +
             "\nโปรดตรวจสอบวันจากประกาศที่เชื่อถือได้ก่อนยืนยัน"
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
