@@ -9,6 +9,7 @@ import com.lotto.app.data.local.dao.SaleDao
 import com.lotto.app.data.local.entity.AppSettingEntity
 import com.lotto.app.data.local.entity.CreditDocumentEntity
 import com.lotto.app.data.local.entity.CreditDocumentItemEntity
+import com.lotto.app.data.local.entity.CreditPaymentEntity
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
 
@@ -18,9 +19,10 @@ import com.lotto.app.data.local.entity.SaleItemEntity
         SaleEntity::class,
         SaleItemEntity::class,
         CreditDocumentEntity::class,
-        CreditDocumentItemEntity::class
+        CreditDocumentItemEntity::class,
+        CreditPaymentEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -29,6 +31,8 @@ abstract class LottoDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "lotto_database"
+        const val PAID_DOCUMENT_RETENTION_DAYS = 180L
+        const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -59,9 +63,7 @@ abstract class LottoDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
-                db.execSQL(
-                    "CREATE INDEX IF NOT EXISTS index_sale_items_saleId ON sale_items(saleId)"
-                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_sale_items_saleId ON sale_items(saleId)")
             }
         }
 
@@ -95,8 +97,31 @@ abstract class LottoDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_credit_document_items_creditDocumentId ON credit_document_items(creditDocumentId)")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE credit_documents ADD COLUMN paidAt INTEGER")
                 db.execSQL(
-                    "CREATE INDEX IF NOT EXISTS index_credit_document_items_creditDocumentId ON credit_document_items(creditDocumentId)"
+                    """
+                    CREATE TABLE IF NOT EXISTS credit_payments (
+                        paymentId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        creditDocumentId INTEGER NOT NULL,
+                        amount INTEGER NOT NULL,
+                        paidAt INTEGER NOT NULL,
+                        FOREIGN KEY(creditDocumentId) REFERENCES credit_documents(creditDocumentId) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_credit_payments_creditDocumentId ON credit_payments(creditDocumentId)")
+                db.execSQL(
+                    """
+                    UPDATE credit_documents
+                    SET paidAt = createdAt
+                    WHERE creditAmount = 0 OR status = 'PAID'
+                    """.trimIndent()
                 )
             }
         }
