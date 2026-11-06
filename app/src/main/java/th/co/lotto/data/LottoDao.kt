@@ -583,6 +583,21 @@ abstract class LottoDao {
         insertAuditEvent(audit)
     }
 
+    @Transaction
+    open fun postGloResults(
+        topResult: DrawResultEntity,
+        bottomResult: DrawResultEntity,
+        topAudit: AuditEventEntity,
+        bottomAudit: AuditEventEntity
+    ) {
+        require(topResult.periodId == bottomResult.periodId) { "GLO results must belong to the same draw period" }
+        require(topResult.resultType == "THREE_TOP" && bottomResult.resultType == "TWO_BOTTOM") {
+            "GLO import must contain first-prize top and official last-two results"
+        }
+        postDrawResult(topResult, topAudit)
+        postDrawResult(bottomResult, bottomAudit)
+    }
+
     @Query("SELECT * FROM draw_results WHERE periodId = :periodId ORDER BY importedAtEpochMillis DESC")
     abstract fun getDrawResults(periodId: String): List<DrawResultEntity>
 
