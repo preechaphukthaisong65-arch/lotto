@@ -555,6 +555,9 @@ abstract class LottoDao {
         require(result.sourceLabel.isNotBlank()) { "Result source is required" }
         val period = getPeriod(result.periodId) ?: error("Draw period not found")
         require(period.status == "CLOSED") { "Results can only be recorded for a closed draw period" }
+        require(getDrawResults(result.periodId).none { it.resultType == result.resultType }) {
+            "An official result for this category is already recorded for the period"
+        }
         require(audit.eventId.isNotBlank() && audit.entityType == "DRAW_RESULT" &&
             audit.entityId == result.resultId && audit.action == "POSTED") {
             "Result audit event does not match the result"
