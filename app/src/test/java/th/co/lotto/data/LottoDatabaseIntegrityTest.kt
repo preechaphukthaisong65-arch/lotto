@@ -74,7 +74,7 @@ class LottoDatabaseIntegrityTest {
         }
         database.openHelper.writableDatabase.execSQL("UPDATE draw_periods SET status = 'CLOSED' WHERE periodId = 'period-settlement'")
         dao.postDrawResult(
-            DrawResultEntity("settlement-result", "period-settlement", "TWO_TOP", "12", "manual", 3L, 3L),
+            DrawResultEntity("settlement-result", "period-settlement", "THREE_TOP", "123", "GLO", 3L, 3L),
             AuditEventEntity("settlement-result-audit", "DRAW_RESULT", "settlement-result", "POSTED", "test", 3L)
         )
         dao.createSettlementSnapshot(openSnapshot, openAudit)
@@ -162,7 +162,7 @@ class LottoDatabaseIntegrityTest {
         dao.insertPeriod(period("period-1"))
         dao.insertLimitRule(
             NumberLimitRuleEntity(
-                "rule-1", "period-1", 2, "TWO_TOP", "12", 1_000L, true
+                "rule-1", "period-1", 3, "THREE_TOP", "123", 1_000L, true
             )
         )
 
@@ -170,8 +170,8 @@ class LottoDatabaseIntegrityTest {
             "sale-1", "period-1", null, "CASH", 1_200L, 100L, "Asia/Bangkok"
         )
         val lines = listOf(
-            SaleLineEntity("line-1", "sale-1", "period-1", "12", "TWO_TOP", 600L, false),
-            SaleLineEntity("line-2", "sale-1", "period-1", "12", "TWO_TOP", 600L, false)
+            SaleLineEntity("line-1", "sale-1", "period-1", "123", "THREE_TOP", 600L, false),
+            SaleLineEntity("line-2", "sale-1", "period-1", "123", "THREE_TOP", 600L, false)
         )
         val audit = AuditEventEntity(
             "event-1", "SALE_DOCUMENT", "sale-1", "POSTED", "test", 100L
@@ -181,7 +181,7 @@ class LottoDatabaseIntegrityTest {
             dao.postSale(document, lines, audit)
         }
         assertEquals(0, dao.documentExists("sale-1"))
-        assertEquals(0L, dao.getSoldAmountForNumber("period-1", "12", "TWO_TOP"))
+        assertEquals(0L, dao.getSoldAmountForNumber("period-1", "123", "THREE_TOP"))
         assertEquals(0, dao.getAuditEvents("sale-1").size)
     }
 
