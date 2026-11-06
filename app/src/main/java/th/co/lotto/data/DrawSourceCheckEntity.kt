@@ -2,10 +2,12 @@ package th.co.lotto.data
 
 import androidx.room.Entity
 import androidx.room.Index
+import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "draw_source_checks",
+    foreignKeys = [ForeignKey(entity = DrawPeriodEntity::class, parentColumns = ["periodId"], childColumns = ["periodId"], onDelete = ForeignKey.RESTRICT)],
     indices = [Index(value = ["periodId", "sourceId"]), Index(value = ["periodId", "fetchedAtEpochMillis"])]
 )
 data class DrawSourceCheckEntity(
