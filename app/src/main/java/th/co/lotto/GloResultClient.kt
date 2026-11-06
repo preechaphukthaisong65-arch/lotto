@@ -48,7 +48,7 @@ class GloResultClient(
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", "Lotto-Android/1.0")
+            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
         }
 
         try {
@@ -102,8 +102,17 @@ class GloResultClient(
                 .getJSONObject("first")
                 .getJSONArray("number")
             require(firstPrize.length() > 0) { "GLO first-prize number is missing" }
-            val firstEntry = firstPrize.getJSONObject(0)
-            val firstNumber = firstEntry.getString("value").trim()
+            var firstEntry: JSONObject? = null
+            var firstRound = Int.MAX_VALUE
+            for (index in 0 until firstPrize.length()) {
+                val candidate = firstPrize.getJSONObject(index)
+                val round = candidate.optInt("round", index + 1)
+                if (round < firstRound) {
+                    firstRound = round
+                    firstEntry = candidate
+                }
+            }
+            val firstNumber = requireNotNull(firstEntry).getString("value").trim()
             require(firstNumber.length == 6 && firstNumber.all { it in '0'..'9' }) {
                 "GLO first-prize number must contain exactly six digits"
             }
