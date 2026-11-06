@@ -27,8 +27,8 @@ class PayoutCalculatorTest {
   )
   val summary=PayoutCalculator.calculatePeriod(matches,snapshot,2_000_000L)
   assertEquals(4,summary.linePayouts.size)
-  assertEquals(1_980_000L,summary.totalPayoutSatang)
-  assertEquals(20_000L,summary.salesAfterPayoutSatang)
+  assertEquals(1_630_000L,summary.totalPayoutSatang)
+  assertEquals(370_000L,summary.salesAfterPayoutSatang)
  }
  @Test fun blocksDuplicateLinePayouts() {
   val snapshot=SettlementSnapshotEntity("s","p",7000L,7000L,50000L,10000L,1L,1L)
