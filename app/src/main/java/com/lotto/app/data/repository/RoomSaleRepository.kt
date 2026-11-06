@@ -42,4 +42,6 @@ class RoomSaleRepository(
         }
         return saleDao.insertSaleWithItems(sale, items)
     }
+
+    override suspend fun getAllSales(): List<SaleEntity> = saleDao.getAllSales()
 }
