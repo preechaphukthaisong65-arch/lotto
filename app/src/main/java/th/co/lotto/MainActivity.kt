@@ -338,13 +338,16 @@ class MainActivity : Activity() {
                     io.execute {
                         val documents = dao.searchSales(periodId, query)
                         val periodTitles = documents.associate { doc -> doc.periodId to (dao.getPeriod(doc.periodId)?.title ?: "ไม่ทราบชื่องวด") }
+                        val halfCounts = documents.associate { doc -> doc.documentId to dao.getLinesForDocument(doc.documentId).count { it.halfPayout } }
                         runOnUiThread {
                             if (documents.isEmpty()) addText(results, "ไม่พบเอกสารขาย", 14, ink)
                             documents.forEach { doc ->
                                 val periodTitle = periodTitles[doc.periodId] ?: "ไม่ทราบชื่องวด"
                                 val label = if (doc.correctionOfDocumentId == null) "บิลต้นฉบับ" else "เอกสารอ้างอิงบิล ${doc.correctionOfDocumentId.take(8)}"
+                                val halfCount = halfCounts[doc.documentId] ?: 0
+                                val halfLabel = if (halfCount > 0) " • มีเลขจ่ายครึ่ง $halfCount รายการ" else " • ไม่มีเลขจ่ายครึ่ง"
                                 addCard(results, "บิล ${doc.documentId.take(8)} • ${formatMoney(doc.totalAmountSatang)}",
-                                    "$periodTitle • $label • ${SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(doc.createdAtEpochMillis))}") {
+                                    "$periodTitle • $label$halfLabel • ${SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(doc.createdAtEpochMillis))}") {
                                     showSaleDetail(doc.documentId)
                                 }
                             }
