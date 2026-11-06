@@ -173,7 +173,6 @@ fun SaleScreen(
     Scaffold(
         topBar = {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                BackButton(onBack = onBack)
                 Text(
                     text = "ขายหวย",
                     style = MaterialTheme.typography.headlineSmall,
@@ -204,7 +203,13 @@ fun SaleScreen(
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
-                    ConfirmButton(
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        BackButton(onBack = onBack)
+                        Spacer(Modifier.weight(1f))
+                        ConfirmButton(
                         onConfirm = {
                             if (canSave) {
                                 coroutineScope.launch {
@@ -224,7 +229,8 @@ fun SaleScreen(
                         confirmationTitle = "ยืนยันการบันทึกการขาย",
                         confirmationMessage = "ตรวจสอบรายการและยอดรวมก่อนยืนยัน",
                         enabled = canSave
-                    )
+                        )
+                    }
                 }
             }
         }
