@@ -68,6 +68,23 @@ class MainActivity : Activity() {
         scheduleHandler.post(scheduleTick)
     }
 
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 911 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            DrawCalendarReminder.ensureScheduled(applicationContext)
+            io.execute {
+                DrawCalendarReminder.deliverDueReminders(
+                    applicationContext,
+                    DrawCalendarService.readState(applicationContext)
+                )
+            }
+        }
+    }
+
     override fun onPause() {
         scheduleHandler.removeCallbacks(scheduleTick)
         super.onPause()
@@ -300,14 +317,26 @@ class MainActivity : Activity() {
 
     private fun createPeriodDialog() {
         val titleInput = EditText(this).apply { hint = "ชื่องวด เช่น งวด 16 พ.ย. 2569" }
-        val dateInput = EditText(this).apply { hint = "วันที่หวยออก (dd/MM/yyyy) จำเป็น" }
+        val calendarState = runCatching { DrawCalendarService.readState(applicationContext) }.getOrNull()
+        val suggestedDate = calendarState?.takeIf { it.status == "CONFIRMED" }?.confirmedDates?.firstOrNull()
+        val dateInput = EditText(this).apply {
+            hint = "วันที่หวยออก (dd/MM/yyyy) จำเป็น"
+            suggestedDate?.let { date ->
+                val millis = date.atStartOfDay(java.time.ZoneId.of("Asia/Bangkok")).toInstant().toEpochMilli()
+                setText(SimpleDateFormat("dd/MM/yyyy", Locale("th", "TH")).format(Date(millis)))
+            }
+        }
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
             addView(titleInput)
             addView(dateInput)
             addView(TextView(this@MainActivity).apply {
-                text = "ระบบปิดรับขายเวลา 14:00 และเปิดงวดที่เตรียมไว้เวลา 18:00 ตามวันหวยออก"
+                text = if (suggestedDate != null) {
+                    "เติมวันจากปฏิทินที่ทั้งสองเว็บไซต์ยืนยันแล้ว • โปรดตรวจทานก่อนบันทึก"
+                } else {
+                    "ปฏิทินยังไม่ยืนยันวันงวดจากทั้งสองเว็บไซต์ • กรุณาตรวจสอบวันด้วยตนเองก่อนบันทึก"
+                }
                 textSize = 12f
                 setTextColor(0xFF526171.toInt())
             })
