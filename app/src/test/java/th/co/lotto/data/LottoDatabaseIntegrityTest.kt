@@ -145,6 +145,21 @@ class LottoDatabaseIntegrityTest {
     }
 
     @Test
+    fun sqliteRejectsCorrectionWithoutOriginalDocument() {
+        dao.insertPeriod(period("period-1"))
+        val sql = database.openHelper.writableDatabase
+        assertThrows(SQLiteException::class.java) {
+            sql.execSQL("""
+                INSERT INTO sale_documents
+                (documentId, periodId, customerId, customerType, totalAmountSatang,
+                 createdAtEpochMillis, deviceTimeZone, correctionOfDocumentId)
+                VALUES ('sale-invalid', 'period-1', NULL, 'CASH', 100, 1, 'Asia/Bangkok', 'missing-original')
+            """.trimIndent())
+        }
+        assertEquals(0, dao.documentExists("sale-invalid"))
+    }
+
+    @Test
     fun linkedCorrectionCannotReferenceAnotherPeriod() {
         dao.insertPeriod(period("period-1"))
         dao.insertPeriod(period("period-2"))
