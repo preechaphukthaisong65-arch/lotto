@@ -122,6 +122,7 @@ abstract class LottoDao {
         WHERE sl.periodId = :periodId
           AND sl.numberText = :numberText
           AND sl.betCategory = :betCategory
+          AND NOT EXISTS (SELECT 1 FROM sale_cancellations sc WHERE sc.documentId = sd.documentId)
     """)
     abstract fun getSoldAmountForNumber(periodId: String, numberText: String, betCategory: String): Long
 
@@ -254,6 +255,33 @@ abstract class LottoDao {
     abstract fun getPaymentsTotalForDocument(documentId: String): Long
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract fun insertSaleCancellation(cancellation: SaleCancellationEntity)
+
+    @Query("SELECT * FROM sale_cancellations WHERE documentId = :documentId LIMIT 1")
+    abstract fun getSaleCancellation(documentId: String): SaleCancellationEntity?
+
+    @Transaction
+    open fun cancelSaleDocument(cancellation: SaleCancellationEntity, audit: AuditEventEntity) {
+        require(cancellation.cancellationId.isNotBlank()) { "Cancellation ID is required" }
+        require(cancellation.reason.isNotBlank()) { "Cancellation reason is required" }
+        val document = getSaleDocument(cancellation.documentId) ?: error("Sale document not found")
+        require(getSaleCancellation(document.documentId) == null) { "This sale bill has already been cancelled" }
+        require(cancellation.originalAmountSatang == document.totalAmountSatang) { "Cancellation amount does not match the original bill" }
+        require(getPaymentsTotalForDocument(document.documentId) == 0L) {
+            "This credit bill has posted payments; a payment reversal workflow is required before cancellation"
+        }
+        require(getDrawResults(document.periodId).isEmpty() && getSettlementSnapshot(document.periodId) == null) {
+            "A bill cannot be cancelled after results or a settlement snapshot have been recorded"
+        }
+        require(audit.eventId.isNotBlank() && audit.entityType == "SALE_CANCELLATION" &&
+            audit.entityId == cancellation.cancellationId && audit.action == "CANCELLED") {
+            "Cancellation audit event does not match the cancellation record"
+        }
+        insertSaleCancellation(cancellation)
+        insertAuditEvent(audit)
+    }
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract fun insertPayment(payment: PaymentEntryEntity)
 
     @Transaction
@@ -267,6 +295,7 @@ abstract class LottoDao {
         }
 
         val document = getSaleDocument(payment.documentId) ?: error("Sale document not found")
+        require(getSaleCancellation(document.documentId) == null) { "Cannot post payment to a cancelled bill" }
         require(document.customerType == "CREDIT") { "Payments can only be applied to credit documents" }
         require(document.customerId == payment.customerId) { "Payment customer does not match sale document" }
 
@@ -278,13 +307,22 @@ abstract class LottoDao {
         insertAuditEvent(audit)
     }
 
-    @Query("SELECT COALESCE(SUM(totalAmountSatang), 0) FROM sale_documents WHERE customerId = :customerId AND customerType = 'CREDIT'")
+    @Query("""
+        SELECT COALESCE(SUM(sd.totalAmountSatang), 0) FROM sale_documents sd
+        WHERE sd.customerId = :customerId AND sd.customerType = 'CREDIT'
+          AND NOT EXISTS (SELECT 1 FROM sale_cancellations sc WHERE sc.documentId = sd.documentId)
+    """)
     abstract fun getCreditSalesTotal(customerId: String): Long
 
     @Query("SELECT COALESCE(SUM(amountSatang), 0) FROM payment_entries WHERE customerId = :customerId")
     abstract fun getPaymentsTotal(customerId: String): Long
 
-    @Query("SELECT * FROM sale_documents WHERE periodId = :periodId ORDER BY createdAtEpochMillis DESC")
+    @Query("""
+        SELECT sd.* FROM sale_documents sd
+        WHERE sd.periodId = :periodId
+          AND NOT EXISTS (SELECT 1 FROM sale_cancellations sc WHERE sc.documentId = sd.documentId)
+        ORDER BY sd.createdAtEpochMillis DESC
+    """)
     abstract fun getSalesForPeriod(periodId: String): List<SaleDocumentEntity>
 
     @Query("SELECT * FROM sale_lines WHERE documentId = :documentId ORDER BY lineId")
@@ -302,7 +340,12 @@ abstract class LottoDao {
     @Query("SELECT COUNT(*) FROM payment_entries WHERE paymentId = :paymentId")
     abstract fun paymentExists(paymentId: String): Int
 
-    @Query("SELECT * FROM sale_documents WHERE customerId = :customerId AND customerType = 'CREDIT' ORDER BY createdAtEpochMillis DESC")
+    @Query("""
+        SELECT sd.* FROM sale_documents sd
+        WHERE sd.customerId = :customerId AND sd.customerType = 'CREDIT'
+          AND NOT EXISTS (SELECT 1 FROM sale_cancellations sc WHERE sc.documentId = sd.documentId)
+        ORDER BY sd.createdAtEpochMillis DESC
+    """)
     abstract fun getCreditDocumentsForCustomer(customerId: String): List<SaleDocumentEntity>
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
