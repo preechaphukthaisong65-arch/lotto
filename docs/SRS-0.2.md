@@ -98,6 +98,7 @@ Phase-7 automated acceptance coverage includes encryption/decryption round trip,
 1. Verify the live GLO API request/response contract and complete real-network integration tests.
 2. Define and implement cash-refund accounting when a cash bill is cancelled after money has physically changed hands.
 3. Verify payout rounding, settlement totals, and report reconciliation end to end.
+4. Confirm permission to use GLO open-result data in a commercial workflow; the GLO Data Catalog currently lists a Creative Commons Non-Commercial license for the result dataset.
 
 Any wagering, payout, or related functionality must undergo applicable legal/compliance review before operational release. Until decisions are approved, these calculations must remain disabled or clearly marked unconfigured.
 
