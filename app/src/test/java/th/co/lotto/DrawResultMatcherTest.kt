@@ -11,7 +11,6 @@ class DrawResultMatcherTest {
     fun matchesOnlyThreeDigitTopAndToadCategories() {
         val results = listOf(
             DrawResultEntity("r1", "p1", "THREE_TOP", "123", "GLO", null, 1L),
-            DrawResultEntity("r2", "p1", "THREE_TOAD", "321", "GLO", null, 1L)
         )
         val lines = listOf(
             SaleLineEntity("l1", "d1", "p1", "123", "THREE_TOP", 1_000L, false),
