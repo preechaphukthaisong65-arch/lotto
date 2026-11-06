@@ -616,15 +616,17 @@ class MainActivity : Activity() {
                     }
                     val maxSatang = SaleEntryParser.parseAmountSatang(maximum.text.toString())
                     require(maxSatang > 0L) { "วงเงินต้องมากกว่า 0" }
-                    val periodId = existing?.periodId ?: database.lottoDao().getOpenPeriod()?.periodId
-                        ?: error("ไม่มีงวดเปิดอยู่")
-                    val rule = NumberLimitRuleEntity(
-                        existing?.ruleId ?: UUID.randomUUID().toString(),
-                        periodId, n.length, cat, n, maxSatang, enabled.isChecked
-                    )
+                    val ruleId = existing?.ruleId ?: UUID.randomUUID().toString()
+                    val enabledValue = enabled.isChecked
                     io.execute {
                         try {
-                            database.lottoDao().saveLimitRule(rule)
+                            val dao = database.lottoDao()
+                            val periodId = existing?.periodId ?: dao.getOpenPeriod()?.periodId
+                                ?: error("ไม่มีงวดเปิดอยู่")
+                            val rule = NumberLimitRuleEntity(
+                                ruleId, periodId, n.length, cat, n, maxSatang, enabledValue
+                            )
+                            dao.saveLimitRule(rule)
                             runOnUiThread {
                                 Toast.makeText(this, "บันทึกกฎวงเงินแล้ว", Toast.LENGTH_SHORT).show()
                                 dialog.dismiss()
