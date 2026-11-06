@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PayoutRateSettingsEntity::class,
         SettlementSnapshotEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -113,6 +113,18 @@ abstract class LottoDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE payout_rate_settings ADD COLUMN twoTopRateHundredths INTEGER NOT NULL DEFAULT 7000")
+                db.execSQL("ALTER TABLE payout_rate_settings ADD COLUMN twoBottomRateHundredths INTEGER NOT NULL DEFAULT 7000")
+                db.execSQL("UPDATE payout_rate_settings SET twoTopRateHundredths = twoDigitRateHundredths, twoBottomRateHundredths = twoDigitRateHundredths")
+                db.execSQL("ALTER TABLE settlement_snapshots ADD COLUMN twoTopRateHundredths INTEGER NOT NULL DEFAULT 7000")
+                db.execSQL("ALTER TABLE settlement_snapshots ADD COLUMN twoBottomRateHundredths INTEGER NOT NULL DEFAULT 7000")
+                db.execSQL("UPDATE settlement_snapshots SET twoTopRateHundredths = twoDigitRateHundredths, twoBottomRateHundredths = twoDigitRateHundredths")
+                installIntegrityGuards(db)
+            }
+        }
+
         private val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -184,8 +196,8 @@ abstract class LottoDatabase : RoomDatabase() {
             db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS validate_sale_line_category_insert
                 BEFORE INSERT ON sale_lines
-                WHEN NEW.betCategory NOT IN ('THREE_TOP', 'THREE_TOAD')
-                  OR length(NEW.numberText) != 3
+                WHEN NEW.betCategory NOT IN ('TWO_TOP', 'TWO_BOTTOM', 'THREE_TOP', 'THREE_TOAD')
+                  OR length(NEW.numberText) != CASE WHEN NEW.betCategory IN ('TWO_TOP', 'TWO_BOTTOM') THEN 2 ELSE 3 END
                   OR NEW.numberText GLOB '*[^0-9]*'
                 BEGIN
                     SELECT RAISE(ABORT, 'Only three-digit top and toad sale lines are supported');
@@ -194,9 +206,9 @@ abstract class LottoDatabase : RoomDatabase() {
             db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS validate_limit_rule_category_insert
                 BEFORE INSERT ON number_limit_rules
-                WHEN NEW.numberLength != 3
-                  OR length(NEW.numberText) != 3
-                  OR NEW.betCategory NOT IN ('THREE_TOP', 'THREE_TOAD')
+                WHEN NEW.numberLength != CASE WHEN NEW.betCategory IN ('TWO_TOP', 'TWO_BOTTOM') THEN 2 ELSE 3 END
+                  OR length(NEW.numberText) != NEW.numberLength
+                  OR NEW.betCategory NOT IN ('TWO_TOP', 'TWO_BOTTOM', 'THREE_TOP', 'THREE_TOAD')
                   OR NEW.numberText GLOB '*[^0-9]*'
                 BEGIN
                     SELECT RAISE(ABORT, 'Only three-digit top and toad limits are supported');
@@ -205,9 +217,9 @@ abstract class LottoDatabase : RoomDatabase() {
             db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS validate_limit_rule_category_update
                 BEFORE UPDATE ON number_limit_rules
-                WHEN NEW.numberLength != 3
-                  OR length(NEW.numberText) != 3
-                  OR NEW.betCategory NOT IN ('THREE_TOP', 'THREE_TOAD')
+                WHEN NEW.numberLength != CASE WHEN NEW.betCategory IN ('TWO_TOP', 'TWO_BOTTOM') THEN 2 ELSE 3 END
+                  OR length(NEW.numberText) != NEW.numberLength
+                  OR NEW.betCategory NOT IN ('TWO_TOP', 'TWO_BOTTOM', 'THREE_TOP', 'THREE_TOAD')
                   OR NEW.numberText GLOB '*[^0-9]*'
                 BEGIN
                     SELECT RAISE(ABORT, 'Only three-digit top and toad limits are supported');
@@ -216,8 +228,8 @@ abstract class LottoDatabase : RoomDatabase() {
             db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS validate_number_block_category_insert
                 BEFORE INSERT ON number_block_rules
-                WHEN length(NEW.numberText) != 3
-                  OR NEW.blockCategory NOT IN ('THREE_TOP', 'THREE_TOAD')
+                WHEN length(NEW.numberText) != CASE WHEN NEW.blockCategory IN ('TWO_TOP', 'TWO_BOTTOM') THEN 2 ELSE 3 END
+                  OR NEW.blockCategory NOT IN ('TWO_TOP', 'TWO_BOTTOM', 'THREE_TOP', 'THREE_TOAD')
                   OR NEW.numberText GLOB '*[^0-9]*'
                 BEGIN
                     SELECT RAISE(ABORT, 'Only three-digit top and toad blocked numbers are supported');
@@ -226,8 +238,8 @@ abstract class LottoDatabase : RoomDatabase() {
             db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS validate_number_block_category_update
                 BEFORE UPDATE ON number_block_rules
-                WHEN length(NEW.numberText) != 3
-                  OR NEW.blockCategory NOT IN ('THREE_TOP', 'THREE_TOAD')
+                WHEN length(NEW.numberText) != CASE WHEN NEW.blockCategory IN ('TWO_TOP', 'TWO_BOTTOM') THEN 2 ELSE 3 END
+                  OR NEW.blockCategory NOT IN ('TWO_TOP', 'TWO_BOTTOM', 'THREE_TOP', 'THREE_TOAD')
                   OR NEW.numberText GLOB '*[^0-9]*'
                 BEGIN
                     SELECT RAISE(ABORT, 'Only three-digit top and toad blocked numbers are supported');
@@ -247,8 +259,8 @@ abstract class LottoDatabase : RoomDatabase() {
             db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS validate_draw_result_category_insert
                 BEFORE INSERT ON draw_results
-                WHEN NEW.resultType NOT IN ('THREE_TOP', '3 ตัวบน')
-                  OR length(NEW.winningNumber) != 3
+                WHEN NEW.resultType NOT IN ('THREE_TOP', '3 ตัวบน', 'TWO_BOTTOM', '2 ตัวล่าง')
+                  OR length(NEW.winningNumber) != CASE WHEN NEW.resultType IN ('TWO_BOTTOM', '2 ตัวล่าง') THEN 2 ELSE 3 END
                   OR NEW.winningNumber GLOB '*[^0-9]*'
                 BEGIN
                     SELECT RAISE(ABORT, 'Only official three-digit top results are supported');
@@ -356,7 +368,7 @@ abstract class LottoDatabase : RoomDatabase() {
                 LottoDatabase::class.java,
                 "lotto-local.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)

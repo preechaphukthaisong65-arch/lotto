@@ -27,7 +27,9 @@ data class PayoutRateSettingsEntity(
     val threeBottomRateHundredths: Long,
     val threeToadRateHundredths: Long,
     val configVersion: Long,
-    val updatedAtEpochMillis: Long
+    val updatedAtEpochMillis: Long,
+    val twoTopRateHundredths: Long = twoDigitRateHundredths,
+    val twoBottomRateHundredths: Long = twoDigitRateHundredths
 )
 
 @Entity(tableName = "customers", indices = [Index(value = ["phone"])])
@@ -157,7 +159,9 @@ data class SettlementSnapshotEntity(
     val threeBottomRateHundredths: Long,
     val threeToadRateHundredths: Long,
     val payoutConfigVersion: Long,
-    val createdAtEpochMillis: Long
+    val createdAtEpochMillis: Long,
+    val twoTopRateHundredths: Long = twoDigitRateHundredths,
+    val twoBottomRateHundredths: Long = twoDigitRateHundredths
 )
 
 @Entity(tableName = "audit_events", indices = [Index(value = ["entityId"]), Index(value = ["createdAtEpochMillis"])])

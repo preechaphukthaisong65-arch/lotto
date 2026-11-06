@@ -13,6 +13,7 @@ data class GloTopResult(
     val drawDateIso: String,
     val firstPrizeNumber: String,
     val threeTopNumber: String,
+    val twoBottomNumber: String,
     val sourceUrl: String,
     val fetchedAtEpochMillis: Long
 )
@@ -116,13 +117,33 @@ class GloResultClient(
             require(firstNumber.length == 6 && firstNumber.all { it in '0'..'9' }) {
                 "GLO first-prize number must contain exactly six digits"
             }
-            return GloTopResult(
-                drawDateIso = drawDate,
-                firstPrizeNumber = firstNumber,
-                threeTopNumber = firstNumber.takeLast(3),
-                sourceUrl = sourceUrl,
-                fetchedAtEpochMillis = fetchedAtEpochMillis
-            )
+            val lastTwo = extractLastTwo(result.getJSONObject("data"))
+            require(lastTwo.length == 2 && lastTwo.all { it in '0'..'9' }) { "GLO last-two result must contain exactly two digits" }
+            return GloTopResult(drawDate, firstNumber, firstNumber.takeLast(3), lastTwo, sourceUrl, fetchedAtEpochMillis)
+        }
+        private fun extractLastTwo(data: JSONObject): String {
+            val keys=setOf("last2","lasttwo","lasttwodigits","runningnumberbacktwo","runningnumberback2")
+            fun value(v:Any?):String?=when(v) {
+                is String -> v.trim().takeIf{it.length==2 && it.all{ch->ch in '0'..'9'}}
+                is JSONObject -> {
+                    val direct=v.optString("value").ifBlank{v.optString("number")}
+                    direct.takeIf{it.length==2 && it.all{ch->ch in '0'..'9'}}
+                     ?: v.optJSONArray("number")?.let{a->(0 until a.length()).asSequence().mapNotNull{i->value(a.opt(i))}.firstOrNull()}
+                }
+                is org.json.JSONArray -> (0 until v.length()).asSequence().mapNotNull{i->value(v.opt(i))}.firstOrNull()
+                else -> null
+            }
+            fun scan(obj:JSONObject):String? {
+                val iter=obj.keys()
+                while(iter.hasNext()) {
+                    val key=iter.next(); val v=obj.opt(key)
+                    if(key.lowercase(Locale.ROOT).filter{it.isLetterOrDigit()} in keys) value(v)?.let{found->return found}
+                    if(v is JSONObject) scan(v)?.let{found->return found}
+                    if(v is org.json.JSONArray) for(i in 0 until v.length()) if(v.opt(i) is JSONObject) scan(v.getJSONObject(i))?.let{found->return found}
+                }
+                return null
+            }
+            return scan(data) ?: error("GLO last-two result is missing or unsupported")
         }
     }
 }

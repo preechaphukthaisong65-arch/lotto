@@ -206,9 +206,9 @@ abstract class LottoDao {
         val incomingByNumberAndCategory = lines.groupBy { it.numberText to it.betCategory }
         incomingByNumberAndCategory.forEach { (key, groupedLines) ->
             val (number, category) = key
-            require(number.length == 3) { "Number must contain exactly 3 digits" }
+            require(number.length == if (category == "TWO_TOP" || category == "TWO_BOTTOM") 2 else 3) { "Number length does not match category" }
             require(number.all { it in '0'..'9' }) { "Number must contain ASCII digits only" }
-            val validCategories = setOf("THREE_TOP", "THREE_TOAD")
+            val validCategories = setOf("TWO_TOP", "TWO_BOTTOM", "THREE_TOP", "THREE_TOAD")
             require(category in validCategories) { "Category does not match number length" }
 
             val rule = getNumberLimitRule(document.periodId, number.length, category, number)
@@ -369,7 +369,7 @@ abstract class LottoDao {
     @Query("""
         SELECT * FROM number_block_rules
         WHERE periodId = :periodId AND blocked = 1
-          AND blockCategory IN ('THREE_TOP', 'THREE_TOAD')
+          AND blockCategory IN ('TWO_TOP', 'TWO_BOTTOM', 'THREE_TOP', 'THREE_TOAD')
         ORDER BY blockCategory, numberText
     """)
     abstract fun getActiveNumberBlockRules(periodId: String): List<NumberBlockRuleEntity>
@@ -377,7 +377,7 @@ abstract class LottoDao {
     @Query("""
         SELECT * FROM number_block_rules
         WHERE periodId = :periodId
-          AND blockCategory IN ('THREE_TOP', 'THREE_TOAD')
+          AND blockCategory IN ('TWO_TOP', 'TWO_BOTTOM', 'THREE_TOP', 'THREE_TOAD')
         ORDER BY blockCategory, numberText
     """)
     abstract fun getAllNumberBlockRules(periodId: String): List<NumberBlockRuleEntity>
@@ -403,7 +403,7 @@ abstract class LottoDao {
     ): Boolean {
         require(ruleId.isNotBlank() && auditEventId.isNotBlank()) { "Rule and audit IDs are required" }
         require(numberText.all { it in '0'..'9' } &&
-            (blockCategory in setOf("THREE_TOP", "THREE_TOAD") && numberText.length == 3)) {
+            ((blockCategory in setOf("THREE_TOP", "THREE_TOAD") && numberText.length == 3) || (blockCategory in setOf("TWO_TOP", "TWO_BOTTOM") && numberText.length == 2))) {
             "Blocked number does not match its category"
         }
         val period = getPeriod(periodId) ?: error("Draw period not found")
@@ -456,7 +456,7 @@ abstract class LottoDao {
         require(rule.numberText.length == 3 && rule.numberText.all { it in '0'..'9' }) {
             "Limit number must contain exactly 3 ASCII digits"
         }
-        val validCategories = setOf("THREE_TOP", "THREE_TOAD")
+        val validCategories = setOf("TWO_TOP", "TWO_BOTTOM", "THREE_TOP", "THREE_TOAD")
         require(rule.numberLength == rule.numberText.length && rule.betCategory in validCategories) {
             "Limit category does not match number length"
         }
@@ -483,7 +483,7 @@ abstract class LottoDao {
         }
     }
 
-    @Query("SELECT * FROM number_limit_rules WHERE periodId = :periodId AND betCategory IN ('THREE_TOP', 'THREE_TOAD') ORDER BY numberLength, betCategory, numberText")
+    @Query("SELECT * FROM number_limit_rules WHERE periodId = :periodId AND betCategory IN ('TWO_TOP', 'TWO_BOTTOM', 'THREE_TOP', 'THREE_TOAD') ORDER BY numberLength, betCategory, numberText")
     abstract fun getLimitRules(periodId: String): List<NumberLimitRuleEntity>
 
     @Query("SELECT * FROM payout_rate_settings WHERE settingsId = 1 LIMIT 1")
@@ -500,6 +500,8 @@ abstract class LottoDao {
         require(settings.settingsId == 1) { "Only the singleton payout settings row is supported" }
         require(listOf(
             settings.twoDigitRateHundredths,
+            settings.twoTopRateHundredths,
+            settings.twoBottomRateHundredths,
             settings.threeTopRateHundredths,
             settings.threeBottomRateHundredths,
             settings.threeToadRateHundredths
@@ -532,6 +534,8 @@ abstract class LottoDao {
         require(getSettlementSnapshot(snapshot.periodId) == null) { "Settlement snapshot already exists for this period" }
         val rates = getPayoutRateSettings() ?: error("Payout rates must be configured before settlement")
         require(snapshot.twoDigitRateHundredths == rates.twoDigitRateHundredths &&
+            snapshot.twoTopRateHundredths == rates.twoTopRateHundredths &&
+            snapshot.twoBottomRateHundredths == rates.twoBottomRateHundredths &&
             snapshot.threeTopRateHundredths == rates.threeTopRateHundredths &&
             snapshot.threeBottomRateHundredths == rates.threeBottomRateHundredths &&
             snapshot.threeToadRateHundredths == rates.threeToadRateHundredths &&
@@ -558,10 +562,11 @@ abstract class LottoDao {
         }
         val expectedLength = when (result.resultType.trim().uppercase(java.util.Locale.ROOT)) {
             "THREE_TOP", "3 ตัวบน" -> 3
+            "TWO_BOTTOM", "2 ตัวล่าง" -> 2
             else -> 0
         }
-        require(expectedLength == 3 && result.winningNumber.length == expectedLength) {
-            "Result type must be 3 ตัวบน derived from GLO and number length must be exactly 3"
+        require(expectedLength > 0 && result.winningNumber.length == expectedLength) {
+            "Only GLO first-prize top and official last-two results are supported"
         }
         require(result.sourceLabel.isNotBlank()) { "Result source is required" }
         val period = getPeriod(result.periodId) ?: error("Draw period not found")

@@ -49,6 +49,8 @@ object PayoutCalculator {
             val rate = when (match.betCategory) {
                 "THREE_TOP" -> snapshot.threeTopRateHundredths
                 "THREE_TOAD" -> snapshot.threeToadRateHundredths
+                "TWO_TOP" -> snapshot.twoTopRateHundredths
+                "TWO_BOTTOM" -> snapshot.twoBottomRateHundredths
                 else -> error("Unsupported payout category: ${match.betCategory}")
             }
             match.lines.map { line ->
