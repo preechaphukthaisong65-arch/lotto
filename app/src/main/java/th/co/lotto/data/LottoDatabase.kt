@@ -209,6 +209,17 @@ abstract class LottoDatabase : RoomDatabase() {
                 END
             """.trimIndent())
             db.execSQL("""
+                CREATE TRIGGER IF NOT EXISTS prevent_duplicate_draw_result_insert
+                BEFORE INSERT ON draw_results
+                WHEN EXISTS (
+                    SELECT 1 FROM draw_results
+                    WHERE periodId = NEW.periodId AND resultType = NEW.resultType
+                )
+                BEGIN
+                    SELECT RAISE(ABORT, 'A draw result for this period and category already exists');
+                END
+            """.trimIndent())
+            db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS validate_draw_result_category_insert
                 BEFORE INSERT ON draw_results
                 WHEN NEW.resultType NOT IN ('THREE_TOP', '3 ตัวบน')
