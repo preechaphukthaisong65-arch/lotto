@@ -22,6 +22,8 @@ private enum class AppScreen {
     Sale,
     Reports,
     TotalSales,
+    CurrentSales,
+    SalesHistory,
     Performance
 }
 
@@ -74,6 +76,14 @@ class MainActivity : ComponentActivity() {
                         AppScreen.TotalSales.name -> ReportDetailScreen(
                             title = "ยอดขายทั้งหมด",
                             onBack = { currentScreen = AppScreen.Reports.name }
+                        )
+                        AppScreen.CurrentSales.name -> ReportDetailScreen(
+                            title = "ยอดขายงวดปัจจุบัน",
+                            onBack = { currentScreen = AppScreen.TotalSales.name }
+                        )
+                        AppScreen.SalesHistory.name -> ReportDetailScreen(
+                            title = "ยอดขายทั้งหมด (ย้อนหลัง 24 งวด)",
+                            onBack = { currentScreen = AppScreen.TotalSales.name }
                         )
                         AppScreen.Performance.name -> ReportDetailScreen(
                             title = "ยอดผลประกอบการ",
