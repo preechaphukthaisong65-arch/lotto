@@ -12,7 +12,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import java.util.UUID
 
 @RunWith(RobolectricTestRunner::class)
 class SaleCancellationDaoTest {
@@ -70,6 +69,29 @@ class SaleCancellationDaoTest {
                 cancellation.copy(cancellationId = "cancel-2"),
                 AuditEventEntity("audit-cancel-2", "SALE_CANCELLATION", "cancel-2", "CANCELLED", "duplicate", now + 2_000L)
             )
+        }
+    }
+
+    @Test
+    fun databaseRejectsUnsupportedSaleCategoriesAndTwoDigitNumbers() {
+        val dao = createDatabase()
+        val now = System.currentTimeMillis()
+        val periodId = "period-category"
+        dao.insertPeriod(DrawPeriodEntity(periodId, "งวดประเภท", now + 86_400_000L, "OPEN", null, now, null, now))
+
+        val invalidLines = listOf(
+            SaleLineEntity("bad-2", "bad-sale-2", periodId, "12", "TWO_TOP", 1_000L, false),
+            SaleLineEntity("bad-bottom", "bad-sale-bottom", periodId, "123", "THREE_BOTTOM", 1_000L, false)
+        )
+        invalidLines.forEachIndexed { index, line ->
+            val documentId = if (index == 0) "bad-sale-2" else "bad-sale-bottom"
+            assertThrows(IllegalArgumentException::class.java) {
+                dao.postSale(
+                    SaleDocumentEntity(documentId, periodId, null, "CASH", 1_000L, now, "Asia/Bangkok"),
+                    listOf(line),
+                    AuditEventEntity("bad-audit-$index", "SALE_DOCUMENT", documentId, "POSTED", "invalid test", now)
+                )
+            }
         }
     }
 
