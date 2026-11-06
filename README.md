@@ -5,7 +5,7 @@ Lotto is being developed as an Android-only, offline-first application. The on-d
 ## Architecture rules
 - No cloud database, backend server, account service, or data synchronization.
 - No customer, sale, credit, payment, or receipt data is transmitted outside the device.
-- Internet access is not required for core operation. Any future public calendar/result import must be optional and must never transmit private transaction data.
+- Internet access is used only when the user requests public result retrieval from the official GLO API. Sales, customers, credit, reports, backup, and cached results remain local/offline; private transaction data is never transmitted.
 - GitHub Actions is used only to compile and package APK test artifacts; it is not part of the running application.
 
 ## Current implementation status
@@ -17,7 +17,7 @@ Lotto is being developed as an Android-only, offline-first application. The on-d
 - No in-app PIN, user accounts, staff roles, or per-module permissions. Device screen lock is the device-level protection.
 - Final physical-device and airplane-mode acceptance testing is still required.
 - Approved half-payout rule: retain the full recorded stake and apply 50% of the configured payout rate. Final payout calculations remain disabled until their end-to-end accounting implementation is verified.
-- Confirmed sales are immutable. Cancellation is a separate auditable event; a replacement purchase is a new sale document.
+- Confirmed sales are immutable. Cancellation is a separate auditable event with timestamp and reason; a replacement purchase is a new sale document. Cancelled bills remain visible in history but are excluded from active totals.
 
 ## Build debug APK
 The workflow is `.github/workflows/android-build.yml`. Pushes to `main`, `feature/**`, and `srs-0.2-offline` trigger Android lint, unit/database tests, and a debug APK build. The `lotto-debug-apk` artifact includes `app-debug.apk`, its SHA-256 checksum, build metadata (commit/branch/run), and Room schemas.
