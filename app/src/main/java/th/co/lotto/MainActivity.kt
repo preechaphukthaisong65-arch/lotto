@@ -1270,7 +1270,7 @@ class MainActivity : Activity() {
                                 UUID.randomUUID().toString(),
                                 "DRAW_RESULT",
                                 result.resultId,
-                                "IMPORTED_GLO",
+                                "POSTED",
                                 "GLO draw ${official.drawDateIso}; first prize ${official.firstPrizeNumber}; THREE_TOP ${official.threeTopNumber}; fetchedAt=$now",
                                 now
                             )
