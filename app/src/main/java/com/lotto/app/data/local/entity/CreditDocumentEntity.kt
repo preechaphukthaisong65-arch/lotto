@@ -14,8 +14,19 @@ data class CreditDocumentEntity(
     val cashAmount: Long,
     val creditAmount: Long,
     val createdAt: Long,
-    val status: String = "OPEN"
-)
+    val status: String = STATUS_OPEN,
+    /**
+     * Null while any credit balance remains.
+     * Set once, when the document becomes fully paid.
+     * This timestamp starts the 180-day retention period.
+     */
+    val paidAt: Long? = null
+) {
+    companion object {
+        const val STATUS_OPEN = "OPEN"
+        const val STATUS_PAID = "PAID"
+    }
+}
 
 @Entity(
     tableName = "credit_document_items",
