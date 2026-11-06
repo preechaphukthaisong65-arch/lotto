@@ -71,8 +71,37 @@ abstract class LottoDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract fun insertCustomer(customer: CustomerEntity)
 
+    @Transaction
+    open fun postCustomer(customer: CustomerEntity, audit: AuditEventEntity) {
+        require(customer.customerId.isNotBlank()) { "Customer ID is required" }
+        require(customer.displayName.isNotBlank()) { "Customer name is required" }
+        require(customer.customerType in setOf("CASH", "CREDIT")) { "Unknown customer type" }
+        if (customer.customerType == "CREDIT") {
+            require(!customer.phone.isNullOrBlank()) { "Credit customer phone is required" }
+            val normalizedPhone = customer.phone.filter { it.isDigit() }
+            require(normalizedPhone.length in 8..15) { "Credit customer phone must contain 8-15 digits" }
+            require(!customer.identityNote.isNullOrBlank()) { "Credit customer identity details are required" }
+        }
+        require(audit.eventId.isNotBlank() && audit.entityType == "CUSTOMER" &&
+            audit.entityId == customer.customerId && audit.action == "CREATED") {
+            "Customer audit event does not match the new customer"
+        }
+        insertCustomer(customer)
+        insertAuditEvent(audit)
+    }
+
     @Query("SELECT * FROM customers ORDER BY displayName COLLATE NOCASE")
     abstract fun getCustomers(): List<CustomerEntity>
+
+    @Query("""
+        SELECT * FROM customers
+        WHERE customerType = :customerType
+          AND (:searchText = '' OR displayName LIKE '%' || :searchText || '%'
+               OR COALESCE(phone, '') LIKE '%' || :searchText || '%'
+               OR COALESCE(identityNote, '') LIKE '%' || :searchText || '%')
+        ORDER BY displayName COLLATE NOCASE
+    """)
+    abstract fun searchCustomers(customerType: String, searchText: String): List<CustomerEntity>
 
     @Query("SELECT * FROM customers WHERE customerId = :customerId LIMIT 1")
     abstract fun getCustomer(customerId: String): CustomerEntity?
