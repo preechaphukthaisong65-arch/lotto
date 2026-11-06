@@ -601,7 +601,30 @@ abstract class LottoDao {
 
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
-    abstract fun insertDrawSourceCheck(check: DrawSourceCheckEntity)
+    abstract fun insertDrawSourceCheckRow(check: DrawSourceCheckEntity)
+
+    @Transaction
+    open fun insertDrawSourceCheck(check: DrawSourceCheckEntity) {
+        require(check.checkId.isNotBlank()) { "Source check ID is required" }
+        require(check.sourceId in setOf("LOTTERYCHECKS", "HUAYREVIEW")) { "Unknown result source" }
+        require(check.firstPrizeNumber.length == 6 && check.firstPrizeNumber.all { it in '0'..'9' }) { "Invalid first-prize number" }
+        require(check.threeTopNumber == check.firstPrizeNumber.takeLast(3)) { "Derived three-top number is invalid" }
+        require(check.twoBottomNumber.length == 2 && check.twoBottomNumber.all { it in '0'..'9' }) { "Invalid last-two number" }
+        require(check.drawDateIso.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) { "Invalid draw date" }
+        require(check.sourceUrl.startsWith("https://")) { "Source URL must use HTTPS" }
+        require(check.fetchedAtEpochMillis > 0L) { "Source check timestamp is invalid" }
+        val period = getPeriod(check.periodId) ?: error("Draw period not found")
+        require(period.status == "CLOSED") { "Only closed periods can be checked" }
+        require(check.drawDateIso == expectedDrawDateIso(check.periodId)) { "Source draw date does not match this period" }
+        insertDrawSourceCheckRow(check)
+    }
+
+    private fun expectedDrawDateIso(periodId: String): String {
+        val millis = getPeriod(periodId)?.drawDateEpochMillis ?: error("Draw date is not configured")
+        return java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).apply {
+            timeZone = java.util.TimeZone.getTimeZone("Asia/Bangkok")
+        }.format(java.util.Date(millis))
+    }
 
     @Query("SELECT * FROM draw_source_checks WHERE periodId = :periodId ORDER BY fetchedAtEpochMillis DESC")
     abstract fun getDrawSourceChecks(periodId: String): List<DrawSourceCheckEntity>
@@ -618,7 +641,7 @@ abstract class LottoDao {
             .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
         val first = latest["LOTTERYCHECKS"] ?: error("LotteryChecks result is missing")
         val second = latest["HUAYREVIEW"] ?: error("HuayReview result is missing")
-        require(first.drawDateIso == second.drawDateIso &&
+        require(first.drawDateIso == second.drawDateIso && first.drawDateIso == expectedDrawDateIso(periodId) &&
             first.firstPrizeNumber == second.firstPrizeNumber && first.twoBottomNumber == second.twoBottomNumber) {
             "Public source results do not match; settlement is blocked"
         }
@@ -644,7 +667,7 @@ abstract class LottoDao {
             .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
         val first = latest["LOTTERYCHECKS"] ?: error("ยังไม่มีผลจาก LotteryChecks")
         val second = latest["HUAYREVIEW"] ?: error("ยังไม่มีผลจาก HuayReview")
-        require(first.drawDateIso == second.drawDateIso &&
+        require(first.drawDateIso == second.drawDateIso && first.drawDateIso == expectedDrawDateIso(periodId) &&
             (first.firstPrizeNumber != second.firstPrizeNumber || first.twoBottomNumber != second.twoBottomNumber)) {
             "ไม่สามารถกรอกผลแทนได้เมื่อสองเว็บไซต์ตรงกัน"
         }
@@ -663,7 +686,7 @@ abstract class LottoDao {
             .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
         val first = latest["LOTTERYCHECKS"] ?: return false
         val second = latest["HUAYREVIEW"] ?: return false
-        if (first.drawDateIso != second.drawDateIso) return false
+        if (first.drawDateIso != second.drawDateIso || runCatching { first.drawDateIso != expectedDrawDateIso(periodId) }.getOrDefault(true)) return false
         val results = getDrawResults(periodId)
         val latestCheckTime = maxOf(first.fetchedAtEpochMillis, second.fetchedAtEpochMillis)
         if (first.firstPrizeNumber == second.firstPrizeNumber && first.twoBottomNumber == second.twoBottomNumber) {
