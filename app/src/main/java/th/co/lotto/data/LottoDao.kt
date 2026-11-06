@@ -151,11 +151,7 @@ abstract class LottoDao {
 
         // Explicitly rejected numbers are separate from monetary limit rules.
         lines.forEach { line ->
-            val blockCategory = when {
-                line.numberText.length == 2 -> "TWO_DIGIT"
-                line.betCategory == "THREE_TOAD" -> "THREE_TOAD"
-                else -> "THREE_STRAIGHT"
-            }
+            val blockCategory = if (line.numberText.length == 2) "TWO_DIGIT" else line.betCategory
             require(getActiveNumberBlockRule(document.periodId, blockCategory, line.numberText) == null) {
                 "Number is not accepted: ${line.numberText} / $blockCategory"
             }
@@ -303,7 +299,7 @@ abstract class LottoDao {
         require(ruleId.isNotBlank() && auditEventId.isNotBlank()) { "Rule and audit IDs are required" }
         require(numberText.all { it in '0'..'9' } &&
             ((blockCategory == "TWO_DIGIT" && numberText.length == 2) ||
-             ((blockCategory == "THREE_STRAIGHT" || blockCategory == "THREE_TOAD") && numberText.length == 3))) {
+             (blockCategory in setOf("THREE_TOP", "THREE_BOTTOM", "THREE_TOAD") && numberText.length == 3))) {
             "Blocked number does not match its category"
         }
         val period = getPeriod(periodId) ?: error("Draw period not found")
