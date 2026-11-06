@@ -1295,7 +1295,7 @@ class MainActivity : Activity() {
                 }
                 runOnUiThread {
                     if (failures.isNotEmpty()) {
-                        Toast.makeText(this, failures.joinToString("\\n") + "\\nยังยืนยันผลไม่ได้และยังคำนวณจ่ายไม่ได้", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, failures.joinToString("\n") + "\nยังยืนยันผลไม่ได้และยังคำนวณจ่ายไม่ได้", Toast.LENGTH_LONG).show()
                     } else if (failures.isEmpty() && first != null && second != null && first.drawDateIso == second.drawDateIso &&
                         (first.firstPrizeNumber != second.firstPrizeNumber || first.twoBottomNumber != second.twoBottomNumber)) {
                         showManualResultDialog(period, first.firstPrizeNumber, first.twoBottomNumber,
@@ -1335,7 +1335,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
             addView(TextView(this@MainActivity).apply {
-                text = "LotteryChecks: รางวัลที่ 1 $lotteryFirst • 2 ตัวล่าง $lotteryBottom\\nHuayReview: รางวัลที่ 1 $huayFirst • 2 ตัวล่าง $huayBottom"
+                text = "LotteryChecks: รางวัลที่ 1 $lotteryFirst • 2 ตัวล่าง $lotteryBottom\nHuayReview: รางวัลที่ 1 $huayFirst • 2 ตัวล่าง $huayBottom"
                 textSize = 14f
                 setTextColor(0xFF9B2C2C.toInt())
             })
@@ -1418,6 +1418,15 @@ class MainActivity : Activity() {
                 if (lc == null || hr == null) {
                     addText(resultList, "สถานะตรวจผล: ยังตรวจสอบจากสองเว็บไซต์ไม่ครบ • ระงับการคำนวณจ่าย", 13, 0xFF9B2C2C.toInt())
                 } else {
+                    addButton(resultList, "LotteryChecks • แหล่งข้อมูลผลรางวัล") {
+                        startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://lotterychecks.com/")))
+                    }
+                    addButton(resultList, "HuayReview • ข้อมูลผลรางวัล (CC BY 4.0)") {
+                        startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://huayreview.net/stats/ten-year-data/")))
+                    }
+                    addButton(resultList, "เงื่อนไขสัญญาอนุญาต CC BY 4.0") {
+                        startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://creativecommons.org/licenses/by/4.0/")))
+                    }
                     addText(resultList, "LotteryChecks: ${lc.firstPrizeNumber} / ${lc.twoBottomNumber} • HuayReview: ${hr.firstPrizeNumber} / ${hr.twoBottomNumber}", 12, ink)
                     if (lc.firstPrizeNumber != hr.firstPrizeNumber || lc.twoBottomNumber != hr.twoBottomNumber) {
                         addText(resultList, if (verificationComplete) "ผลไม่ตรงกัน แต่ผู้ใช้ตรวจสอบ GLO และยืนยันผลแล้ว" else "ผลสองเว็บไซต์ไม่ตรงกัน • ระงับการคำนวณจ่ายและสรุปยอด", 13, 0xFF9B2C2C.toInt())
