@@ -130,16 +130,13 @@ class SaleCancellationDaoTest {
         validLines.forEachIndexed { index, line ->
             val documentId = if (index == 0) "valid-top-sale" else "valid-bottom-sale"
             dao.postSale(
-                SaleDocumentEntity(documentId, periodId, null, "CASH", 1_000L, now + index, "Asia/Bangkok"),
+                SaleDocumentEntity(documentId, periodId, null, "CASH", 1_000L, now, "Asia/Bangkok"),
                 listOf(line),
-                AuditEventEntity("valid-audit-$index", "SALE_DOCUMENT", documentId, "POSTED", "valid two-digit category", now + index)
+                AuditEventEntity("valid-audit-$index", "SALE_DOCUMENT", documentId, "POSTED", "valid two-digit category", now)
             )
         }
 
-        assertEquals(1, dao.searchSales(periodId, "").size.let { count ->
-            // Each saved document has one sale line; history returns documents.
-            count
-        })
+        assertEquals(2, dao.searchSales(periodId, "").size)
         assertEquals(1_000L, dao.getSoldAmountForNumber(periodId, "05", "TWO_TOP"))
         assertEquals(1_000L, dao.getSoldAmountForNumber(periodId, "01", "TWO_BOTTOM"))
 
