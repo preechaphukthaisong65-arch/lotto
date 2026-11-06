@@ -20,9 +20,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DrawResultEntity::class,
         AuditEventEntity::class,
         PayoutRateSettingsEntity::class,
-        SettlementSnapshotEntity::class
+        SettlementSnapshotEntity::class,
+        DrawSourceCheckEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
