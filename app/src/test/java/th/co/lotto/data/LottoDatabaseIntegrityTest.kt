@@ -20,6 +20,7 @@ import java.time.ZoneId
 
 @RunWith(RobolectricTestRunner::class)
 class LottoDatabaseIntegrityTest {
+    // Test fixtures updated for the supported three-digit sale categories.
     private lateinit var database: LottoDatabase
     private lateinit var dao: LottoDao
 
