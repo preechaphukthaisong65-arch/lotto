@@ -147,7 +147,9 @@ class MainActivity : Activity() {
                         " • กำหนดเปิด " + SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(it))
                     } ?: ""
                     addCard(currentBody, p.title,
-                        "$statusLabel • วันหวยออก $dateLabel$openLabel • รหัสงวด: ${p.periodId.take(8)}") { }
+                        "$statusLabel • วันหวยออก $dateLabel$openLabel • รหัสงวด: ${p.periodId.take(8)}") {
+                        if (p.status != "CLOSED") editPeriodDateDialog(p)
+                    }
                     if (p.status == "OPEN") {
                         addButton(currentBody, "ปิดรับขายงวดนี้") { confirmClosePeriod(p) }
                     }
@@ -178,6 +180,53 @@ class MainActivity : Activity() {
                 }
             }
             .show()
+    }
+
+    private fun editPeriodDateDialog(period: DrawPeriodEntity) {
+        val dateInput = EditText(this).apply {
+            hint = "วันที่หวยออก (dd/MM/yyyy)"
+            period.drawDateEpochMillis?.let {
+                setText(SimpleDateFormat("dd/MM/yyyy", Locale("th", "TH")).format(Date(it)))
+            }
+        }
+        AlertDialog.Builder(this)
+            .setTitle("กำหนดวันหวยออก • ${period.title}")
+            .setView(dateInput)
+            .setNegativeButton("กลับ", null)
+            .setPositiveButton("บันทึก", null)
+            .create()
+            .also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val dateText = dateInput.text.toString().trim()
+                        val drawDate = try {
+                            SimpleDateFormat("dd/MM/yyyy", Locale("th", "TH"))
+                                .apply { isLenient = false }.parse(dateText)?.time
+                        } catch (_: Exception) { null }
+                        if (drawDate == null) {
+                            dateInput.error = "กรุณาระบุวันที่ให้ถูกต้อง"
+                            return@setOnClickListener
+                        }
+                        io.execute {
+                            try {
+                                val updated = database.lottoDao()
+                                    .updateEditablePeriodDrawDate(period.periodId, drawDate)
+                                require(updated == 1) { "งวดนี้ไม่อยู่ในสถานะที่แก้ไขวันได้" }
+                                runOnUiThread {
+                                    Toast.makeText(this, "ปรับวันหวยออกแล้ว", Toast.LENGTH_SHORT).show()
+                                    dialog.dismiss()
+                                    showPeriods()
+                                }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    Toast.makeText(this, "บันทึกวันหวยออกไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
     }
 
     private fun createPeriodDialog() {
