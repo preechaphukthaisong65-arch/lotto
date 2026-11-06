@@ -103,10 +103,10 @@ Implemented phase-7 backup format:
 - Android Auto Backup is disabled in the manifest. Backup files are user-managed and must be stored securely.
 
 ## 14. Security
-No in-app PIN, user accounts, staff roles, or per-module permissions. The device's Android screen lock is the device-level access protection. Internet access is used only to retrieve public results from LotteryChecks and HuayReview; the app does not connect to GLO and must never transmit private customer, sales, credit, payment, or receipt data. Core sales, customer, credit, report, and backup functions must work offline. Preserve immutable records and audit events. Use a passphrase-derived key for exported backup encryption.
+No in-app PIN, user accounts, staff roles, or per-module permissions. The device's Android screen lock is the device-level access protection. Internet access is used only to retrieve public results and published calendar pages from LotteryChecks and HuayReview; the app does not connect to GLO and must never transmit private customer, sales, credit, payment, or receipt data. Core sales, customer, credit, report, and backup functions must work offline. Preserve immutable records and audit events. Use a passphrase-derived key for exported backup encryption.
 
 Implemented protections:
-- Application data remains inside the Android app sandbox; no cloud database, backend, account service, or synchronization.
+- Application data remains inside the Android app sandbox; no cloud database, backend, account service, or synchronization. Calendar audit records are stored locally in an append-only private app file.
 - Android system backup is disabled (allowBackup=false).
 - Exported backup data is encrypted with a portable passphrase-derived key and authenticated encryption; the passphrase is held only in memory during the operation and cleared afterwards.
 - Restore validates contents before replacement and rolls back to the prior database/receipts if installation or Room re-open validation fails.
