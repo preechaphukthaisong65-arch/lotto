@@ -1428,9 +1428,8 @@ class MainActivity : Activity() {
                 pendingBackupPassphrase = null
                 io.execute {
                     try {
-                        val encrypted = LocalBackupManager.createEncryptedBackup(this, database, passphrase)
                         contentResolver.openOutputStream(uri, "w")?.use { output ->
-                            output.write(encrypted)
+                            LocalBackupManager.writeEncryptedBackup(this, database, passphrase, output)
                             output.flush()
                         } ?: error("ไม่สามารถเขียนไฟล์สำรองได้")
                         runOnUiThread {
@@ -1527,20 +1526,9 @@ class MainActivity : Activity() {
                         dialog.dismiss()
                         io.execute {
                             try {
-                                val encrypted = contentResolver.openInputStream(uri)?.use { input ->
-                                    val bytes = java.io.ByteArrayOutputStream()
-                                    val buffer = ByteArray(8192)
-                                    var total = 0
-                                    while (true) {
-                                        val count = input.read(buffer)
-                                        if (count < 0) break
-                                        total = Math.addExact(total, count)
-                                        require(total <= 256 * 1024 * 1024) { "ไฟล์สำรองมีขนาดเกิน 256 MB" }
-                                        bytes.write(buffer, 0, count)
-                                    }
-                                    bytes.toByteArray()
+                                contentResolver.openInputStream(uri)?.use { input ->
+                                    LocalBackupManager.restoreEncryptedBackup(this, input, passphrase)
                                 } ?: error("ไม่สามารถอ่านไฟล์สำรองได้")
-                                LocalBackupManager.restoreEncryptedBackup(this, encrypted, passphrase)
                                 runOnUiThread {
                                     Toast.makeText(this, "กู้คืนข้อมูลสำเร็จ", Toast.LENGTH_LONG).show()
                                     showHome()
