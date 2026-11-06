@@ -80,6 +80,20 @@ abstract class LottoDatabase : RoomDatabase() {
                 BEGIN SELECT RAISE(ABORT, 'Draw result references an unknown period'); END
             """.trimIndent())
             db.execSQL("""
+                CREATE TRIGGER IF NOT EXISTS validate_sale_correction_reference_insert
+                BEFORE INSERT ON sale_documents
+                WHEN NEW.correctionOfDocumentId IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM sale_documents
+                    WHERE documentId = NEW.correctionOfDocumentId
+                      AND periodId = NEW.periodId
+                      AND correctionOfDocumentId IS NULL
+                  )
+                BEGIN
+                    SELECT RAISE(ABORT, 'Correction must reference an original document in the same period');
+                END
+            """.trimIndent())
+            db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS validate_sale_line_parent_insert
                 BEFORE INSERT ON sale_lines
                 WHEN NOT EXISTS (
