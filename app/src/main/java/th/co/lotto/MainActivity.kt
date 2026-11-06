@@ -732,7 +732,7 @@ class MainActivity : Activity() {
         }
         val dialog = AlertDialog.Builder(this)
             .setTitle("ยืนยันยกเลิกบิล")
-            .setMessage("บิลเดิมจะไม่ถูกลบ แต่จะถูกทำเครื่องหมายยกเลิกและไม่นำไปคิดยอดขาย วงเงิน ลูกหนี้ หรือผลรางวัล")
+            .setMessage("บิลเดิมจะไม่ถูกลบ แต่จะถูกทำเครื่องหมายยกเลิกและไม่นำไปคิดยอดขาย วงเงิน ลูกหนี้ หรือผลรางวัล • ขั้นตอนนี้ยังไม่บันทึกการคืนเงินจริง")
             .setView(form)
             .setNegativeButton("กลับ", null)
             .setPositiveButton("ยืนยันยกเลิก", null)
