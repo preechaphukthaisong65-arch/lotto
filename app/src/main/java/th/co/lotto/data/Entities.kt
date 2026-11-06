@@ -1,5 +1,6 @@
 package th.co.lotto.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -87,7 +88,7 @@ data class NumberLimitRuleEntity(
     val numberText: String,
     val maximumAmountSatang: Long,
     val enabled: Boolean,
-    val halfPayout: Boolean = false
+    @ColumnInfo(defaultValue = "0") val halfPayout: Boolean = false
 )
 
 @Entity(
