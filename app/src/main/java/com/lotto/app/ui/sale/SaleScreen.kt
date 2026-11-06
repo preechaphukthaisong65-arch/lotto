@@ -25,22 +25,29 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.lotto.app.domain.model.SaleDraft
+import com.lotto.app.domain.model.SaleDraftItem
+import com.lotto.app.domain.rules.LottoRules
+import com.lotto.app.domain.rules.PayoutMode
+import com.lotto.app.domain.rules.PrizeType
 import com.lotto.app.ui.components.buttons.BackButton
 import com.lotto.app.ui.components.buttons.ConfirmButton
 import com.lotto.app.ui.sale.components.SaleNumberRow
 import com.lotto.app.ui.sale.model.ThreeDigitEntry
 import com.lotto.app.ui.sale.model.TwoDigitEntry
+import kotlinx.coroutines.launch
 
 @Composable
 fun SaleScreen(
     onBack: () -> Unit,
-    onSave: () -> Unit
+    onSave: suspend (SaleDraft) -> Long
 ) {
     val threeDigitEntries = remember { mutableStateListOf(ThreeDigitEntry(id = 1L)) }
     val twoDigitEntries = remember { mutableStateListOf(TwoDigitEntry(id = 1L)) }
@@ -52,15 +59,115 @@ fun SaleScreen(
     var creditSelected by remember { mutableStateOf(false) }
     var cashAmount by remember { mutableStateOf("") }
     var creditAmount by remember { mutableStateOf("") }
+    var isSaving by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
 
     val total = threeDigitEntries.sumOf {
         (it.straightAmount.toLongOrNull() ?: 0L) + (it.boxAmount.toLongOrNull() ?: 0L)
     } + twoDigitEntries.sumOf {
         (it.topAmount.toLongOrNull() ?: 0L) + (it.bottomAmount.toLongOrNull() ?: 0L)
     }
+
+    val cashValue = when {
+        cashSelected && creditSelected -> cashAmount.toLongOrNull() ?: 0L
+        cashSelected -> total
+        else -> 0L
+    }
+    val creditValue = when {
+        cashSelected && creditSelected -> creditAmount.toLongOrNull() ?: 0L
+        creditSelected -> total
+        else -> 0L
+    }
+
     val paymentSelected = cashSelected || creditSelected
-    val splitValid = !(cashSelected && creditSelected) ||
-        ((cashAmount.toLongOrNull() ?: 0L) + (creditAmount.toLongOrNull() ?: 0L) == total)
+    val splitValid = cashValue + creditValue == total
+    val customerValid = !creditSelected || (firstName.isNotBlank() && lastName.isNotBlank())
+
+    val activeEntriesValid = threeDigitEntries.all { entry ->
+        val straightAmount = entry.straightAmount.toLongOrNull() ?: 0L
+        val todAmount = entry.boxAmount.toLongOrNull() ?: 0L
+        (straightAmount == 0L && todAmount == 0L) ||
+            (LottoRules.isValidThreeDigitNumber(
+                entry.firstDigit + entry.secondDigit + entry.thirdDigit
+            ) && straightAmount >= 0L && todAmount >= 0L)
+    } && twoDigitEntries.all { entry ->
+        val topAmount = entry.topAmount.toLongOrNull() ?: 0L
+        val bottomAmount = entry.bottomAmount.toLongOrNull() ?: 0L
+        (topAmount == 0L && bottomAmount == 0L) ||
+            (LottoRules.isValidTwoDigitNumber(entry.firstDigit + entry.secondDigit) &&
+                topAmount >= 0L && bottomAmount >= 0L)
+    }
+
+    val canSave = total > 0L && paymentSelected && splitValid &&
+        customerValid && activeEntriesValid && !isSaving
+
+    fun createDraft(): SaleDraft {
+        val items = buildList {
+            threeDigitEntries.forEach { entry ->
+                val number = entry.firstDigit + entry.secondDigit + entry.thirdDigit
+                val straight = entry.straightAmount.toLongOrNull() ?: 0L
+                val tod = entry.boxAmount.toLongOrNull() ?: 0L
+                if (straight > 0L) add(
+                    SaleDraftItem(
+                        number = number,
+                        prizeType = PrizeType.THREE_DIGIT_STRAIGHT.name,
+                        amount = straight,
+                        payoutMultiplier = LottoRules.payoutMultiplier(
+                            PrizeType.THREE_DIGIT_STRAIGHT,
+                            PayoutMode.FULL
+                        )
+                    )
+                )
+                if (tod > 0L) add(
+                    SaleDraftItem(
+                        number = number,
+                        prizeType = PrizeType.THREE_DIGIT_TOD.name,
+                        amount = tod,
+                        payoutMultiplier = LottoRules.payoutMultiplier(
+                            PrizeType.THREE_DIGIT_TOD,
+                            PayoutMode.FULL
+                        )
+                    )
+                )
+            }
+            twoDigitEntries.forEach { entry ->
+                val number = entry.firstDigit + entry.secondDigit
+                val top = entry.topAmount.toLongOrNull() ?: 0L
+                val bottom = entry.bottomAmount.toLongOrNull() ?: 0L
+                if (top > 0L) add(
+                    SaleDraftItem(
+                        number = number,
+                        prizeType = PrizeType.TWO_DIGIT_TOP.name,
+                        amount = top,
+                        payoutMultiplier = LottoRules.payoutMultiplier(
+                            PrizeType.TWO_DIGIT_TOP,
+                            PayoutMode.FULL
+                        )
+                    )
+                )
+                if (bottom > 0L) add(
+                    SaleDraftItem(
+                        number = number,
+                        prizeType = PrizeType.TWO_DIGIT_BOTTOM.name,
+                        amount = bottom,
+                        payoutMultiplier = LottoRules.payoutMultiplier(
+                            PrizeType.TWO_DIGIT_BOTTOM,
+                            PayoutMode.FULL
+                        )
+                    )
+                )
+            }
+        }
+        return SaleDraft(
+            customerFirstName = firstName.trim(),
+            customerLastName = lastName.trim(),
+            totalAmount = total,
+            cashAmount = cashValue,
+            creditAmount = creditValue,
+            items = items
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -89,12 +196,33 @@ fun SaleScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
+                    if (saveError != null) {
+                        Text(
+                            text = saveError.orEmpty(),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     ConfirmButton(
-                        onConfirm = onSave,
-                        label = "ยืนยัน / บันทึก",
+                        onConfirm = {
+                            if (canSave) {
+                                coroutineScope.launch {
+                                    isSaving = true
+                                    saveError = null
+                                    try {
+                                        onSave(createDraft())
+                                    } catch (error: Exception) {
+                                        saveError = error.message ?: "บันทึกข้อมูลไม่สำเร็จ"
+                                    } finally {
+                                        isSaving = false
+                                    }
+                                }
+                            }
+                        },
+                        label = if (isSaving) "กำลังบันทึก..." else "ยืนยัน / บันทึก",
                         confirmationTitle = "ยืนยันการบันทึกการขาย",
                         confirmationMessage = "ตรวจสอบรายการและยอดรวมก่อนยืนยัน",
-                        enabled = total > 0L && paymentSelected && splitValid
+                        enabled = canSave
                     )
                 }
             }
@@ -122,6 +250,13 @@ fun SaleScreen(
                         label = { Text("นามสกุล") },
                         singleLine = true
                     )
+                    if (creditSelected && !customerValid) {
+                        Text(
+                            "การขายเงินเชื่อต้องกรอกชื่อและนามสกุลลูกค้า",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
             item { Divider() }
@@ -207,6 +342,13 @@ fun SaleScreen(
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
+                    }
+                    if (!activeEntriesValid) {
+                        Text(
+                            "กรุณากรอกเลขให้ครบทุกหลักในรายการที่มียอดซื้อ",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             }
