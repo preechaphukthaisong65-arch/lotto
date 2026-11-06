@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "feature/**"
+      - "srs-0.2-offline"
   workflow_dispatch:
 
 permissions:
