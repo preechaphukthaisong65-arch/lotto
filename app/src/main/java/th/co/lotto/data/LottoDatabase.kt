@@ -12,6 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DrawPeriodEntity::class,
         CustomerEntity::class,
         SaleDocumentEntity::class,
+        SaleCancellationEntity::class,
         SaleLineEntity::class,
         PaymentEntryEntity::class,
         NumberLimitRuleEntity::class,
@@ -21,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PayoutRateSettingsEntity::class,
         SettlementSnapshotEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -109,6 +110,25 @@ abstract class LottoDatabase : RoomDatabase() {
                 installIntegrityGuards(db)
                 db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_settlement_snapshot_update BEFORE UPDATE ON settlement_snapshots BEGIN SELECT RAISE(ABORT, 'Settlement snapshots are immutable'); END")
                 db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_settlement_snapshot_delete BEFORE DELETE ON settlement_snapshots BEGIN SELECT RAISE(ABORT, 'Settlement snapshots are immutable'); END")
+            }
+        }
+
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS sale_cancellations (
+                        cancellationId TEXT NOT NULL PRIMARY KEY,
+                        documentId TEXT NOT NULL,
+                        originalAmountSatang INTEGER NOT NULL,
+                        reason TEXT NOT NULL,
+                        cancelledAtEpochMillis INTEGER NOT NULL,
+                        FOREIGN KEY(documentId) REFERENCES sale_documents(documentId)
+                            ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sale_cancellations_documentId ON sale_cancellations(documentId)")
+                db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_sale_cancellation_update BEFORE UPDATE ON sale_cancellations BEGIN SELECT RAISE(ABORT, 'Sale cancellation records are immutable'); END")
+                db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_sale_cancellation_delete BEFORE DELETE ON sale_cancellations BEGIN SELECT RAISE(ABORT, 'Sale cancellation records are immutable'); END")
             }
         }
 
@@ -201,6 +221,8 @@ abstract class LottoDatabase : RoomDatabase() {
             db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_settlement_snapshot_delete BEFORE DELETE ON settlement_snapshots BEGIN SELECT RAISE(ABORT, 'Settlement snapshots are immutable'); END")
 
             // Posted financial source records and their audit trail are append-only.
+            db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_sale_cancellation_update BEFORE UPDATE ON sale_cancellations BEGIN SELECT RAISE(ABORT, 'Sale cancellation records are immutable'); END")
+            db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_sale_cancellation_delete BEFORE DELETE ON sale_cancellations BEGIN SELECT RAISE(ABORT, 'Sale cancellation records are immutable'); END")
             db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_sale_document_update BEFORE UPDATE ON sale_documents BEGIN SELECT RAISE(ABORT, 'Sale documents are immutable'); END")
             db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_sale_document_delete BEFORE DELETE ON sale_documents BEGIN SELECT RAISE(ABORT, 'Sale documents are immutable'); END")
             db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_sale_line_update BEFORE UPDATE ON sale_lines BEGIN SELECT RAISE(ABORT, 'Sale lines are immutable'); END")
@@ -228,7 +250,7 @@ abstract class LottoDatabase : RoomDatabase() {
                 LottoDatabase::class.java,
                 "lotto-local.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
