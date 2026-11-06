@@ -28,9 +28,11 @@ abstract class SaleDao {
         sale: SaleEntity,
         items: List<SaleItemEntity>
     ): Long {
+        // Every sale is stored in the same sales table, regardless of payment type.
         val saleId = insertSale(sale)
         insertSaleItems(items.map { it.copy(saleId = saleId) })
 
+        // Only the credit portion gets a separate document in the credit-account category.
         if (sale.creditAmount > 0L) {
             val creditDocumentId = insertCreditDocument(
                 CreditDocumentEntity(
@@ -57,6 +59,9 @@ abstract class SaleDao {
         }
         return saleId
     }
+
+    @Query("SELECT * FROM sales ORDER BY createdAt DESC, saleId DESC")
+    abstract suspend fun getAllSales(): List<SaleEntity>
 
     @Query("SELECT * FROM sales WHERE saleId = :saleId LIMIT 1")
     abstract suspend fun getSaleById(saleId: Long): SaleEntity?
