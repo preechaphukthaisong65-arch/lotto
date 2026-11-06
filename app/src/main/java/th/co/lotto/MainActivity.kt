@@ -1314,6 +1314,7 @@ class MainActivity : Activity() {
                     val bottomAudit = AuditEventEntity(UUID.randomUUID().toString(), "DRAW_RESULT", bottom.resultId,
                         "POSTED", "Two public sources matched; TWO_BOTTOM=${first.twoBottomNumber}", now)
                     dao.postComparedResults(period.periodId, top, bottom, topAudit, bottomAudit)
+                    createSettlementSnapshotIfConfigured(period.periodId)
                 }
                 runOnUiThread {
                     if (failures.isNotEmpty()) {
@@ -1334,6 +1335,26 @@ class MainActivity : Activity() {
                 runOnUiThread { Toast.makeText(this, "บันทึกผลตรวจสอบไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
             }
         }
+    }
+
+
+    private fun createSettlementSnapshotIfConfigured(periodId: String) {
+        val dao = database.lottoDao()
+        if (!dao.isResultVerificationComplete(periodId) || dao.getSettlementSnapshot(periodId) != null) return
+        val rates = dao.getPayoutRateSettings() ?: return
+        val now = System.currentTimeMillis()
+        val snapshot = th.co.lotto.data.SettlementSnapshotEntity(
+            UUID.randomUUID().toString(), periodId,
+            rates.twoDigitRateHundredths, rates.threeTopRateHundredths,
+            rates.threeBottomRateHundredths, rates.threeToadRateHundredths,
+            rates.configVersion, now,
+            twoTopRateHundredths = rates.twoTopRateHundredths,
+            twoBottomRateHundredths = rates.twoBottomRateHundredths
+        )
+        val audit = AuditEventEntity(UUID.randomUUID().toString(), "SETTLEMENT",
+            snapshot.settlementId, "SNAPSHOTTED",
+            "Automatic payout-rate snapshot after verified two-source/manual result confirmation; version=${rates.configVersion}", now)
+        dao.createSettlementSnapshot(snapshot, audit)
     }
 
     private fun showManualResultDialog(
@@ -1399,8 +1420,9 @@ class MainActivity : Activity() {
                     "POSTED", "Manual result verification", now)
                 io.execute {
                     try {
-                        database.lottoDao().postManualVerifiedResults(period.periodId, first, bottom,
-                            topAudit, bottomAudit, now)
+                        val dao = database.lottoDao()
+                        dao.postManualVerifiedResults(period.periodId, first, bottom, topAudit, bottomAudit, now)
+                        createSettlementSnapshotIfConfigured(period.periodId)
                         runOnUiThread {
                             dialog.dismiss()
                             Toast.makeText(this, "บันทึกผลที่ตรวจสอบด้วยตนเองแล้ว", Toast.LENGTH_LONG).show()
