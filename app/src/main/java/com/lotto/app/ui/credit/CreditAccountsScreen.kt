@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -47,10 +49,12 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
     val paymentInputs = remember { mutableStateMapOf<Long, String>() }
     var refreshKey by remember { mutableStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var pendingPayment by remember { mutableStateOf<Pair<Long, Long>?>(null) }
     val scope = rememberCoroutineScope()
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")) }
 
     LaunchedEffect(refreshKey) {
+        repository.cleanupExpiredPaidBills()
         openBills = repository.getOpenBills()
         paidBills = repository.getPaidBills()
         paymentHistory = (openBills + paidBills).associate { bill ->
@@ -121,16 +125,7 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
                                             if (amount == null || amount <= 0L) {
                                                 errorMessage = "กรุณากรอกยอดรับชำระให้ถูกต้อง"
                                             } else {
-                                                scope.launch {
-                                                    try {
-                                                        repository.receivePayment(bill.creditDocumentId, amount)
-                                                        paymentInputs[bill.creditDocumentId] = ""
-                                                        errorMessage = null
-                                                        refreshKey += 1
-                                                    } catch (error: Exception) {
-                                                        errorMessage = error.message ?: "บันทึกการรับชำระไม่สำเร็จ"
-                                                    }
-                                                }
+                                                pendingPayment = bill.creditDocumentId to amount
                                             }
                                         },
                                         modifier = Modifier.fillMaxWidth()
@@ -142,5 +137,32 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
                 }
             }
         }
+    }
+
+    pendingPayment?.let { (documentId, amount) ->
+        AlertDialog(
+            onDismissRequest = { pendingPayment = null },
+            title = { Text("ยืนยันการรับชำระ") },
+            text = { Text("ยืนยันรับเงินจำนวน $amount บาทใช่หรือไม่?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        try {
+                            repository.receivePayment(documentId, amount)
+                            paymentInputs[documentId] = ""
+                            errorMessage = null
+                            pendingPayment = null
+                            refreshKey += 1
+                        } catch (error: Exception) {
+                            errorMessage = error.message ?: "บันทึกการรับชำระไม่สำเร็จ"
+                            pendingPayment = null
+                        }
+                    }
+                }) { Text("ยืนยัน") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingPayment = null }) { Text("ยกเลิก") }
+            }
+        )
     }
 }
