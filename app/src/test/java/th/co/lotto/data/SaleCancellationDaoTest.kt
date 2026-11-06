@@ -148,9 +148,9 @@ class SaleCancellationDaoTest {
             val documentId = if (index == 0) "bad-sale-length" else "bad-sale-category"
             assertThrows(IllegalArgumentException::class.java) {
                 dao.postSale(
-                    SaleDocumentEntity(documentId, periodId, null, "CASH", 1_000L, now + 10_000L + index, "Asia/Bangkok"),
+                    SaleDocumentEntity(documentId, periodId, null, "CASH", 1_000L, now, "Asia/Bangkok"),
                     listOf(line),
-                    AuditEventEntity("bad-audit-$index", "SALE_DOCUMENT", documentId, "POSTED", "invalid test", now + 10_000L + index)
+                    AuditEventEntity("bad-audit-$index", "SALE_DOCUMENT", documentId, "POSTED", "invalid test", now)
                 )
             }
         }
