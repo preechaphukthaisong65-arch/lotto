@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -229,27 +230,32 @@ fun SaleScreen(
         }
     ) { innerPadding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            modifier = Modifier.fillMaxSize().padding(innerPadding).imePadding(),
             contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("ข้อมูลลูกค้า", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    OutlinedTextField(
-                        value = firstName,
-                        onValueChange = { firstName = it },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("ชื่อ") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = lastName,
-                        onValueChange = { lastName = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("นามสกุล") },
-                        singleLine = true
-                    )
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = firstName,
+                            onValueChange = { firstName = it },
+                            modifier = Modifier.weight(1f),
+                            label = { Text("ชื่อ") },
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = lastName,
+                            onValueChange = { lastName = it },
+                            modifier = Modifier.weight(1f),
+                            label = { Text("นามสกุล") },
+                            singleLine = true
+                        )
+                    }
                     if (creditSelected && !customerValid) {
                         Text(
                             "การขายเงินเชื่อต้องกรอกชื่อและนามสกุลลูกค้า",
