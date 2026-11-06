@@ -11,6 +11,7 @@ import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.ImageView
 import android.widget.Toast
 import th.co.lotto.data.CustomerEntity
 import th.co.lotto.data.DrawPeriodEntity
@@ -385,11 +386,25 @@ class MainActivity : Activity() {
                         "${formatMoney(line.amountSatang)} • ${if (line.halfPayout) "จ่ายครึ่ง" else "จ่ายเต็ม"}") { }
                 }
                 addText(currentBody, "ยอดรวม: ${formatMoney(document.totalAmountSatang)}", 18, navy)
+                if (receiptFile.exists()) {
+                    val receiptBitmap = android.graphics.BitmapFactory.decodeFile(receiptFile.absolutePath)
+                    if (receiptBitmap != null) {
+                        addText(currentBody, "ภาพใบเสร็จที่บันทึกไว้ในเครื่อง", 14, ink)
+                        currentBody.addView(ImageView(this).apply {
+                            setImageBitmap(receiptBitmap)
+                            adjustViewBounds = true
+                            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                        }, LinearLayout.LayoutParams(-1, -2))
+                    }
+                }
                 addButton(currentBody, if (receiptFile.exists()) "สร้างภาพใบเสร็จใหม่จากข้อมูลต้นฉบับ" else "สร้างภาพใบเสร็จจากข้อมูลต้นฉบับ") {
                     io.execute {
                         try {
                             val file = ReceiptRenderer.render(this, document, period?.title ?: "ไม่ทราบงวด", lines)
-                            runOnUiThread { Toast.makeText(this, "สร้างใบเสร็จแล้ว: ${file.name}", Toast.LENGTH_LONG).show() }
+                            runOnUiThread {
+                                Toast.makeText(this, "สร้างใบเสร็จแล้ว: ${file.name}", Toast.LENGTH_LONG).show()
+                                showSaleDetail(document.documentId)
+                            }
                         } catch (e: Exception) {
                             runOnUiThread { Toast.makeText(this, "สร้างใบเสร็จไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
                         }
