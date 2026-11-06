@@ -15,10 +15,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SaleLineEntity::class,
         PaymentEntryEntity::class,
         NumberLimitRuleEntity::class,
+        NumberBlockRuleEntity::class,
         DrawResultEntity::class,
         AuditEventEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -34,6 +35,26 @@ abstract class LottoDatabase : RoomDatabase() {
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE draw_periods ADD COLUMN scheduledOpenEpochMillis INTEGER")
+                installIntegrityGuards(db)
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS number_block_rules (
+                        ruleId TEXT NOT NULL PRIMARY KEY,
+                        periodId TEXT NOT NULL,
+                        blockCategory TEXT NOT NULL,
+                        numberText TEXT NOT NULL,
+                        blocked INTEGER NOT NULL,
+                        createdAtEpochMillis INTEGER NOT NULL,
+                        updatedAtEpochMillis INTEGER NOT NULL,
+                        FOREIGN KEY(periodId) REFERENCES draw_periods(periodId)
+                            ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_number_block_rules_periodId_blockCategory_numberText ON number_block_rules(periodId, blockCategory, numberText)")
                 installIntegrityGuards(db)
             }
         }
@@ -142,7 +163,7 @@ abstract class LottoDatabase : RoomDatabase() {
                 LottoDatabase::class.java,
                 "lotto-local.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
