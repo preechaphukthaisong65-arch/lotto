@@ -1121,7 +1121,7 @@ class MainActivity : Activity() {
         dialog.show()
     }
 
-    private fun showResults() {
+    private fun showResults(selectedPeriodId: String? = null) {
         base("ผลหวย")
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
         io.execute {
@@ -1135,6 +1135,8 @@ class MainActivity : Activity() {
                 val picker = Spinner(this).apply {
                     adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
                         periods.map { "${it.title} • ${when (it.status) { "CLOSED" -> "ปิดงวด"; "OPEN" -> "เปิดขาย"; else -> "เตรียมเปิด" }}" })
+                    val selectedIndex = selectedPeriodId?.let { id -> periods.indexOfFirst { it.periodId == id } } ?: 0
+                    setSelection(selectedIndex.coerceAtLeast(0))
                 }
                 currentBody.addView(picker)
                 val resultList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -1327,7 +1329,7 @@ class MainActivity : Activity() {
                                 Toast.makeText(this,
                                     "นำเข้าผล GLO แล้ว • 3 ตัวบน ${official.threeTopNumber} • $snapshotMessage",
                                     Toast.LENGTH_LONG).show()
-                                showResults()
+                                showResults(selected.periodId)
                             }
                         } catch (e: Exception) {
                             runOnUiThread {
