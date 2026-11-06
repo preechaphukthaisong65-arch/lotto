@@ -2,6 +2,8 @@ package th.co.lotto.data
 
 import android.database.sqlite.SQLiteException
 import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -10,7 +12,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import java.util.UUID
 
 @RunWith(RobolectricTestRunner::class)
 class LottoDatabaseIntegrityTest {
@@ -22,7 +23,20 @@ class LottoDatabaseIntegrityTest {
         database = Room.inMemoryDatabaseBuilder(
             RuntimeEnvironment.getApplication(),
             LottoDatabase::class.java
-        ).allowMainThreadQueries().build()
+        )
+            .allowMainThreadQueries()
+            .addCallback(object : RoomDatabase.Callback() {
+                override fun onCreate(db: SupportSQLiteDatabase) {
+                    super.onCreate(db)
+                    LottoDatabase.installIntegrityGuards(db)
+                }
+
+                override fun onOpen(db: SupportSQLiteDatabase) {
+                    super.onOpen(db)
+                    LottoDatabase.installIntegrityGuards(db)
+                }
+            })
+            .build()
         dao = database.lottoDao()
     }
 
