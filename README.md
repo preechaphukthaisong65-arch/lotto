@@ -12,11 +12,12 @@ Lotto is being developed as an Android-only, offline-first application. The on-d
 - SRS 0.2 baseline: `docs/SRS-0.2.md`.
 - Room/SQLite local schema for periods, customers, sale documents/lines, payments, limits, results, and audit events.
 - Atomic sale-posting DAO method and database triggers protecting posted sale documents and lines from update/delete.
-- Sales, credit/payment workflows, period limits, receipts, result matching, reports, and immutable payout-rate snapshots are implemented on the offline branch.
+- Sales are restricted to 3-digit top (ตรง) and 3-digit top permutation (โต๊ด), with separate limits. Credit/payment workflows, period limits, receipts, result matching, reports, and immutable payout-rate snapshots are implemented on the offline branch.
 - Encrypted local backup/restore is implemented with a user-supplied passphrase; it packages the SQLite database and receipt images, validates the archive/database before replacement, and includes rollback protection.
-- PIN roles and per-module permissions remain a deliberate decision gate; no speculative role model is enabled.
+- No in-app PIN, user accounts, staff roles, or per-module permissions. Device screen lock is the device-level protection.
 - Final physical-device and airplane-mode acceptance testing is still required.
-- Payout rules and other unresolved decisions in SRS 0.2 are intentionally not guessed or enabled.
+- Approved half-payout rule: retain the full recorded stake and apply 50% of the configured payout rate. Final payout calculations remain disabled until their end-to-end accounting implementation is verified.
+- Confirmed sales are immutable. Cancellation is a separate auditable event; a replacement purchase is a new sale document.
 
 ## Build debug APK
 The workflow is `.github/workflows/android-build.yml`. Pushes to `main`, `feature/**`, and `srs-0.2-offline` trigger Android lint, unit/database tests, and a debug APK build. The `lotto-debug-apk` artifact includes `app-debug.apk`, its SHA-256 checksum, build metadata (commit/branch/run), and Room schemas.
