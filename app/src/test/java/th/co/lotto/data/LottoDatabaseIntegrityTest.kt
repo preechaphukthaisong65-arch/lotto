@@ -184,6 +184,33 @@ class LottoDatabaseIntegrityTest {
     }
 
     @Test
+    fun halfPayoutIsResolvedFromPeriodRuleAndCannotBeChosenInSalePayload() {
+        dao.insertPeriod(period("period-1"))
+        dao.saveLimitRule(NumberLimitRuleEntity(
+            "half-rule", "period-1", 2, "TWO_TOP", "12", 5_000L, true, true
+        ))
+        val halfDocument = SaleDocumentEntity(
+            "sale-half", "period-1", null, "CASH", 1_000L, 10L, "Asia/Bangkok"
+        )
+        dao.postSale(
+            halfDocument,
+            listOf(SaleLineEntity("line-half", "sale-half", "period-1", "12", "TWO_TOP", 1_000L, false)),
+            AuditEventEntity("event-half", "SALE_DOCUMENT", "sale-half", "POSTED", "test", 10L)
+        )
+        assertEquals(true, dao.getLinesForDocument("sale-half").single().halfPayout)
+
+        val fullDocument = SaleDocumentEntity(
+            "sale-full", "period-1", null, "CASH", 1_000L, 20L, "Asia/Bangkok"
+        )
+        dao.postSale(
+            fullDocument,
+            listOf(SaleLineEntity("line-full", "sale-full", "period-1", "13", "TWO_TOP", 1_000L, true)),
+            AuditEventEntity("event-full", "SALE_DOCUMENT", "sale-full", "POSTED", "test", 20L)
+        )
+        assertEquals(false, dao.getLinesForDocument("sale-full").single().halfPayout)
+    }
+
+    @Test
     fun savingSameLimitRuleUpdatesItInsteadOfCreatingDuplicates() {
         dao.insertPeriod(period("period-1"))
         dao.saveLimitRule(NumberLimitRuleEntity(
@@ -199,6 +226,7 @@ class LottoDatabaseIntegrityTest {
         assertEquals("rule-original", rules.single().ruleId)
         assertEquals(3_000L, rules.single().maximumAmountSatang)
         assertFalse(rules.single().enabled)
+        assertFalse(rules.single().halfPayout)
     }
 
     @Test
