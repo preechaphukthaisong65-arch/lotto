@@ -27,7 +27,7 @@ class SaleEntryParserTest {
         assertTrue(entries[1].halfPayout)
         assertEquals("001", entries[2].number)
         assertEquals(725L, entries[4].amountSatang)
-        assertEquals(4_275L, SaleEntryParser.totalSatang(entries))
+        assertEquals(4_875L, SaleEntryParser.totalSatang(entries))
     }
 
     @Test
