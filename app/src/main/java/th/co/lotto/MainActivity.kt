@@ -1347,9 +1347,9 @@ class MainActivity : Activity() {
                             }
                             val lines = documents.flatMap { dao.getLinesForDocument(it.documentId) }
                             val payments = documents.associate { it.documentId to dao.getPaymentsTotalForDocument(it.documentId) }
-                            val results = dao.getDrawResults(period.periodId)
+                            val drawResults = dao.getDrawResults(period.periodId)
                             val snapshot = dao.getSettlementSnapshot(period.periodId)
-                            val matches = DrawResultMatcher.findMatches(results, lines)
+                            val matches = DrawResultMatcher.findMatches(drawResults, lines)
                             val payoutSummary = snapshot?.let {
                                 runCatching { PayoutCalculator.calculatePeriod(matches, it, documents.fold(0L) { total, doc ->
                                     Math.addExact(total, doc.totalAmountSatang)
