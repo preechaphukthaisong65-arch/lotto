@@ -100,6 +100,13 @@ object DrawCalendarService {
             confirmed.add(lottery.dates[i])
         }
         val hasMismatch = compareCount > confirmed.size
+        val hasDisagreement = confirmed.isEmpty() || hasMismatch
+        val manualPrefs = context.getSharedPreferences("draw_calendar_reminders", Context.MODE_PRIVATE)
+        val storedManualSignature = manualPrefs.getString("manual_signature", null)
+        val currentMismatchSignature = if (hasDisagreement) mismatchSignature(lottery, huay) else null
+        if ((!hasDisagreement) || (storedManualSignature != null && storedManualSignature != currentMismatchSignature)) {
+            manualPrefs.edit().remove("manual_signature").remove("manual_date").remove("manual_confirmed_at").apply()
+        }
         if (stale) {
             return DrawCalendarState("STALE", lottery.dates, huay.dates, emptyList(), latestTime,
                 "ข้อมูลเก่า หรือเวลาตรวจสอบสองแหล่งห่างกันเกิน 10 นาที ต้องตรวจสอบใหม่ก่อนยืนยันวันงวด")
@@ -326,6 +333,7 @@ object DrawCalendarReminder {
             return
         }
         if (state.status != "CONFIRMED" && state.status != "USER_CONFIRMED") return
+        prefs.edit().remove("last_mismatch_alert").apply()
         val current = state.confirmedDates.joinToString(",") { it.toString() }
         val previous = prefs.getString("last_confirmed_dates", "").orEmpty()
         if (previous.isNotBlank() && previous != current) {
