@@ -703,6 +703,7 @@ class MainActivity : Activity() {
     private fun showLimits() {
         base("เลขอั้นและเลขเต็ม")
         addButton(currentBody, "＋ เพิ่ม/กำหนดวงเงินเลข") { createLimitDialog() }
+        addButton(currentBody, "จัดการเลขไม่รับ") { showBlockedNumbers() }
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
         io.execute {
             val dao = database.lottoDao()
@@ -740,6 +741,114 @@ class MainActivity : Activity() {
         "THREE_BOTTOM" -> "3 ตัวล่าง"
         "THREE_TOAD" -> "3 ตัวโต๊ด"
         else -> category
+    }
+
+    private fun showBlockedNumbers() {
+        base("จัดการเลขไม่รับ")
+        addButton(currentBody, "＋ เพิ่มเลขไม่รับ") { createBlockedNumberDialog() }
+        addButton(currentBody, "กลับเลขอั้น/เลขเต็ม") { showLimits() }
+        io.execute {
+            val dao = database.lottoDao()
+            val period = dao.getOpenPeriod() ?: dao.getPreparedPeriod()
+            val rules = period?.let { dao.getAllNumberBlockRules(it.periodId) } ?: emptyList()
+            runOnUiThread {
+                addText(currentBody, period?.let { "งวด: ${it.title}" } ?: "ไม่มีงวดเปิดหรือเตรียมไว้", 14, ink)
+                if (rules.isEmpty()) addText(currentBody, "ยังไม่มีรายการเลขไม่รับในงวดนี้", 13, ink)
+                rules.forEach { rule ->
+                    val typeLabel = when (rule.blockCategory) {
+                        "TWO_DIGIT" -> "2 ตัว (บน/ล่าง)"
+                        "THREE_STRAIGHT" -> "3 ตัวเต็ง (บน/ล่าง)"
+                        "THREE_TOAD" -> "3 ตัวโต๊ด"
+                        else -> rule.blockCategory
+                    }
+                    val status = if (rule.blocked) "ไม่รับ" else "ปลดบล็อกแล้ว"
+                    addCard(currentBody, "${rule.numberText} • $typeLabel", status) {
+                        if (rule.blocked) {
+                            AlertDialog.Builder(this)
+                                .setTitle("ปลดเลขไม่รับ")
+                                .setMessage("ยืนยันเปิดรับเลข ${rule.numberText} ในประเภท $typeLabel หรือไม่?")
+                                .setNegativeButton("กลับ", null)
+                                .setPositiveButton("ยืนยันปลดบล็อก") { _, _ ->
+                                    io.execute {
+                                        try {
+                                            dao.setNumberBlocked(
+                                                rule.ruleId, rule.periodId, rule.blockCategory,
+                                                rule.numberText, false, System.currentTimeMillis(),
+                                                UUID.randomUUID().toString()
+                                            )
+                                            runOnUiThread {
+                                                Toast.makeText(this, "ปลดเลขไม่รับแล้ว", Toast.LENGTH_SHORT).show()
+                                                showBlockedNumbers()
+                                            }
+                                        } catch (e: Exception) {
+                                            runOnUiThread { Toast.makeText(this, "ทำรายการไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
+                                        }
+                                    }
+                                }.show()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun createBlockedNumberDialog() {
+        val number = EditText(this).apply {
+            hint = "เลข 2 หรือ 3 หลัก"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        val labels = listOf("2 ตัว (บน/ล่าง)", "3 ตัวเต็ง (บน/ล่าง)", "3 ตัวโต๊ด")
+        val categories = listOf("TWO_DIGIT", "THREE_STRAIGHT", "THREE_TOAD")
+        val category = Spinner(this).apply {
+            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, labels)
+        }
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), 0)
+            addView(number)
+            addView(category)
+        }
+        val dialog = AlertDialog.Builder(this).setTitle("เพิ่มเลขไม่รับ").setView(form)
+            .setNegativeButton("กลับ", null).setPositiveButton("บันทึก", null).create()
+        dialog.setOnShowListener {
+            val saveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            saveButton.setOnClickListener {
+                val value = number.text.toString().trim()
+                val blockCategory = categories[category.selectedItemPosition]
+                val requiredLength = if (blockCategory == "TWO_DIGIT") 2 else 3
+                if (value.length != requiredLength || !value.all { it in '0'..'9' }) {
+                    number.error = "กรุณากรอกเลข $requiredLength หลักให้ถูกต้อง"
+                    return@setOnClickListener
+                }
+                saveButton.isEnabled = false
+                io.execute {
+                    try {
+                        val dao = database.lottoDao()
+                        val period = dao.getOpenPeriod() ?: dao.getPreparedPeriod()
+                            ?: error("ไม่มีงวดเปิดหรือเตรียมไว้")
+                        val changed = dao.setNumberBlocked(
+                            UUID.randomUUID().toString(), period.periodId, blockCategory,
+                            value, true, System.currentTimeMillis(), UUID.randomUUID().toString()
+                        )
+                        runOnUiThread {
+                            Toast.makeText(
+                                this,
+                                if (changed) "เพิ่มเลขไม่รับแล้ว" else "เลขนี้ถูกตั้งเป็นเลขไม่รับอยู่แล้ว",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            dialog.dismiss()
+                            showBlockedNumbers()
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread {
+                            saveButton.isEnabled = true
+                            Toast.makeText(this, "บันทึกไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
+        }
+        dialog.show()
     }
 
     private fun createLimitDialog(existing: NumberLimitRuleEntity? = null) {
