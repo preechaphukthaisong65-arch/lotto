@@ -1,6 +1,6 @@
 # LOTTO — Software Requirements Specification (SRS)
 
-Version: 0.3  
+Version: 0.4  
 Date: 6 November 2026  
 Platform: Android  
 Architecture: Offline-first / Local Database  
@@ -41,7 +41,7 @@ Build an Android application for managing lottery-period records, sales document
 - Recheck upcoming calendar information at least once per day when network access is available. Calendar checks are user-data-free and must not transmit customer, sales, credit, payment, or receipt data. Cached calendar information remains viewable offline but cannot be treated as a fresh check.
 - If both sources later agree on a changed draw date, update the upcoming period date with an auditable change record and notify the user of the previous and new dates. Never silently change a confirmed date. If sources disagree about a change, retain the last confirmed date as historical information, mark the current schedule unconfirmed, and notify the user to verify it.
 - Notification delivery depends on Android notification permission and device scheduling constraints. If notifications are unavailable or denied, show the reminder and its status in the app. Calendar source access must use documented/publicly accessible information and comply with each source's terms; do not assume the result API provides future calendar dates.
-- Public draw-calendar import is optional and must never upload transaction data.
+- Public draw-calendar retrieval uses the public LotteryChecks draw-calendar page and HuayReview annual calendar pages as a module separate from result checks. It must never upload transaction data.
 
 
 ### 4.1 Upcoming draw calendar and advance reminders
@@ -113,13 +113,13 @@ Implemented protections:
 - In-app PIN enrollment, user accounts, roles, and per-module permissions are explicitly out of scope. The backup passphrase is separate from device screen-lock security.
 
 ## 15. Acceptance tests
-Install/launch; create period; upcoming calendar retrieval from both sources; same-date confirmation; one-source provisional state; date disagreement; missing/malformed/unavailable calendar source; no inferred date creation; daily refresh and rate-limit handling; 7-day reminder; late confirmation inside the 7-day window; confirmed date-change audit and reminder rescheduling; notification permission denied/in-app fallback; cached calendar visibility and stale labeling offline; create period; accept only TWO_TOP, TWO_BOTTOM, THREE_TOP, and THREE_TOAD sales with matching digit lengths; reject all unsupported categories and wrong digit lengths; preserve leading zeroes; enforce independent limits and blocked numbers; auto-label half-payout; cash/credit customers; partial/full payments; receipt generation; immutable confirmed bills; cancellation audit, duplicate-cancel rejection, cancelled-bill exclusion from limits/reports/credit/results; LotteryChecks and HuayReview result retrieval and exact draw-date validation; matching, mismatch, and unavailable-source states; manual GLO verification only after mismatch; append-only source audit; result caching and offline access; settlement gating; payout totals; reports; backup/restore; airplane-mode core operation; process death/restart; and failure recovery on a physical Android device.
+Install/launch; fetch LotteryChecks draw-calendar and HuayReview annual calendar pages; parse future Thai dates; compare ordered upcoming dates; show disagreement/unavailable/malformed states without selecting a winner; append local source-check audit records; cached calendar stale labeling; daily WorkManager refresh under network constraint; 7-day notification and late-confirmation reminder; confirmed schedule-change notice; Android notification permission denied fallback; create period; upcoming calendar retrieval from both sources; same-date confirmation; one-source provisional state; date disagreement; missing/malformed/unavailable calendar source; no inferred date creation; daily refresh and rate-limit handling; 7-day reminder; late confirmation inside the 7-day window; confirmed date-change audit and reminder rescheduling; notification permission denied/in-app fallback; cached calendar visibility and stale labeling offline; create period; accept only TWO_TOP, TWO_BOTTOM, THREE_TOP, and THREE_TOAD sales with matching digit lengths; reject all unsupported categories and wrong digit lengths; preserve leading zeroes; enforce independent limits and blocked numbers; auto-label half-payout; cash/credit customers; partial/full payments; receipt generation; immutable confirmed bills; cancellation audit, duplicate-cancel rejection, cancelled-bill exclusion from limits/reports/credit/results; LotteryChecks and HuayReview result retrieval and exact draw-date validation; matching, mismatch, and unavailable-source states; manual GLO verification only after mismatch; append-only source audit; result caching and offline access; settlement gating; payout totals; reports; backup/restore; airplane-mode core operation; process death/restart; and failure recovery on a physical Android device.
 
 Phase-7 automated acceptance coverage includes encryption/decryption round trip, wrong-passphrase rejection, tamper detection, and minimum passphrase length. Restore validation additionally checks archive paths, archive size, SQLite integrity, foreign keys, schema version, required tables, and rollback on replacement failure. Manual cross-device restore and physical-device interruption testing remain required.
 
 ## 16. Remaining implementation gates
-1. Verify whether LotteryChecks and HuayReview expose stable, publicly accessible future draw-calendar data and document the permitted retrieval method for each. Do not assume either result API supports future calendar dates; do not scrape or reuse page content contrary to source terms.
-2. Implement independent calendar-source clients, local calendar audit/persistence, two-source date comparison, daily refresh, and 7-day Android reminders with permission-denied/in-app fallback.
+1. Complete device-level tests for WorkManager delivery, Android notification permission, OEM battery restrictions, and schedule changes. Android may defer background execution and notifications.
+2. Validate parser behavior against live HTML changes and source disagreements; fail closed if either public page no longer yields validated future dates.
 3. Complete calendar acceptance tests for matching, mismatch, missing dates, malformed data, outages, date changes, stale/offline cache, late confirmation, and notification scheduling.
 4. Complete live real-network integration tests for the LotteryChecks and HuayReview request/response contracts, including missing draws, malformed data, rate limits, and source outages.
 5. Define and implement cash-refund accounting when a cash bill is cancelled after money has physically changed hands.
@@ -133,3 +133,12 @@ This project is a non-commercial research prototype. It retrieves public results
 - The workflow verifies that the APK exists and is non-empty, generates a SHA-256 checksum, and records the source commit, branch, and workflow run in build metadata.
 - The APK, checksum, build metadata, and Room schema snapshots are uploaded as one short-retention test artifact.
 - Debug APKs are test builds only. A signed production release, key custody, and release signing process are not enabled in this phase.
+
+
+## 18. Draw-calendar implementation notes (0.4)
+- The app fetches `https://lotterychecks.com/draw-calendar` and HuayReview annual pages `https://huayreview.net/calendar-<Buddhist Era year>/` for the current and following year. These are public HTML calendar pages; the app does not treat the LotteryChecks result API or HuayReview historical-results dataset as a future-calendar API.
+- Calendar checks are stored in an append-only private app file (`draw_calendar_checks.log`) with source ID, status, ordered ISO dates, source URL, retrieval timestamp, and failure reason. No customer or transaction data is included.
+- The app confirms only the common ordered upcoming-date prefix. A disagreement, missing/invalid calendar, source failure, or stale check suppresses reminders rather than guessing. Cached records are viewable but expire for confirmation after 36 hours.
+- WorkManager performs a network-constrained daily refresh. When a date is confirmed and is within seven calendar days, a local Android notification is issued once per draw date. If confirmation first arrives inside the seven-day window, the app sends an immediate reminder stating the remaining days. A newly confirmed changed date generates a schedule-change notification.
+- Notifications require Android notification permission. If denied, the in-app calendar still displays source data and status; background notification delivery is not guaranteed when Android/OEM battery policies defer work.
+- Calendar date confirmation is separate from draw-result verification and does not automatically create or alter sales periods. The user must review and create/adjust a period using the confirmed calendar date.

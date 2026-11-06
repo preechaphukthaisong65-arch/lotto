@@ -1,6 +1,8 @@
 package th.co.lotto
 
 import android.app.Activity
+import android.os.Build
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.app.AlertDialog
 import android.os.Bundle
@@ -34,6 +36,7 @@ import java.util.Date
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.concurrent.Executors
+import androidx.core.content.ContextCompat
 
 class MainActivity : Activity() {
     private val io = Executors.newSingleThreadExecutor()
@@ -55,6 +58,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DrawCalendarReminder.ensureScheduled(applicationContext)
         showHome()
     }
 
@@ -112,6 +116,7 @@ class MainActivity : Activity() {
         base("Lotto")
         addText(currentBody, "ระบบจัดการข้อมูลแบบออฟไลน์", 16, ink)
         addText(currentBody, "ข้อมูลจัดเก็บในโทรศัพท์ ไม่มี Cloud Database, Backend หรือระบบซิงก์", 13, 0xFF526171.toInt())
+        addCard(currentBody, "ปฏิทินวันออกรางวัล", "ตรวจสอบวันงวดจาก LotteryChecks และ HuayReview พร้อมแจ้งเตือนล่วงหน้า 7 วัน") { showDrawCalendar() }
         addCard(currentBody, "จัดการงวดหวย", "สร้างงวดใหม่และดูงวดที่บันทึกไว้") { showPeriods() }
         addCard(currentBody, "หน้าขาย", "บันทึกรายการขายตามงวด") { showSales() }
         addCard(currentBody, "รายการขายและประวัติ", "ค้นหาเอกสาร กรองงวด และดูใบเสร็จย้อนหลัง") { showSalesHistory() }
@@ -123,6 +128,67 @@ class MainActivity : Activity() {
         addCard(currentBody, "รายงาน", "รายงานยอดขาย ลูกหนี้ และยอดคงเหลือ") { showReports() }
         addCard(currentBody, "ตั้งค่าอัตราจ่าย", "กำหนดอัตราจ่ายแยกตามเลขทั้ง 4 ประเภท") { showSettings() }
         addCard(currentBody, "สำรองและกู้คืน", "ไฟล์สำรองเข้ารหัสด้วยรหัสผ่าน • ย้ายเครื่องและกู้คืนได้") { showBackup() }
+    }
+
+
+    private fun showDrawCalendar(stateOverride: DrawCalendarState? = null) {
+        base("ปฏิทินวันออกรางวัล")
+        addText(currentBody, "ตรวจสอบกำหนดการจาก LotteryChecks และ HuayReview แยกจากระบบตรวจผลรางวัล", 14, ink)
+        addText(currentBody, "ยืนยันวันงวดเมื่อทั้งสองเว็บไซต์แสดงวันตามลำดับตรงกันเท่านั้น หากไม่ตรงกัน ระบบจะไม่เดาวันและไม่เปลี่ยนงวดให้อัตโนมัติ", 12, 0xFF526171.toInt())
+        addButton(currentBody, "⟳ ตรวจสอบปฏิทินจาก 2 เว็บไซต์") {
+            Toast.makeText(this, "กำลังตรวจสอบปฏิทิน...", Toast.LENGTH_SHORT).show()
+            io.execute {
+                val state = DrawCalendarService.refresh(applicationContext)
+                DrawCalendarReminder.deliverDueReminders(applicationContext, state)
+                runOnUiThread { showDrawCalendar(state) }
+            }
+        }
+        addButton(currentBody, "เปิดการแจ้งเตือนล่วงหน้า 7 วัน") {
+            if (Build.VERSION.SDK_INT >= 33 &&
+                ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 911)
+            } else {
+                DrawCalendarReminder.ensureScheduled(applicationContext)
+                Toast.makeText(this, "เปิดการตรวจสอบปฏิทินรายวันแล้ว", Toast.LENGTH_LONG).show()
+            }
+        }
+        addButton(currentBody, "กลับหน้าหลัก") { showHome() }
+
+        val state = stateOverride ?: DrawCalendarService.readState(applicationContext)
+        val statusText = when (state.status) {
+            "CONFIRMED" -> "ยืนยันวันงวดจากทั้งสองเว็บไซต์แล้ว"
+            "DISAGREEMENT" -> "วันงวดไม่ตรงกัน • รอยืนยัน"
+            "STALE" -> "ข้อมูลปฏิทินเก่า • ต้องตรวจสอบใหม่"
+            "UNAVAILABLE" -> "ยังไม่มีข้อมูลจากทั้งสองเว็บไซต์"
+            else -> "รอตรวจสอบปฏิทิน"
+        }
+        val statusColor = if (state.status == "CONFIRMED") 0xFF26734D.toInt() else 0xFF9B2C2C.toInt()
+        addText(currentBody, statusText, 16, statusColor)
+        addText(currentBody, "ตรวจสอบล่าสุด: " + (state.lastCheckedEpochMillis?.let {
+            SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(it))
+        } ?: "ยังไม่เคยตรวจสอบ"), 12, 0xFF526171.toInt())
+        if (state.status == "CONFIRMED" && state.confirmedDates.isNotEmpty()) {
+            addText(currentBody, "วันที่ทั้งสองแหล่งยืนยันตรงกัน", 15, navy)
+            state.confirmedDates.forEachIndexed { index, date ->
+                val days = java.time.temporal.ChronoUnit.DAYS.between(
+                    java.time.LocalDate.now(java.time.ZoneId.of("Asia/Bangkok")), date
+                )
+                addCard(currentBody, "งวด " + (index + 1) + " • " +
+                    date.format(java.time.format.DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale("th", "TH"))),
+                    if (days >= 0) "เหลือ " + days + " วัน" else "วันที่ผ่านไปแล้ว") { }
+            }
+        } else {
+            if (state.lotteryChecksDates.isNotEmpty()) {
+                addText(currentBody, "LotteryChecks • " + state.lotteryChecksDates.joinToString(), 13, ink)
+            }
+            if (state.huayReviewDates.isNotEmpty()) {
+                addText(currentBody, "HuayReview • " + state.huayReviewDates.joinToString(), 13, ink)
+            }
+            if (state.message.isNotBlank()) addText(currentBody, state.message, 12, 0xFF9B2C2C.toInt())
+        }
+        addText(currentBody, "แหล่งข้อมูล: lotterychecks.com/draw-calendar และ huayreview.net/calendar-ปีพ.ศ. • ปฏิทินนี้ไม่ใช่การยืนยันผลรางวัล", 11, 0xFF526171.toInt())
+        addText(currentBody, "หากเว็บไซต์ขัดแย้งกัน ให้ตรวจประกาศสำนักงานสลากกินแบ่งรัฐบาลด้วยตนเอง ระบบจะไม่เลือกวันจากเว็บไซต์ใดเว็บไซต์หนึ่งแทนผู้ใช้", 11, 0xFF526171.toInt())
     }
 
     private fun showPeriods() {

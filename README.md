@@ -31,3 +31,6 @@ The workflow is `.github/workflows/android-build.yml`. Pushes to `main`, `featur
 - Compile SDK 35 / Minimum SDK 26
 
 This is a test build, not a signed production release. Backups are portable encrypted files; keep the passphrase separately because it cannot be recovered.
+
+## Upcoming draw calendar
+The Android app checks the public LotteryChecks draw calendar and HuayReview annual calendar independently. Only matching ordered upcoming dates are confirmed. The app stores a local append-only calendar audit, refreshes daily with WorkManager when network is available, and issues a seven-day local reminder when Android notification permission is granted. Source disagreement suppresses reminders; the app does not infer dates or connect to GLO.
