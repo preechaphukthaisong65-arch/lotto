@@ -105,11 +105,35 @@ object DrawCalendarService {
                 "ข้อมูลเก่า หรือเวลาตรวจสอบสองแหล่งห่างกันเกิน 10 นาที ต้องตรวจสอบใหม่ก่อนยืนยันวันงวด")
         }
         if (confirmed.isEmpty() || hasMismatch) {
+            val signature = mismatchSignature(lottery, huay)
+            val prefs = context.getSharedPreferences("draw_calendar_reminders", Context.MODE_PRIVATE)
+            val manualSignature = prefs.getString("manual_signature", null)
+            val manualDate = prefs.getString("manual_date", null)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            if (manualSignature == signature && manualDate != null && !manualDate.isBefore(today)) {
+                return DrawCalendarState("USER_CONFIRMED", lottery.dates, huay.dates, listOf(manualDate), latestTime,
+                    "ผู้ใช้ยืนยันวันงวด $manualDate หลังตรวจสอบความขัดแย้งของสองเว็บไซต์")
+            }
             return DrawCalendarState("DISAGREEMENT", lottery.dates, huay.dates, emptyList(), latestTime,
-                "กำหนดการลำดับถัดไปไม่ตรงกัน หรือข้อมูลของงวดถัดไปไม่ครบ จึงยังไม่ส่งการแจ้งเตือนวันงวด")
+                "กำหนดการจากสองเว็บไซต์ไม่ตรงกัน ต้องตรวจสอบและยืนยันวันด้วยตนเอง")
         }
         return DrawCalendarState("CONFIRMED", lottery.dates, huay.dates, confirmed, latestTime,
             "ยืนยันได้เฉพาะวันที่ตรงกันตามลำดับจากทั้งสองเว็บไซต์")
+    }
+
+    private fun mismatchSignature(lottery: CalendarSourceSnapshot, huay: CalendarSourceSnapshot): String =
+        listOf(lottery.dates.take(3).joinToString(","), huay.dates.take(3).joinToString(",")).joinToString("|")
+
+    fun confirmManualDate(context: Context, date: LocalDate): DrawCalendarState {
+        val lottery = CalendarAuditLog.latest(context, "LOTTERYCHECKS") ?: error("ยังไม่มีข้อมูลจาก LotteryChecks")
+        val huay = CalendarAuditLog.latest(context, "HUAYREVIEW") ?: error("ยังไม่มีข้อมูลจาก HuayReview")
+        require(date.isAfter(LocalDate.now(BANGKOK))) { "วันออกรางวัลต้องเป็นวันในอนาคต" }
+        val signature = mismatchSignature(lottery, huay)
+        val now = System.currentTimeMillis()
+        context.getSharedPreferences("draw_calendar_reminders", Context.MODE_PRIVATE).edit()
+            .putString("manual_signature", signature).putString("manual_date", date.toString())
+            .putLong("manual_confirmed_at", now).apply()
+        CalendarAuditLog.appendManual(context, date, signature, now)
+        return readState(context)
     }
 
     internal fun parseLotteryChecks(html: String, today: LocalDate): List<LocalDate> {
@@ -250,6 +274,14 @@ private object CalendarAuditLog {
         }
     }
 
+    @Synchronized
+    fun appendManual(context: Context, date: LocalDate, signature: String, timestamp: Long) {
+        val encoded = Base64.getEncoder().encodeToString(signature.toByteArray(StandardCharsets.UTF_8))
+        val line = "$timestamp\tUSER_CONFIRMED\t$date\t$encoded\n"
+        context.openFileOutput("draw_calendar_manual_audit.log", Context.MODE_APPEND)
+            .bufferedWriter(StandardCharsets.UTF_8).use { it.write(line) }
+    }
+
     private fun parseLine(line: String): CalendarSourceSnapshot? {
         val parts = line.split("\t")
         if (parts.size != 6) return null
@@ -275,7 +307,6 @@ object DrawCalendarReminder {
     }
 
     fun deliverDueReminders(context: Context, state: DrawCalendarState) {
-        if (state.status != "CONFIRMED") return
         createChannel(context)
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -283,6 +314,18 @@ object DrawCalendarReminder {
         ) return
         val today = LocalDate.now(BANGKOK)
         val prefs = context.getSharedPreferences("draw_calendar_reminders", Context.MODE_PRIVATE)
+        if (state.status == "DISAGREEMENT") {
+            val signature = state.lotteryChecksDates.take(3).joinToString(",") + "|" + state.huayReviewDates.take(3).joinToString(",")
+            if (signature != prefs.getString("last_mismatch_alert", null)) {
+                val lotteryDate = state.lotteryChecksDates.firstOrNull()?.toString() ?: "ไม่พบข้อมูล"
+                val huayDate = state.huayReviewDates.firstOrNull()?.toString() ?: "ไม่พบข้อมูล"
+                post(context, 800002, "วันออกรางวัลจากเว็บไซต์ไม่ตรงกัน",
+                    "LotteryChecks: $lotteryDate • HuayReview: $huayDate • กรุณาเปิดปฏิทินในแอปเพื่อตรวจสอบและยืนยันวัน")
+                prefs.edit().putString("last_mismatch_alert", signature).apply()
+            }
+            return
+        }
+        if (state.status != "CONFIRMED" && state.status != "USER_CONFIRMED") return
         val current = state.confirmedDates.joinToString(",") { it.toString() }
         val previous = prefs.getString("last_confirmed_dates", "").orEmpty()
         if (previous.isNotBlank() && previous != current) {
@@ -290,19 +333,19 @@ object DrawCalendarReminder {
             val newDate = state.confirmedDates.firstOrNull()?.toString().orEmpty()
             if (oldDate != newDate && newDate.isNotBlank()) {
                 post(context, 800001, "มีการเปลี่ยนวันออกรางวัล",
-                    "วันงวดถัดไปเปลี่ยนจาก $oldDate เป็น $newDate ตามข้อมูลที่ทั้งสองเว็บไซต์ยืนยันตรงกัน")
+                    "วันงวดถัดไปเปลี่ยนจาก $oldDate เป็น $newDate ตามสถานะ " +
+                        if (state.status == "USER_CONFIRMED") "ที่ผู้ใช้ยืนยัน" else "ที่ทั้งสองเว็บไซต์ยืนยันตรงกัน")
             }
         }
         prefs.edit().putString("last_confirmed_dates", current).apply()
         state.confirmedDates.forEach { date ->
             val days = ChronoUnit.DAYS.between(today, date)
-            if (days in 0..7) {
-                val key = "reminded_$date"
-                if (!prefs.getBoolean(key, false)) {
-                    val detail = if (days == 0L) "วันนี้เป็นวันออกรางวัล" else "เหลืออีก $days วัน"
-                    post(context, date.hashCode(), "แจ้งเตือนวันออกรางวัล", "งวดวันที่ $date • $detail")
-                    prefs.edit().putBoolean(key, true).apply()
-                }
+            val key = "reminded_$date"
+            if (days in 0..7 && !prefs.getBoolean(key, false)) {
+                val detail = if (days == 7L) "แจ้งล่วงหน้าครบ 7 วัน" else
+                    "ยืนยันกำหนดการเมื่อเหลือ $days วัน จึงเป็นการแจ้งเตือนล่าช้ากว่ากำหนด 7 วัน"
+                post(context, date.hashCode(), "แจ้งเตือนวันออกรางวัล", "งวดวันที่ $date • $detail")
+                prefs.edit().putBoolean(key, true).apply()
             }
         }
     }
