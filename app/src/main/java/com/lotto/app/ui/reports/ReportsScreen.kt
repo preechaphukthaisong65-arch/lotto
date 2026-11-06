@@ -132,7 +132,9 @@ private fun ReportMenuItem(
 @Composable
 fun ReportDetailScreen(
     title: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenCurrentSales: () -> Unit = {},
+    onOpenSalesHistory: () -> Unit = {}
 ) {
     Scaffold(
         bottomBar = {
@@ -154,7 +156,9 @@ fun ReportDetailScreen(
             TotalSalesLayout(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
+                    .padding(innerPadding),
+                onOpenCurrentSales = onOpenCurrentSales,
+                onOpenSalesHistory = onOpenSalesHistory
             )
         } else {
             Column(
@@ -180,7 +184,11 @@ fun ReportDetailScreen(
 }
 
 @Composable
-private fun TotalSalesLayout(modifier: Modifier = Modifier) {
+private fun TotalSalesLayout(
+    modifier: Modifier = Modifier,
+    onOpenCurrentSales: () -> Unit,
+    onOpenSalesHistory: () -> Unit
+) {
     Column(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -204,16 +212,29 @@ private fun TotalSalesLayout(modifier: Modifier = Modifier) {
                     .weight(1f)
             )
         }
-        Box(
+        Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    shape = RoundedCornerShape(8.dp)
-                )
-        )
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "รายการยอดขาย",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            ReportMenuItem(
+                title = "ยอดขายงวดปัจจุบัน",
+                icon = Icons.Outlined.ReceiptLong,
+                onClick = onOpenCurrentSales
+            )
+            ReportMenuItem(
+                title = "ยอดขายทั้งหมด (ย้อนหลัง 24 งวด)",
+                icon = Icons.Outlined.Assessment,
+                onClick = onOpenSalesHistory
+            )
+        }
     }
 }
 
