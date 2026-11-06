@@ -27,15 +27,11 @@ object SaleEntryParser {
                 val category = parts[1].uppercase(java.util.Locale.ROOT)
                 val amount = parseAmountSatang(parts[2])
 
-                require(number.length in 2..3 && number.all { it in '0'..'9' }) {
-                    "เลขต้องมี 2 หรือ 3 หลัก: $number"
+                require(number.length == 3 && number.all { it in '0'..'9' }) {
+                    "เลขต้องมี 3 หลัก: $number"
                 }
                 require(amount > 0L) { "จำนวนเงินต้องมากกว่า 0" }
-                val allowed = if (number.length == 2) {
-                    setOf("TWO_TOP", "TWO_BOTTOM")
-                } else {
-                    setOf("THREE_TOP", "THREE_BOTTOM", "THREE_TOAD")
-                }
+                val allowed = setOf("THREE_TOP", "THREE_TOAD")
                 require(category in allowed) { "ประเภทไม่ตรงกับจำนวนหลัก: $number" }
                 ParsedSaleEntry(number, category, amount)
             }.toList()
