@@ -405,6 +405,7 @@ class MainActivity : Activity() {
     private fun showSales() {
         base("หน้าขาย")
         addText(currentBody, "เพิ่มรายการเลข ประเภท และจำนวนเงิน ระบบจะตรวจสอบกฎหวยอั้นและกำหนดสถานะจ่ายครึ่งให้อัตโนมัติ", 13, ink)
+        addText(currentBody, "วิธีตัดสินผล: 3 ตัวบน/โต๊ดใช้เลขท้าย 3 หลักของรางวัลที่ 1 • 2 ตัวบนใช้เลขท้าย 2 หลักของรางวัลที่ 1 • 2 ตัวล่างใช้ผลเลขท้าย 2 ตัวจาก GLO", 12, 0xFF526171.toInt())
         addText(currentBody, "ราคาเท่ากัน: ใส่ยอดเงินเท่ากันทุกบรรทัด • ราคาไม่เท่ากัน: ใส่ยอดแยกแต่ละบรรทัด", 12, 0xFF526171.toInt())
         addButton(currentBody, "＋ บันทึกบิลขาย") { createSaleDialog() }
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
