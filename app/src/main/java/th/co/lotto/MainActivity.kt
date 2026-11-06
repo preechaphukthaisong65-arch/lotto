@@ -244,7 +244,9 @@ class MainActivity : Activity() {
                 val dialog = AlertDialog.Builder(this).setTitle("บันทึกบิล • ${period.title}").setView(form)
                     .setNegativeButton("กลับ", null).setPositiveButton("บันทึก", null).create()
                 dialog.setOnShowListener {
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                    val saveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                    saveButton.setOnClickListener {
+                        if (!saveButton.isEnabled) return@setOnClickListener
                         try {
                             val type = customerType.selectedItem.toString()
                             val selectedCustomer = if (type == "CREDIT") {
@@ -283,6 +285,7 @@ class MainActivity : Activity() {
                             }
                             val audit = AuditEventEntity(UUID.randomUUID().toString(), "SALE_DOCUMENT",
                                 documentId, "POSTED", "Sale posted from sales screen", now)
+                            saveButton.isEnabled = false
                             io.execute {
                                 try {
                                     dao.postSale(document, lines, audit)
@@ -291,18 +294,22 @@ class MainActivity : Activity() {
                                         runOnUiThread {
                                             Toast.makeText(this, "บันทึกบิลสำเร็จ • ใบเสร็จบันทึกในเครื่องแล้ว", Toast.LENGTH_LONG).show()
                                             addText(currentBody, "บิลล่าสุด: ${documentId.take(8)} • ใบเสร็จ: ${receipt.name}", 12, ink)
+                                            dialog.dismiss()
                                         }
                                     } catch (receiptError: Exception) {
                                         runOnUiThread {
                                             Toast.makeText(this, "บันทึกบิลแล้ว แต่สร้างภาพใบเสร็จไม่สำเร็จ กรุณาสร้างใหม่จากประวัติบิล: ${receiptError.message}", Toast.LENGTH_LONG).show()
                                             addText(currentBody, "บันทึกบิลแล้ว: ${documentId.take(8)} • ใบเสร็จยังต้องสร้างใหม่จากประวัติ", 12, ink)
+                                            dialog.dismiss()
                                         }
                                     }
                                 } catch (e: Exception) {
-                                    runOnUiThread { Toast.makeText(this, "บันทึกไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
+                                    runOnUiThread {
+                                        saveButton.isEnabled = true
+                                        Toast.makeText(this, "บันทึกไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show()
+                                    }
                                 }
                             }
-                            dialog.dismiss()
                         } catch (e: Exception) {
                             Toast.makeText(this, e.message ?: "ข้อมูลไม่ถูกต้อง", Toast.LENGTH_LONG).show()
                         }
