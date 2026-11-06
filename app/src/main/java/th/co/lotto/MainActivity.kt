@@ -219,7 +219,6 @@ class MainActivity : Activity() {
                         val latestClosedDrawDate = if (open == null) {
                             dao.getPeriods().firstOrNull { period ->
                                 period.status == "CLOSED" && period.drawDateEpochMillis != null &&
-                                    now >= PeriodSchedule.closeAt(period.drawDateEpochMillis) &&
                                     now < PeriodSchedule.openNextAt(period.drawDateEpochMillis)
                             }?.drawDateEpochMillis
                         } else null
@@ -658,6 +657,7 @@ class MainActivity : Activity() {
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
         io.execute {
             val dao = database.lottoDao()
+            PeriodSchedule.advance(dao, System.currentTimeMillis())
             val period = dao.getOpenPeriod()
             val rules = period?.let { dao.getLimitRules(it.periodId) } ?: emptyList()
             val soldByRule = rules.associate { rule ->
