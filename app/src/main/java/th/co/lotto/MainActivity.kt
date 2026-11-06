@@ -1288,7 +1288,7 @@ class MainActivity : Activity() {
                     }
                 }
                 currentBody.addView(resultList)
-                if (selectedPeriodId != null) renderSavedResults(selectedPeriodId, resultList)
+                periods.getOrNull(picker.selectedItemPosition)?.periodId?.let { renderSavedResults(it, resultList) }
                 addText(currentBody, "ผลรางวัลนำเข้าจาก GLO โดยตรงเท่านั้น • หาก GLO ไม่พร้อมใช้งาน ระบบจะไม่ใช้ผลจากเว็บอื่นแทน • ผลที่บันทึกแล้วใช้งานออฟไลน์ได้", 12, 0xFF526171.toInt())
             }
         }
