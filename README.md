@@ -12,7 +12,6 @@ Lotto is being developed as an Android-only, offline-first application. The on-d
 - SRS 0.2 baseline: `docs/SRS-0.2.md`.
 - Room/SQLite local schema for periods, customers, sale documents/lines, payments, limits, results, and audit events.
 - Atomic sale-posting DAO method and database triggers protecting posted sale documents and lines from update/delete.
-- Initial home navigation, period creation/list, and customer creation/list.
 - Sales, credit/payment workflows, period limits, receipts, result matching, reports, and immutable payout-rate snapshots are implemented on the offline branch.
 - Encrypted local backup/restore is implemented with a user-supplied passphrase; it packages the SQLite database and receipt images, validates the archive/database before replacement, and includes rollback protection.
 - PIN roles and per-module permissions remain a deliberate decision gate; no speculative role model is enabled.
