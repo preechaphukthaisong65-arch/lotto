@@ -181,6 +181,7 @@ abstract class LottoDatabase : RoomDatabase() {
 
         private val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TRIGGER IF EXISTS prevent_duplicate_draw_result_insert")
                 db.execSQL("CREATE TABLE IF NOT EXISTS draw_source_checks (checkId TEXT NOT NULL PRIMARY KEY, periodId TEXT NOT NULL, sourceId TEXT NOT NULL, drawDateIso TEXT NOT NULL, firstPrizeNumber TEXT NOT NULL, threeTopNumber TEXT NOT NULL, twoBottomNumber TEXT NOT NULL, sourceUrl TEXT NOT NULL, fetchedAtEpochMillis INTEGER NOT NULL, FOREIGN KEY(periodId) REFERENCES draw_periods(periodId) ON UPDATE NO ACTION ON DELETE RESTRICT)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_source_checks_periodId_sourceId ON draw_source_checks(periodId, sourceId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_source_checks_periodId_fetchedAtEpochMillis ON draw_source_checks(periodId, fetchedAtEpochMillis)")
@@ -263,17 +264,6 @@ abstract class LottoDatabase : RoomDatabase() {
                   OR NEW.numberText GLOB '*[^0-9]*'
                 BEGIN
                     SELECT RAISE(ABORT, 'Only three-digit top and toad blocked numbers are supported');
-                END
-            """.trimIndent())
-            db.execSQL("""
-                CREATE TRIGGER IF NOT EXISTS prevent_duplicate_draw_result_insert
-                BEFORE INSERT ON draw_results
-                WHEN EXISTS (
-                    SELECT 1 FROM draw_results
-                    WHERE periodId = NEW.periodId AND resultType = NEW.resultType
-                )
-                BEGIN
-                    SELECT RAISE(ABORT, 'A draw result for this period and category already exists');
                 END
             """.trimIndent())
             db.execSQL("""
