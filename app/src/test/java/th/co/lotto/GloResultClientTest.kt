@@ -51,6 +51,23 @@ class GloResultClientTest {
     }
 
     @Test
+    fun extractsFirstPrizeAndLastTwoFromOfficialPrizeArrays() {
+        val arrayResponse = validResponse
+            .replace(
+                "\"first\": {\n                  \"price\": \"6000000\",\n                  \"number\": [\n                    { \"round\": 1, \"value\": \"639214\" }\n                  ]\n                },",
+                "\"prizes\": [ { \"id\": \"prizeFirst\", \"number\": [ \"639214\" ] } ],"
+            )
+            .replace(
+                "\"last2\": {\n                  \"number\": [\n                    { \"round\": 1, \"value\": \"01\" }\n                  ]\n                }",
+                "\"runningNumbers\": [ { \"id\": \"runningNumberBackTwo\", \"number\": [ \"01\" ] } ]"
+            )
+        val result = GloResultClient.parseResponse(arrayResponse, "2026-07-16")
+        assertEquals("639214", result.firstPrizeNumber)
+        assertEquals("214", result.threeTopNumber)
+        assertEquals("01", result.twoBottomNumber)
+    }
+
+    @Test
     fun rejectsWrongDateInvalidFirstPrizeAndMissingLastTwo() {
         assertThrows(IllegalArgumentException::class.java) {
             GloResultClient.parseResponse(validResponse, "2026-07-01")
