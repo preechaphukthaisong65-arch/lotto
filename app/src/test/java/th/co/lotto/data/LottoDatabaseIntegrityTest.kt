@@ -114,17 +114,18 @@ class LottoDatabaseIntegrityTest {
     @Test
     fun saleHistoryCanSearchByDocumentOrNumberAndFilterByPeriod() {
         dao.insertPeriod(period("period-1"))
-        val first = SaleDocumentEntity("sale-123", "period-1", null, "CASH", 2_000L, 10L, "Asia/Bangkok")
-        dao.postSale(first, listOf(SaleLineEntity("line-1", "sale-123", "period-1", "12", "TWO_TOP", 2_000L, false)),
-            AuditEventEntity("event-1", "SALE_DOCUMENT", "sale-123", "POSTED", "test", 10L))
+        val first = SaleDocumentEntity("document-alpha", "period-1", null, "CASH", 2_000L, 10L, "Asia/Bangkok")
+        dao.postSale(first, listOf(SaleLineEntity("line-1", "document-alpha", "period-1", "12", "TWO_TOP", 2_000L, false)),
+            AuditEventEntity("event-1", "SALE_DOCUMENT", "document-alpha", "POSTED", "test", 10L))
         database.openHelper.writableDatabase.execSQL("UPDATE draw_periods SET status = 'CLOSED' WHERE periodId = 'period-1'")
         dao.insertPeriod(period("period-2"))
-        val second = SaleDocumentEntity("sale-456", "period-2", null, "CASH", 3_000L, 20L, "Asia/Bangkok")
-        dao.postSale(second, listOf(SaleLineEntity("line-2", "sale-456", "period-2", "123", "THREE_TOAD", 3_000L, true)),
-            AuditEventEntity("event-2", "SALE_DOCUMENT", "sale-456", "POSTED", "test", 20L))
+        val second = SaleDocumentEntity("document-beta", "period-2", null, "CASH", 3_000L, 20L, "Asia/Bangkok")
+        dao.postSale(second, listOf(SaleLineEntity("line-2", "document-beta", "period-2", "123", "THREE_TOAD", 3_000L, true)),
+            AuditEventEntity("event-2", "SALE_DOCUMENT", "document-beta", "POSTED", "test", 20L))
 
-        assertEquals(listOf("sale-123"), dao.searchSales("period-1", "12").map { it.documentId })
-        assertEquals(listOf("sale-456"), dao.searchSales(null, "123").map { it.documentId })
+        assertEquals(listOf("document-alpha"), dao.searchSales("period-1", "12").map { it.documentId })
+        assertEquals(listOf("document-beta"), dao.searchSales(null, "123").map { it.documentId })
+        assertEquals(listOf("document-alpha"), dao.searchSales(null, "alpha").map { it.documentId })
         assertEquals(2, dao.searchSales(null, "").size)
     }
 
