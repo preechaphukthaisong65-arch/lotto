@@ -3,6 +3,8 @@ package th.co.lotto
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.text.Html
 import androidx.core.app.NotificationCompat
@@ -70,6 +72,14 @@ object DrawCalendarService {
         if (lottery == null || huay == null) {
             return DrawCalendarState("UNAVAILABLE", lottery?.dates.orEmpty(), huay?.dates.orEmpty(),
                 emptyList(), latestTime, "ยังไม่มีผลตรวจสอบครบทั้งสองเว็บไซต์")
+        }
+        val connectivity = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val activeNetwork = connectivity.activeNetwork
+        val capabilities = activeNetwork?.let { connectivity.getNetworkCapabilities(it) }
+        val online = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+        if (!online) {
+            return DrawCalendarState("STALE", lottery.dates, huay.dates, emptyList(), latestTime,
+                "ออฟไลน์ • แสดงข้อมูลปฏิทินที่บันทึกไว้เท่านั้น ไม่ถือเป็นการยืนยันข้อมูลปัจจุบัน")
         }
         val stale = System.currentTimeMillis() - minOf(lottery.fetchedAt, huay.fetchedAt) > 36L * 60L * 60L * 1000L
         if (!lottery.successful || !huay.successful) {
