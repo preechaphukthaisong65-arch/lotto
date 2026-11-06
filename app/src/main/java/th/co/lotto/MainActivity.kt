@@ -1194,7 +1194,8 @@ class MainActivity : Activity() {
                     resultList.removeAllViews()
                     val selectedPeriod = periods[picker.selectedItemPosition]
                     io.execute {
-                        val savedResults = dao.getDrawResults(selectedPeriod.periodId)
+                        val savedResults = dao.getDrawResults(selectedPeriod.periodId).groupBy { it.resultType }
+                            .values.mapNotNull { group -> group.maxByOrNull { it.importedAtEpochMillis } }
                         val snapshot = dao.getSettlementSnapshot(selectedPeriod.periodId)
                         val documents = dao.getSalesForPeriod(selectedPeriod.periodId)
                         val lines = documents.flatMap { dao.getLinesForDocument(it.documentId) }
@@ -1276,7 +1277,7 @@ class MainActivity : Activity() {
                     second.fetchedAtEpochMillis >= System.currentTimeMillis() - 10 * 60 * 1000L
                 if (comparable && first!!.firstPrizeNumber == second!!.firstPrizeNumber &&
                     first.twoBottomNumber == second.twoBottomNumber &&
-                    dao.getDrawResults(period.periodId).isEmpty()) {
+                    !dao.isResultVerificationComplete(period.periodId)) {
                     val now = System.currentTimeMillis()
                     val top = th.co.lotto.data.DrawResultEntity(
                         UUID.randomUUID().toString(), period.periodId, "THREE_TOP", first.threeTopNumber,
@@ -1396,7 +1397,8 @@ class MainActivity : Activity() {
         resultList.removeAllViews()
         io.execute {
             val dao = database.lottoDao()
-            val results = dao.getDrawResults(periodId)
+            val results = dao.getDrawResults(periodId).groupBy { it.resultType }
+                .values.mapNotNull { group -> group.maxByOrNull { it.importedAtEpochMillis } }
             val sourceChecks = dao.getDrawSourceChecks(periodId).groupBy { it.sourceId }
                 .mapValues { (_, rows) -> rows.maxByOrNull { it.fetchedAtEpochMillis }!! }
             val verificationComplete = dao.isResultVerificationComplete(periodId)
