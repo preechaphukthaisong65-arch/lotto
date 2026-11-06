@@ -188,8 +188,8 @@ class MainActivity : Activity() {
 
     private fun showSales() {
         base("หน้าขาย")
-        addText(currentBody, "กรอกรายการแบบบรรทัดละ 1 รายการ: เลข,ประเภท,จำนวนเงิน,HALF หรือ FULL", 13, ink)
-        addText(currentBody, "ตัวอย่าง: 12,TWO_TOP,20,FULL  •  123,THREE_TOAD,10,HALF", 12, 0xFF526171.toInt())
+        addText(currentBody, "กรอกรายการบรรทัดละ 1 รายการ: เลข,ประเภท,จำนวนเงิน,HALF หรือ FULL", 13, ink)
+        addText(currentBody, "ราคาเท่ากัน: ใส่ยอดเงินเดียวกันทุกบรรทัด • ราคาไม่เท่ากัน: ใส่ยอดแยกแต่ละบรรทัด\nตัวอย่าง: 12,TWO_TOP,20,FULL  •  123,THREE_TOAD,10,HALF", 12, 0xFF526171.toInt())
         addButton(currentBody, "＋ บันทึกบิลขาย") { createSaleDialog() }
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
         io.execute {
@@ -271,7 +271,7 @@ class MainActivity : Activity() {
                             require(parsed.isNotEmpty()) { "กรุณากรอกรายการขายอย่างน้อย 1 บรรทัด" }
                             val now = System.currentTimeMillis()
                             val documentId = UUID.randomUUID().toString()
-                            val total = parsed.sumOf { it.third.first }
+                            val total = parsed.fold(0L) { sum, item -> Math.addExact(sum, item.third.first) }
                             val document = SaleDocumentEntity(
                                 documentId, period.periodId, selectedCustomer?.customerId, type,
                                 total, now, java.util.TimeZone.getDefault().id, correctionOfDocumentId
@@ -285,10 +285,17 @@ class MainActivity : Activity() {
                             io.execute {
                                 try {
                                     dao.postSale(document, lines, audit)
-                                    val receipt = ReceiptRenderer.render(this, document, period.title, lines)
-                                    runOnUiThread {
-                                        Toast.makeText(this, "บันทึกบิลสำเร็จ • ใบเสร็จบันทึกในเครื่องแล้ว", Toast.LENGTH_LONG).show()
-                                        addText(currentBody, "บิลล่าสุด: ${documentId.take(8)} • ใบเสร็จ: ${receipt.name}", 12, ink)
+                                    try {
+                                        val receipt = ReceiptRenderer.render(this, document, period.title, lines)
+                                        runOnUiThread {
+                                            Toast.makeText(this, "บันทึกบิลสำเร็จ • ใบเสร็จบันทึกในเครื่องแล้ว", Toast.LENGTH_LONG).show()
+                                            addText(currentBody, "บิลล่าสุด: ${documentId.take(8)} • ใบเสร็จ: ${receipt.name}", 12, ink)
+                                        }
+                                    } catch (receiptError: Exception) {
+                                        runOnUiThread {
+                                            Toast.makeText(this, "บันทึกบิลแล้ว แต่สร้างภาพใบเสร็จไม่สำเร็จ กรุณาสร้างใหม่จากประวัติบิล: ${receiptError.message}", Toast.LENGTH_LONG).show()
+                                            addText(currentBody, "บันทึกบิลแล้ว: ${documentId.take(8)} • ใบเสร็จยังต้องสร้างใหม่จากประวัติ", 12, ink)
+                                        }
                                     }
                                 } catch (e: Exception) {
                                     runOnUiThread { Toast.makeText(this, "บันทึกไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
@@ -310,38 +317,43 @@ class MainActivity : Activity() {
     private fun showSalesHistory() {
         base("รายการขายและประวัติ")
         val dao = database.lottoDao()
-        val search = EditText(this).apply { hint = "ค้นหาด้วยเลขที่บิลหรือเลขที่ขาย" }
-        val periods = dao.getPeriods()
-        val periodPicker = Spinner(this).apply {
-            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
-                listOf("ทุกงวด") + periods.map { it.title })
-        }
-        val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        addText(currentBody, "ค้นหาบิลจากเลขที่เอกสารหรือเลขที่อยู่ในรายการ และเลือกกรองตามงวด", 13, ink)
-        currentBody.addView(search)
-        currentBody.addView(periodPicker)
-        addButton(currentBody, "ค้นหา") {
-            val selectedIndex = periodPicker.selectedItemPosition - 1
-            val periodId = if (selectedIndex >= 0) periods[selectedIndex].periodId else null
-            val query = search.text.toString().trim()
-            results.removeAllViews()
-            io.execute {
-                val documents = dao.searchSales(periodId, query)
-                runOnUiThread {
-                    if (documents.isEmpty()) addText(results, "ไม่พบเอกสารขาย", 14, ink)
-                    documents.forEach { doc ->
-                        val periodTitle = dao.getPeriod(doc.periodId)?.title ?: "ไม่ทราบชื่องวด"
-                        val label = if (doc.correctionOfDocumentId == null) "บิลต้นฉบับ" else "เอกสารอ้างอิงบิล ${doc.correctionOfDocumentId.take(8)}"
-                        addCard(results, "บิล ${doc.documentId.take(8)} • ${formatMoney(doc.totalAmountSatang)}",
-                            "$periodTitle • $label • ${SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(doc.createdAtEpochMillis))}") {
-                            showSaleDetail(doc.documentId)
+        io.execute {
+            val periods = dao.getPeriods()
+            runOnUiThread {
+                val search = EditText(this).apply { hint = "ค้นหาด้วยเลขที่บิลหรือเลขที่ขาย" }
+                val periodPicker = Spinner(this).apply {
+                    adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
+                        listOf("ทุกงวด") + periods.map { it.title })
+                }
+                val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                addText(currentBody, "ค้นหาบิลจากเลขที่เอกสารหรือเลขที่อยู่ในรายการ และเลือกกรองตามงวด", 13, ink)
+                currentBody.addView(search)
+                currentBody.addView(periodPicker)
+                addButton(currentBody, "ค้นหา") {
+                    val selectedIndex = periodPicker.selectedItemPosition - 1
+                    val periodId = if (selectedIndex >= 0) periods[selectedIndex].periodId else null
+                    val query = search.text.toString().trim()
+                    results.removeAllViews()
+                    io.execute {
+                        val documents = dao.searchSales(periodId, query)
+                        val periodTitles = documents.associate { doc -> doc.periodId to (dao.getPeriod(doc.periodId)?.title ?: "ไม่ทราบชื่องวด") }
+                        runOnUiThread {
+                            if (documents.isEmpty()) addText(results, "ไม่พบเอกสารขาย", 14, ink)
+                            documents.forEach { doc ->
+                                val periodTitle = periodTitles[doc.periodId] ?: "ไม่ทราบชื่องวด"
+                                val label = if (doc.correctionOfDocumentId == null) "บิลต้นฉบับ" else "เอกสารอ้างอิงบิล ${doc.correctionOfDocumentId.take(8)}"
+                                addCard(results, "บิล ${doc.documentId.take(8)} • ${formatMoney(doc.totalAmountSatang)}",
+                                    "$periodTitle • $label • ${SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(doc.createdAtEpochMillis))}") {
+                                    showSaleDetail(doc.documentId)
+                                }
+                            }
                         }
                     }
                 }
+                currentBody.addView(results)
+                addButton(currentBody, "กลับหน้าหลัก") { showHome() }
             }
         }
-        currentBody.addView(results)
-        addButton(currentBody, "กลับหน้าหลัก") { showHome() }
     }
 
     private fun showSaleDetail(documentId: String) {
@@ -373,7 +385,7 @@ class MainActivity : Activity() {
                         "${formatMoney(line.amountSatang)} • ${if (line.halfPayout) "จ่ายครึ่ง" else "จ่ายเต็ม"}") { }
                 }
                 addText(currentBody, "ยอดรวม: ${formatMoney(document.totalAmountSatang)}", 18, navy)
-                addButton(currentBody, if (receiptFile.exists()) "เปิดสร้างใบเสร็จใหม่จากข้อมูลต้นฉบับ" else "สร้างใบเสร็จจากข้อมูลต้นฉบับ") {
+                addButton(currentBody, if (receiptFile.exists()) "สร้างภาพใบเสร็จใหม่จากข้อมูลต้นฉบับ" else "สร้างภาพใบเสร็จจากข้อมูลต้นฉบับ") {
                     io.execute {
                         try {
                             val file = ReceiptRenderer.render(this, document, period?.title ?: "ไม่ทราบงวด", lines)
