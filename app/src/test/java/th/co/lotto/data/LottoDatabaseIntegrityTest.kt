@@ -319,14 +319,14 @@ class LottoDatabaseIntegrityTest {
     fun halfPayoutIsResolvedFromPeriodRuleAndCannotBeChosenInSalePayload() {
         dao.insertPeriod(period("period-1"))
         dao.saveLimitRule(NumberLimitRuleEntity(
-            "half-rule", "period-1", 2, "TWO_TOP", "12", 5_000L, true, true
+            "half-rule", "period-1", 3, "THREE_TOP", "123", 5_000L, true, true
         ))
         val halfDocument = SaleDocumentEntity(
             "sale-half", "period-1", null, "CASH", 1_000L, 10L, "Asia/Bangkok"
         )
         dao.postSale(
             halfDocument,
-            listOf(SaleLineEntity("line-half", "sale-half", "period-1", "12", "TWO_TOP", 1_000L, false)),
+            listOf(SaleLineEntity("line-half", "sale-half", "period-1", "123", "THREE_TOP", 1_000L, false)),
             AuditEventEntity("event-half", "SALE_DOCUMENT", "sale-half", "POSTED", "test", 10L)
         )
         assertEquals(true, dao.getLinesForDocument("sale-half").single().halfPayout)
@@ -336,7 +336,7 @@ class LottoDatabaseIntegrityTest {
         )
         dao.postSale(
             fullDocument,
-            listOf(SaleLineEntity("line-full", "sale-full", "period-1", "13", "TWO_TOP", 1_000L, true)),
+            listOf(SaleLineEntity("line-full", "sale-full", "period-1", "124", "THREE_TOP", 1_000L, true)),
             AuditEventEntity("event-full", "SALE_DOCUMENT", "sale-full", "POSTED", "test", 20L)
         )
         assertEquals(false, dao.getLinesForDocument("sale-full").single().halfPayout)
@@ -346,11 +346,11 @@ class LottoDatabaseIntegrityTest {
     fun savingSameLimitRuleUpdatesItInsteadOfCreatingDuplicates() {
         dao.insertPeriod(period("period-1"))
         dao.saveLimitRule(NumberLimitRuleEntity(
-            "rule-original", "period-1", 2, "TWO_TOP", "12", 2_000L, true
+            "rule-original", "period-1", 3, "THREE_TOP", "123", 2_000L, true
         ))
 
         dao.saveLimitRule(NumberLimitRuleEntity(
-            "rule-new-id", "period-1", 2, "TWO_TOP", "12", 3_000L, false
+            "rule-new-id", "period-1", 3, "THREE_TOP", "123", 3_000L, false
         ))
 
         val rules = dao.getLimitRules("period-1")
@@ -365,7 +365,7 @@ class LottoDatabaseIntegrityTest {
     fun limitCannotBeReducedBelowAlreadySoldAmount() {
         dao.insertPeriod(period("period-1"))
         val rule = NumberLimitRuleEntity(
-            "rule-1", "period-1", 2, "TWO_TOP", "12", 2_000L, true
+            "rule-1", "period-1", 3, "THREE_TOP", "123", 2_000L, true
         )
         dao.saveLimitRule(rule)
         val document = SaleDocumentEntity(
@@ -373,7 +373,7 @@ class LottoDatabaseIntegrityTest {
         )
         dao.postSale(
             document,
-            listOf(SaleLineEntity("line-1", "sale-1", "period-1", "12", "TWO_TOP", 1_500L, false)),
+            listOf(SaleLineEntity("line-1", "sale-1", "period-1", "123", "THREE_TOP", 1_500L, false)),
             AuditEventEntity("event-1", "SALE_DOCUMENT", "sale-1", "POSTED", "test", 10L)
         )
 
@@ -387,7 +387,7 @@ class LottoDatabaseIntegrityTest {
     fun disabledLimitDoesNotBlockSales() {
         dao.insertPeriod(period("period-1"))
         dao.saveLimitRule(NumberLimitRuleEntity(
-            "rule-1", "period-1", 2, "TWO_TOP", "12", 1_000L, false
+            "rule-1", "period-1", 3, "THREE_TOP", "123", 1_000L, false
         ))
         val document = SaleDocumentEntity(
             "sale-1", "period-1", null, "CASH", 1_500L, 10L, "Asia/Bangkok"
