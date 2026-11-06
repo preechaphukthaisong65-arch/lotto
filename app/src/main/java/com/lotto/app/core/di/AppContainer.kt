@@ -3,6 +3,8 @@ package com.lotto.app.core.di
 import android.content.Context
 import androidx.room.Room
 import com.lotto.app.data.local.LottoDatabase
+import com.lotto.app.data.repository.CreditAccountRepository
+import com.lotto.app.data.repository.RoomCreditAccountRepository
 import com.lotto.app.data.repository.RoomSaleRepository
 import com.lotto.app.data.repository.RoomSettingsRepository
 import com.lotto.app.data.repository.SaleRepository
@@ -27,5 +29,9 @@ class AppContainer(context: Context) {
 
     val saleRepository: SaleRepository by lazy {
         RoomSaleRepository(database.saleDao())
+    }
+
+    val creditAccountRepository: CreditAccountRepository by lazy {
+        RoomCreditAccountRepository(database.saleDao())
     }
 }
