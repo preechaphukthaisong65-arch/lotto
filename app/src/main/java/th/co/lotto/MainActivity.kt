@@ -1501,7 +1501,7 @@ class MainActivity : Activity() {
                                 runCatching { PayoutCalculator.calculatePeriod(matches, it, documents.fold(0L) { total, doc ->
                                     Math.addExact(total, doc.totalAmountSatang)
                                 }) }.getOrNull()
-                            }
+                            } else null
                             val report = PeriodReportEngine.calculate(
                                 period.periodId, documents, lines, payments,
                                 java.time.ZoneId.of("Asia/Bangkok")
