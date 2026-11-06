@@ -86,7 +86,8 @@ data class NumberLimitRuleEntity(
     val betCategory: String,
     val numberText: String,
     val maximumAmountSatang: Long,
-    val enabled: Boolean
+    val enabled: Boolean,
+    val halfPayout: Boolean = false
 )
 
 @Entity(
