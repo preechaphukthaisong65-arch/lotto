@@ -208,7 +208,7 @@ class MainActivity : Activity() {
         } ?: "ยังไม่เคยตรวจสอบ"), 12, 0xFF526171.toInt())
         if ((state.status == "CONFIRMED" || state.status == "USER_CONFIRMED") && state.confirmedDates.isNotEmpty()) {
             addText(currentBody,
-                if (state.status == "USER_CONFIRMED") "วันที่ผู้ใช้ตรวจสอบและยืนยัน" else "วันที่ทั้งสองแหล่งยืนยันตรงกัน",
+                if (state.status == "USER_CONFIRMED") "วันงวดที่ยืนยันแล้ว (รวมวันที่ผู้ใช้ยืนยัน)" else "วันที่ทั้งสองแหล่งยืนยันตรงกัน",
                 15, navy)
             state.confirmedDates.forEachIndexed { index, date ->
                 val days = java.time.temporal.ChronoUnit.DAYS.between(
@@ -224,6 +224,9 @@ class MainActivity : Activity() {
                 addText(currentBody, "HuayReview • " + state.huayReviewDates.joinToString(), 13, ink)
             }
         } else {
+            if (state.confirmedDates.isNotEmpty()) {
+                addText(currentBody, "งวดที่ทั้งสองเว็บไซต์ยืนยันตรงกัน: " + state.confirmedDates.joinToString(), 13, 0xFF26734D.toInt())
+            }
             if (state.lotteryChecksDates.isNotEmpty()) {
                 addText(currentBody, "LotteryChecks • " + state.lotteryChecksDates.joinToString(), 13, ink)
             }
@@ -240,7 +243,7 @@ class MainActivity : Activity() {
         val dateInput = EditText(this).apply {
             hint = "วันที่ออกรางวัล (dd/MM/yyyy)"
             inputType = android.text.InputType.TYPE_CLASS_DATETIME
-            state.confirmedDates.firstOrNull()?.let { date ->
+            if (state.status == "USER_CONFIRMED") state.confirmedDates.lastOrNull()?.let { date ->
                 val millis = date.atStartOfDay(java.time.ZoneId.of("Asia/Bangkok")).toInstant().toEpochMilli()
                 setText(SimpleDateFormat("dd/MM/yyyy", Locale("th", "TH")).format(Date(millis)))
             }
