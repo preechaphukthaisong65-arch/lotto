@@ -419,7 +419,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun createSaleDialog(correctionOfDocumentId: String? = null) {
+    private fun createSaleDialog() {
         val dao = database.lottoDao()
         io.execute {
             PeriodSchedule.advance(dao, System.currentTimeMillis())
@@ -430,12 +430,6 @@ class MainActivity : Activity() {
                     Toast.makeText(this, "ยังไม่มีงวดเปิดขาย กรุณาสร้างงวดก่อน", Toast.LENGTH_LONG).show()
                     return@runOnUiThread
                 }
-                val correctionSource = correctionOfDocumentId?.let { dao.getSaleDocument(it) }
-                if (correctionOfDocumentId != null && (correctionSource == null || correctionSource.periodId != period.periodId || correctionSource.correctionOfDocumentId != null)) {
-                    Toast.makeText(this, "เอกสารอ้างอิงต้องเป็นบิลต้นฉบับในงวดที่กำลังเปิดอยู่", Toast.LENGTH_LONG).show()
-                    return@runOnUiThread
-                }
-
                 val categories = listOf(
                     "3 ตัวบน" to "THREE_TOP",
                     "3 ตัวโต๊ด" to "THREE_TOAD"
@@ -560,7 +554,7 @@ class MainActivity : Activity() {
                             val total = SaleEntryParser.totalSatang(parsed)
                             val document = SaleDocumentEntity(
                                 documentId, period.periodId, selectedCustomer?.customerId, type,
-                                total, now, java.util.TimeZone.getDefault().id, correctionOfDocumentId
+                                total, now, java.util.TimeZone.getDefault().id
                             )
                             val lines = parsed.map { entry ->
                                 SaleLineEntity(UUID.randomUUID().toString(), documentId, period.periodId,
@@ -1158,7 +1152,7 @@ class MainActivity : Activity() {
                                 addText(resultList, "อัตราจ่ายงวดนี้: ยังไม่ได้บันทึก snapshot", 12, 0xFF9B2C2C.toInt())
                             } else {
                                 addText(resultList,
-                                    "อัตราจ่ายที่ตรึงไว้ • รุ่น ${settlementSnapshot.payoutConfigVersion} • 2 ตัว ${BigDecimal.valueOf(settlementSnapshot.twoDigitRateHundredths, 2).stripTrailingZeros().toPlainString()} • 3 บน ${BigDecimal.valueOf(settlementSnapshot.threeTopRateHundredths, 2).stripTrailingZeros().toPlainString()} • 3 ล่าง ${BigDecimal.valueOf(settlementSnapshot.threeBottomRateHundredths, 2).stripTrailingZeros().toPlainString()} • โต๊ด ${BigDecimal.valueOf(settlementSnapshot.threeToadRateHundredths, 2).stripTrailingZeros().toPlainString()}",
+                                    "อัตราจ่ายที่ตรึงไว้ • รุ่น ${settlementSnapshot.payoutConfigVersion} • 3 ตัวบน ${BigDecimal.valueOf(settlementSnapshot.threeTopRateHundredths, 2).stripTrailingZeros().toPlainString()} • 3 ตัวโต๊ด ${BigDecimal.valueOf(settlementSnapshot.threeToadRateHundredths, 2).stripTrailingZeros().toPlainString()}",
                                     12, navy)
                             }
                             if (results.isEmpty()) addText(resultList, "ยังไม่มีผลหวยที่บันทึกในงวดนี้", 13, ink)
@@ -1253,7 +1247,7 @@ class MainActivity : Activity() {
                     }
                     val type = Spinner(this).apply {
                         adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
-                            listOf("THREE_TOP", "THREE_TOAD"))
+                            listOf("3 ตัวบน", "3 ตัวโต๊ด"))
                     }
                     val number = EditText(this).apply {
                         hint = "เลขผลรางวัล"
@@ -1270,7 +1264,7 @@ class MainActivity : Activity() {
                         .setNegativeButton("กลับ", null).setPositiveButton("บันทึก", null).create()
                     dialog.setOnShowListener {
                         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                            val resultType = type.selectedItem.toString()
+                            val resultType = if (type.selectedItemPosition == 0) "THREE_TOP" else "THREE_TOAD"
                             val winningNumber = number.text.toString().trim()
                             val sourceLabel = source.text.toString().trim()
                             val expectedLength = 3
