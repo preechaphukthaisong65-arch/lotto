@@ -453,10 +453,11 @@ abstract class LottoDao {
     @Transaction
     open fun saveLimitRule(rule: NumberLimitRuleEntity) {
         require(rule.ruleId.isNotBlank()) { "Limit rule ID is required" }
-        require(rule.numberText.length == 3 && rule.numberText.all { it in '0'..'9' }) {
-            "Limit number must contain exactly 3 ASCII digits"
-        }
         val validCategories = setOf("TWO_TOP", "TWO_BOTTOM", "THREE_TOP", "THREE_TOAD")
+        val expectedLength = if (rule.betCategory == "TWO_TOP" || rule.betCategory == "TWO_BOTTOM") 2 else 3
+        require(rule.numberText.length == expectedLength && rule.numberText.all { it in '0'..'9' }) {
+            "Limit number length does not match category"
+        }
         require(rule.numberLength == rule.numberText.length && rule.betCategory in validCategories) {
             "Limit category does not match number length"
         }
