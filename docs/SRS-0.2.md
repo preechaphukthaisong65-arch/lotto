@@ -98,9 +98,9 @@ Phase-7 automated acceptance coverage includes encryption/decryption round trip,
 1. Complete live real-network integration tests for the GLO API request/response contract.
 2. Define and implement cash-refund accounting when a cash bill is cancelled after money has physically changed hands.
 3. Verify payout totals and sales-after-payout report reconciliation end to end using representative sale/result fixtures.
-4. Confirm permission to use GLO open-result data in a commercial workflow; the GLO Data Catalog currently lists a Creative Commons Non-Commercial license for the result dataset.
+4. Maintain non-commercial research use of GLO open-result data and comply with its Creative Commons Non-Commercial terms, including attribution. Any change to commercial use requires a separate license review.
 
-Any wagering, payout, or related functionality must undergo applicable legal/compliance review before operational release. Current payout summaries are deterministic calculations from saved results and rate snapshots, but must not be represented as net profit or a final cash ledger until cash-refund handling and legal/commercial-use review are complete.
+This project is a non-commercial research prototype. GLO result data is used for research/testing under the published Creative Commons Non-Commercial terms, with source attribution. Any wagering, payout, or related functionality must undergo applicable legal/compliance review before real-world operational use, regardless of commercial intent. Current payout summaries are deterministic calculations from saved results and rate snapshots, but must not be represented as net profit or a final cash ledger until cash-refund handling is complete. Commercial distribution or use is outside the current project scope and requires a separate license review.
 
 ## 17. Build and delivery
 - GitHub Actions runs Android lint, Room/database unit tests, and debug APK assembly on the offline development branch.
