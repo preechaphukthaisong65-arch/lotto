@@ -183,6 +183,7 @@ abstract class LottoDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("DROP TRIGGER IF EXISTS prevent_duplicate_draw_result_insert")
                 db.execSQL("CREATE TABLE IF NOT EXISTS draw_source_checks (checkId TEXT NOT NULL PRIMARY KEY, periodId TEXT NOT NULL, sourceId TEXT NOT NULL, drawDateIso TEXT NOT NULL, firstPrizeNumber TEXT NOT NULL, threeTopNumber TEXT NOT NULL, twoBottomNumber TEXT NOT NULL, sourceUrl TEXT NOT NULL, fetchedAtEpochMillis INTEGER NOT NULL, FOREIGN KEY(periodId) REFERENCES draw_periods(periodId) ON UPDATE NO ACTION ON DELETE RESTRICT)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_source_checks_periodId ON draw_source_checks(periodId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_source_checks_periodId_sourceId ON draw_source_checks(periodId, sourceId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_source_checks_periodId_fetchedAtEpochMillis ON draw_source_checks(periodId, fetchedAtEpochMillis)")
                 db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_draw_source_check_update BEFORE UPDATE ON draw_source_checks BEGIN SELECT RAISE(ABORT, 'source check immutable'); END")
