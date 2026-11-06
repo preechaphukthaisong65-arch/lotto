@@ -60,6 +60,19 @@ data class SaleDocumentEntity(
 )
 
 @Entity(
+    tableName = "sale_cancellations",
+    foreignKeys = [ForeignKey(entity = SaleDocumentEntity::class, parentColumns = ["documentId"], childColumns = ["documentId"], onDelete = ForeignKey.RESTRICT)],
+    indices = [Index(value = ["documentId"], unique = true)]
+)
+data class SaleCancellationEntity(
+    @PrimaryKey val cancellationId: String,
+    val documentId: String,
+    val originalAmountSatang: Long,
+    val reason: String,
+    val cancelledAtEpochMillis: Long
+)
+
+@Entity(
     tableName = "sale_lines",
     foreignKeys = [ForeignKey(entity = SaleDocumentEntity::class, parentColumns = ["documentId"], childColumns = ["documentId"], onDelete = ForeignKey.RESTRICT)],
     indices = [Index(value = ["documentId"]), Index(value = ["periodId", "numberText", "betCategory"])]
