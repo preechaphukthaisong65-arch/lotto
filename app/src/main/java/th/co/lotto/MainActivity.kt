@@ -84,7 +84,7 @@ class MainActivity : Activity() {
             runOnUiThread {
                 if (periods.isEmpty()) addText(currentBody, "ยังไม่มีข้อมูลงวดหวย", 14, ink)
                 periods.forEach { p ->
-                    addCard(currentBody, p.title, "สถานะ: \${p.status} • รหัสงวด: \${p.periodId.take(8)}") { }
+                    addCard(currentBody, p.title, "สถานะ: ${p.status} • รหัสงวด: ${p.periodId.take(8)}") { }
                 }
             }
         }
@@ -114,7 +114,7 @@ class MainActivity : Activity() {
                     val dao = database.lottoDao()
                     val open = dao.getOpenPeriod()
                     if (open != null) {
-                        runOnUiThread { Toast.makeText(this, "ยังมีงวดเปิดอยู่: \${open.title}", Toast.LENGTH_LONG).show() }
+                        runOnUiThread { Toast.makeText(this, "ยังมีงวดเปิดอยู่: ${open.title}", Toast.LENGTH_LONG).show() }
                     } else {
                         dao.insertPeriod(DrawPeriodEntity(UUID.randomUUID().toString(), title, date, "OPEN", null, System.currentTimeMillis()))
                         runOnUiThread { Toast.makeText(this, "บันทึกงวดแล้ว", Toast.LENGTH_SHORT).show(); showPeriods() }
@@ -135,7 +135,7 @@ class MainActivity : Activity() {
             runOnUiThread {
                 if (customers.isEmpty()) addText(currentBody, "ยังไม่มีข้อมูลลูกค้า", 14, ink)
                 customers.forEach { c ->
-                    addCard(currentBody, c.displayName, "\${c.customerType} • \${c.phone ?: "ไม่ระบุเบอร์โทร"}") { }
+                    addCard(currentBody, c.displayName, "${c.customerType} • ${c.phone ?: "ไม่ระบุเบอร์โทร"}") { }
                 }
             }
         }
