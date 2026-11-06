@@ -117,7 +117,7 @@ class MainActivity : Activity() {
         addCard(currentBody, "รับชำระเงิน", "บันทึกรับชำระเต็มจำนวนหรือบางส่วน") { showCreditLedger() }
         addCard(currentBody, "เลขอั้นและเลขเต็ม", "กำหนดวงเงินแยกตามประเภทเลข") { showLimits() }
         addCard(currentBody, "ผลหวยและสรุปยอด", "บันทึกผลและตรวจสอบยอดตามงวด") { showNotReady("ผลหวยและสรุปยอด") }
-        addCard(currentBody, "รายงาน", "รายงานยอดขาย ลูกหนี้ และยอดคงเหลือ") { showNotReady("รายงาน") }
+        addCard(currentBody, "รายงาน", "รายงานยอดขาย ลูกหนี้ และยอดคงเหลือ") { showReports() }
         addCard(currentBody, "ตั้งค่าและ PIN", "กำหนดค่าระบบและสิทธิ์การเข้าถึง") { showNotReady("ตั้งค่าและ PIN") }
         addCard(currentBody, "สำรองและกู้คืน", "สำรองข้อมูลลงไฟล์ในเครื่อง") { showNotReady("สำรองและกู้คืน") }
     }
@@ -1005,6 +1005,68 @@ class MainActivity : Activity() {
             }
         }
         dialog.show()
+    }
+
+    private fun showReports() {
+        base("รายงาน")
+        addButton(currentBody, "กลับหน้าหลัก") { showHome() }
+        val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        io.execute {
+            val dao = database.lottoDao()
+            val periods = dao.getPeriods()
+            runOnUiThread {
+                if (periods.isEmpty()) {
+                    addText(currentBody, "ยังไม่มีงวดสำหรับสร้างรายงาน", 14, ink)
+                    return@runOnUiThread
+                }
+                val picker = Spinner(this).apply {
+                    adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
+                        periods.map { it.title })
+                }
+                addText(currentBody, "เลือกงวดที่ต้องการดูรายงาน", 14, ink)
+                currentBody.addView(picker)
+                addButton(currentBody, "แสดงรายงาน") {
+                    results.removeAllViews()
+                    val period = periods[picker.selectedItemPosition]
+                    io.execute {
+                        try {
+                            val documents = dao.getSalesForPeriod(period.periodId)
+                            val lines = documents.flatMap { dao.getLinesForDocument(it.documentId) }
+                            val payments = documents.associate { it.documentId to dao.getPaymentsTotalForDocument(it.documentId) }
+                            val report = PeriodReportEngine.calculate(
+                                period.periodId, documents, lines, payments,
+                                java.time.ZoneId.of("Asia/Bangkok")
+                            )
+                            runOnUiThread {
+                                addText(results, "งวด: \${period.title}", 18, navy)
+                                addText(results, "จำนวนเอกสาร: \${report.documentCount} • รายการขาย: \${report.lineCount}", 14, ink)
+                                addText(results, "ยอดขายรวมจากเอกสาร: \${formatMoney(report.grossSalesSatang)}", 17, navy)
+                                addText(results, "เงินสด: \${formatMoney(report.cashSalesSatang)}", 14, ink)
+                                addText(results, "เงินเชื่อ: \${formatMoney(report.creditSalesSatang)}", 14, ink)
+                                addText(results, "รับชำระแล้ว: \${formatMoney(report.paymentsReceivedSatang)}", 14, ink)
+                                addText(results, "ยอดค้างเงินเชื่อ: \${formatMoney(report.outstandingCreditSatang)}", 14, ink)
+                                addText(results, "เลขจ่ายครึ่ง: \${report.halfPayoutLineCount} รายการ • ยอดขาย \${formatMoney(report.halfPayoutAmountSatang)}", 14, ink)
+                                addText(results, "ยอดแยกประเภท", 16, navy)
+                                report.categoryTotalsSatang.forEach { (category, amount) ->
+                                    addText(results, "\${categoryLabel(category)}: \${formatMoney(amount)}", 14, ink)
+                                }
+                                addText(results, "ยอดขายรายวัน", 16, navy)
+                                report.dailyGrossSalesSatang.forEach { (date, amount) ->
+                                    addText(results, "$date • \${formatMoney(amount)}", 14, ink)
+                                }
+                                if (report.correctionDocumentCount > 0) {
+                                    addText(results, "มีเอกสารแก้ไข \${report.correctionDocumentCount} ฉบับ • ยอดขายรวมข้างต้นนับรวมเอกสารแก้ไขด้วย และยังไม่หักกลบเป็นยอดสุทธิ", 13, 0xFF9B2C2C.toInt())
+                                }
+                                addText(results, "ยังไม่คำนวณยอดจ่ายรางวัล กำไร หรือยอดสุทธิ จนกว่าจะกำหนดสูตรและกฎบัญชีตาม SRS 0.2", 13, 0xFF9B2C2C.toInt())
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread { addText(results, "สร้างรายงานไม่สำเร็จ: \${e.message}", 14, 0xFF9B2C2C.toInt()) }
+                        }
+                    }
+                }
+                currentBody.addView(results)
+            }
+        }
     }
 
     private fun showNotReady(module: String) {
