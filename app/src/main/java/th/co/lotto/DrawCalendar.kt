@@ -67,6 +67,7 @@ object DrawCalendarService {
     }
 
     fun readState(context: Context): DrawCalendarState {
+        val today = LocalDate.now(BANGKOK)
         val lottery = CalendarAuditLog.latest(context, "LOTTERYCHECKS")
         val huay = CalendarAuditLog.latest(context, "HUAYREVIEW")
         val latestTime = listOfNotNull(lottery?.fetchedAt, huay?.fetchedAt).maxOrNull()
