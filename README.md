@@ -10,7 +10,7 @@ Lotto is being developed as an Android-only, offline-first application. The on-d
 
 ## Current implementation status
 - SRS 0.2 baseline: `docs/SRS-0.2.md`.
-- Room/SQLite local schema for periods, customers, sale documents/lines, payments, limits, results, and audit events.
+- Room/SQLite local schema for periods, customers, sale documents/lines, immutable cancellation records, payments, limits, results, and audit events.
 - Atomic sale-posting and bill-cancellation DAO methods; SQLite triggers protect posted sale documents, lines, cancellation records, result records, and supported category constraints.
 - Sales are restricted to 3-digit top (ตรง) and 3-digit top permutation (โต๊ด), with separate limits. Credit/payment workflows, period limits, receipts, result matching, reports, and immutable payout-rate snapshots are implemented on the offline branch.
 - Draw results are retrieved directly from the official GLO result API; the app validates the requested draw date and first-prize number, stores its last three digits locally, and derives toad matches by permutation. GLO retrieval requires internet; saved results remain available offline.
