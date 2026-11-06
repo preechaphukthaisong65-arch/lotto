@@ -208,10 +208,10 @@ abstract class LottoDao {
             val (number, category) = key
             require(number.length == 2 || number.length == 3) { "Number must contain 2 or 3 digits" }
             require(number.all { it in '0'..'9' }) { "Number must contain ASCII digits only" }
-            val validCategories = if (number.length == 2) {
-                setOf("TWO_TOP", "TWO_BOTTOM")
+            val validCategories = if (number.length == 3) {
+                setOf("THREE_TOP", "THREE_TOAD")
             } else {
-                setOf("THREE_TOP", "THREE_BOTTOM", "THREE_TOAD")
+                emptySet()
             }
             require(category in validCategories) { "Category does not match number length" }
 
@@ -355,8 +355,7 @@ abstract class LottoDao {
     ): Boolean {
         require(ruleId.isNotBlank() && auditEventId.isNotBlank()) { "Rule and audit IDs are required" }
         require(numberText.all { it in '0'..'9' } &&
-            ((blockCategory == "TWO_DIGIT" && numberText.length == 2) ||
-             (blockCategory in setOf("THREE_TOP", "THREE_BOTTOM", "THREE_TOAD") && numberText.length == 3))) {
+            (blockCategory in setOf("THREE_TOP", "THREE_TOAD") && numberText.length == 3)) {
             "Blocked number does not match its category"
         }
         val period = getPeriod(periodId) ?: error("Draw period not found")
@@ -406,16 +405,10 @@ abstract class LottoDao {
     @Transaction
     open fun saveLimitRule(rule: NumberLimitRuleEntity) {
         require(rule.ruleId.isNotBlank()) { "Limit rule ID is required" }
-        require(rule.numberText.length in 2..3 && rule.numberText.all { it in '0'..'9' }) {
-            "Limit number must contain 2 or 3 ASCII digits"
+        require(rule.numberText.length == 3 && rule.numberText.all { it in '0'..'9' }) {
+            "Limit number must contain exactly 3 ASCII digits"
         }
-        val validCategories = if (rule.numberLength == 2) {
-            setOf("TWO_TOP", "TWO_BOTTOM")
-        } else if (rule.numberLength == 3) {
-            setOf("THREE_TOP", "THREE_BOTTOM", "THREE_TOAD")
-        } else {
-            emptySet()
-        }
+        val validCategories = setOf("THREE_TOP", "THREE_TOAD")
         require(rule.numberLength == rule.numberText.length && rule.betCategory in validCategories) {
             "Limit category does not match number length"
         }
@@ -516,12 +509,11 @@ abstract class LottoDao {
             "Winning number must contain digits only"
         }
         val expectedLength = when (result.resultType.trim().uppercase(java.util.Locale.ROOT)) {
-            "TWO_TOP", "TWO_BOTTOM", "2 ตัวบน", "2 ตัวล่าง" -> 2
-            "THREE_TOP", "THREE_BOTTOM", "3 ตัวบน", "3 ตัวล่าง" -> 3
+            "THREE_TOP", "THREE_TOAD", "3 ตัวบน", "3 ตัวโต๊ด" -> 3
             else -> 0
         }
-        require(expectedLength > 0 && result.winningNumber.length == expectedLength) {
-            "Result type must be a supported 2- or 3-digit category and number length must match"
+        require(expectedLength == 3 && result.winningNumber.length == expectedLength) {
+            "Result type must be 3 ตัวบน or 3 ตัวโต๊ด and number length must be exactly 3"
         }
         require(result.sourceLabel.isNotBlank()) { "Result source is required" }
         val period = getPeriod(result.periodId) ?: error("Draw period not found")
