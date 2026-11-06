@@ -153,7 +153,7 @@ class MainActivity : Activity() {
     private fun showDrawCalendar(stateOverride: DrawCalendarState? = null) {
         base("ปฏิทินวันออกรางวัล")
         addText(currentBody, "ตรวจสอบกำหนดการจาก LotteryChecks และ HuayReview แยกจากระบบตรวจผลรางวัล", 14, ink)
-        addText(currentBody, "ยืนยันวันงวดเมื่อทั้งสองเว็บไซต์แสดงวันตามลำดับตรงกันเท่านั้น หากไม่ตรงกัน ระบบจะไม่เดาวันและไม่เปลี่ยนงวดให้อัตโนมัติ", 12, 0xFF526171.toInt())
+        addText(currentBody, "หากสองเว็บไซต์ระบุวันไม่ตรงกัน แอปจะแจ้งเตือนทันทีและให้ผู้ใช้ตรวจสอบก่อนเลือกวันยืนยันเอง โดยไม่เลือกวันแทนผู้ใช้", 12, 0xFF526171.toInt())
         addButton(currentBody, "⟳ ตรวจสอบปฏิทินจาก 2 เว็บไซต์") {
             Toast.makeText(this, "กำลังตรวจสอบปฏิทิน...", Toast.LENGTH_SHORT).show()
             io.execute {
@@ -190,18 +190,24 @@ class MainActivity : Activity() {
         )
         val statusText = when (state.status) {
             "CONFIRMED" -> "ยืนยันวันงวดจากทั้งสองเว็บไซต์แล้ว"
-            "DISAGREEMENT" -> "วันงวดไม่ตรงกัน • รอยืนยัน"
+            "USER_CONFIRMED" -> "ผู้ใช้ยืนยันวันงวดแล้ว • รอตรวจสอบกับข้อมูลรอบถัดไป"
+            "DISAGREEMENT" -> "วันงวดไม่ตรงกัน • ต้องยืนยันด้วยตนเอง"
             "STALE" -> "ข้อมูลปฏิทินเก่า • ต้องตรวจสอบใหม่"
             "UNAVAILABLE" -> "ยังไม่มีข้อมูลจากทั้งสองเว็บไซต์"
             else -> "รอตรวจสอบปฏิทิน"
         }
-        val statusColor = if (state.status == "CONFIRMED") 0xFF26734D.toInt() else 0xFF9B2C2C.toInt()
+        val statusColor = if (state.status == "CONFIRMED" || state.status == "USER_CONFIRMED") 0xFF26734D.toInt() else 0xFF9B2C2C.toInt()
+        if (state.status == "DISAGREEMENT") {
+            addButton(currentBody, "ยืนยันวันออกรางวัลด้วยตนเอง") { manualCalendarDateDialog(state) }
+        }
         addText(currentBody, statusText, 16, statusColor)
         addText(currentBody, "ตรวจสอบล่าสุด: " + (state.lastCheckedEpochMillis?.let {
             SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(it))
         } ?: "ยังไม่เคยตรวจสอบ"), 12, 0xFF526171.toInt())
-        if (state.status == "CONFIRMED" && state.confirmedDates.isNotEmpty()) {
-            addText(currentBody, "วันที่ทั้งสองแหล่งยืนยันตรงกัน", 15, navy)
+        if ((state.status == "CONFIRMED" || state.status == "USER_CONFIRMED") && state.confirmedDates.isNotEmpty()) {
+            addText(currentBody,
+                if (state.status == "USER_CONFIRMED") "วันที่ผู้ใช้ตรวจสอบและยืนยัน" else "วันที่ทั้งสองแหล่งยืนยันตรงกัน",
+                15, navy)
             state.confirmedDates.forEachIndexed { index, date ->
                 val days = java.time.temporal.ChronoUnit.DAYS.between(
                     java.time.LocalDate.now(java.time.ZoneId.of("Asia/Bangkok")), date
@@ -220,7 +226,56 @@ class MainActivity : Activity() {
             if (state.message.isNotBlank()) addText(currentBody, state.message, 12, 0xFF9B2C2C.toInt())
         }
         addText(currentBody, "แหล่งข้อมูล: lotterychecks.com/draw-calendar และ huayreview.net/calendar-ปีพ.ศ. • ปฏิทินนี้ไม่ใช่การยืนยันผลรางวัล", 11, 0xFF526171.toInt())
-        addText(currentBody, "หากเว็บไซต์ขัดแย้งกัน ให้ตรวจประกาศสำนักงานสลากกินแบ่งรัฐบาลด้วยตนเอง ระบบจะไม่เลือกวันจากเว็บไซต์ใดเว็บไซต์หนึ่งแทนผู้ใช้", 11, 0xFF526171.toInt())
+        addText(currentBody, "หากเว็บไซต์ขัดแย้งกัน ให้ตรวจสอบข้อมูลด้วยตนเองก่อนยืนยันวัน แอปจะบันทึกวัน ผู้ยืนยัน เวลา และชุดข้อมูลต้นทางไว้ในประวัติภายในเครื่อง", 11, 0xFF526171.toInt())
+    }
+
+    private fun manualCalendarDateDialog(state: DrawCalendarState) {
+        val dateInput = EditText(this).apply {
+            hint = "วันที่ออกรางวัล (dd/MM/yyyy)"
+            inputType = android.text.InputType.TYPE_CLASS_DATETIME
+        }
+        val sourceDetails = "LotteryChecks: " + (state.lotteryChecksDates.firstOrNull()?.toString() ?: "ไม่พบข้อมูล") +
+            "\nHuayReview: " + (state.huayReviewDates.firstOrNull()?.toString() ?: "ไม่พบข้อมูล") +
+            "\nโปรดตรวจสอบวันจากประกาศที่เชื่อถือได้ก่อนยืนยัน"
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), 0)
+            addView(TextView(this@MainActivity).apply { text = sourceDetails; textSize = 14f; setTextColor(ink) })
+            addView(dateInput)
+        }
+        val dialog = AlertDialog.Builder(this).setTitle("ยืนยันวันออกรางวัล").setView(layout)
+            .setNegativeButton("ยกเลิก", null).setPositiveButton("ยืนยันวันที่", null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val parsed = try {
+                    SimpleDateFormat("dd/MM/yyyy", Locale("th", "TH")).apply {
+                        isLenient = false
+                        timeZone = java.util.TimeZone.getTimeZone("Asia/Bangkok")
+                    }.parse(dateInput.text.toString().trim())
+                } catch (_: Exception) { null }
+                if (parsed == null) {
+                    dateInput.error = "กรุณาระบุวันที่ให้ถูกต้อง"
+                    return@setOnClickListener
+                }
+                io.execute {
+                    try {
+                        val updated = DrawCalendarService.confirmManualDate(
+                            applicationContext,
+                            java.time.Instant.ofEpochMilli(parsed.time).atZone(java.time.ZoneId.of("Asia/Bangkok")).toLocalDate()
+                        )
+                        DrawCalendarReminder.deliverDueReminders(applicationContext, updated)
+                        runOnUiThread {
+                            dialog.dismiss()
+                            Toast.makeText(this, "บันทึกวันออกรางวัลและประวัติการยืนยันแล้ว", Toast.LENGTH_LONG).show()
+                            showDrawCalendar(updated)
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread { Toast.makeText(this, "ยืนยันวันไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
+                    }
+                }
+            }
+        }
+        dialog.show()
     }
 
     private fun showPeriods() {
