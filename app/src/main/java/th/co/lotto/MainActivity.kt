@@ -1427,6 +1427,7 @@ class MainActivity : Activity() {
                     addButton(resultList, "เงื่อนไขสัญญาอนุญาต CC BY 4.0") {
                         startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://creativecommons.org/licenses/by/4.0/")))
                     }
+                    addText(resultList, "การใช้ข้อมูล HuayReview: CC BY 4.0 • แปลงผลรางวัลที่ 1 เป็นเลขท้าย 3 ตัวและ 2 ตัวบนตามกติกาของแอป", 11, 0xFF526171.toInt())
                     addText(resultList, "LotteryChecks: ${lc.firstPrizeNumber} / ${lc.twoBottomNumber} • HuayReview: ${hr.firstPrizeNumber} / ${hr.twoBottomNumber}", 12, ink)
                     if (lc.firstPrizeNumber != hr.firstPrizeNumber || lc.twoBottomNumber != hr.twoBottomNumber) {
                         addText(resultList, if (verificationComplete) "ผลไม่ตรงกัน แต่ผู้ใช้ตรวจสอบ GLO และยืนยันผลแล้ว" else "ผลสองเว็บไซต์ไม่ตรงกัน • ระงับการคำนวณจ่ายและสรุปยอด", 13, 0xFF9B2C2C.toInt())
