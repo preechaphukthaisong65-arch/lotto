@@ -139,14 +139,16 @@ object LocalBackupManager {
 
             var totalExtracted = 0L
             var entryCount = 0
+            val seenEntries = mutableSetOf<String>()
             ZipInputStream(FileInputStream(archiveFile)).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
                     entryCount++
                     require(entryCount <= 10_000) { "ไฟล์สำรองมีจำนวนรายการมากเกินไป" }
                     val name = entry.name
+                    require(seenEntries.add(name)) { "ไฟล์สำรองมีรายการซ้ำ" }
                     require(!name.startsWith("/") && !name.contains('\\') &&
-                        name.split('/').none { it == ".." || it.isEmpty() }) {
+                        name.split('/').none { it == ".." || it == "." || it.isEmpty() }) {
                         "ไฟล์สำรองมีเส้นทางที่ไม่ปลอดภัย"
                     }
                     val destination = when {
@@ -205,6 +207,7 @@ object LocalBackupManager {
                 }
                 File(context.getDatabasePath("lotto-local.db-wal").path).delete()
                 File(context.getDatabasePath("lotto-local.db-shm").path).delete()
+                File(context.getDatabasePath("lotto-local.db-journal").path).delete()
                 require(extractedDb.renameTo(targetDb)) { "ติดตั้งฐานข้อมูลที่กู้คืนไม่สำเร็จ" }
                 newDbInstalled = true
 
