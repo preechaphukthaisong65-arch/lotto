@@ -197,8 +197,10 @@ class MainActivity : Activity() {
             else -> "รอตรวจสอบปฏิทิน"
         }
         val statusColor = if (state.status == "CONFIRMED" || state.status == "USER_CONFIRMED") 0xFF26734D.toInt() else 0xFF9B2C2C.toInt()
-        if (state.status == "DISAGREEMENT") {
-            addButton(currentBody, "ยืนยันวันออกรางวัลด้วยตนเอง") { manualCalendarDateDialog(state) }
+        if (state.status == "DISAGREEMENT" || state.status == "USER_CONFIRMED") {
+            addButton(currentBody,
+                if (state.status == "USER_CONFIRMED") "แก้ไขวันที่ที่ยืนยัน" else "ยืนยันวันออกรางวัลด้วยตนเอง"
+            ) { manualCalendarDateDialog(state) }
         }
         addText(currentBody, statusText, 16, statusColor)
         addText(currentBody, "ตรวจสอบล่าสุด: " + (state.lastCheckedEpochMillis?.let {
@@ -215,6 +217,11 @@ class MainActivity : Activity() {
                 addText(currentBody, "งวด " + (index + 1) + " • " +
                     date.format(java.time.format.DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale("th", "TH"))) +
                     " • " + (if (days >= 0) "เหลือ " + days + " วัน" else "วันที่ผ่านไปแล้ว"), 14, navy)
+            }
+            if (state.status == "USER_CONFIRMED") {
+                addText(currentBody, "ข้อมูลต้นทางที่ยังไม่ตรงกัน", 14, 0xFF9B2C2C.toInt())
+                addText(currentBody, "LotteryChecks • " + state.lotteryChecksDates.joinToString(), 13, ink)
+                addText(currentBody, "HuayReview • " + state.huayReviewDates.joinToString(), 13, ink)
             }
         } else {
             if (state.lotteryChecksDates.isNotEmpty()) {
