@@ -29,7 +29,8 @@ private val homeMenuOptions = listOf(
 @Composable
 fun HomeScreen(
     onOpenSale: () -> Unit,
-    onOpenReports: () -> Unit
+    onOpenReports: () -> Unit,
+    onOpenHistory: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -57,6 +58,7 @@ fun HomeScreen(
                         onClick = when (option) {
                             HomeMenuOption.Sell -> onOpenSale
                             HomeMenuOption.Reports -> onOpenReports
+                            HomeMenuOption.History -> onOpenHistory
                             else -> ({})
                         }
                     )
