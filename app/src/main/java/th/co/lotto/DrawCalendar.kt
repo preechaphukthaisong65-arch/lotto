@@ -1,5 +1,6 @@
 package th.co.lotto
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -315,6 +316,7 @@ object DrawCalendarReminder {
         }
     }
 
+    @SuppressLint("MissingPermission")
     private fun post(context: Context, id: Int, title: String, message: String) {
         val notification = NotificationCompat.Builder(context, CALENDAR_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
