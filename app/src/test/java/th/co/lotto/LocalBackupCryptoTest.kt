@@ -15,6 +15,39 @@ class LocalBackupCryptoTest {
     }
 
     @Test
+    fun streamingBackupRoundTrips() {
+        val original = ByteArray(64 * 1024) { (it % 251).toByte() }
+        val passphrase = "correct horse battery".toCharArray()
+        val encrypted = java.io.ByteArrayOutputStream()
+        LocalBackupManager.encryptStream(java.io.ByteArrayInputStream(original), encrypted, passphrase)
+        val restored = java.io.ByteArrayOutputStream()
+        LocalBackupManager.decryptStream(java.io.ByteArrayInputStream(encrypted.toByteArray()), restored, passphrase)
+        assertArrayEquals(original, restored.toByteArray())
+    }
+
+    @Test
+    fun streamingRestoreRejectsWrongPassphraseAndTampering() {
+        val passphrase = "correct horse battery".toCharArray()
+        val encrypted = java.io.ByteArrayOutputStream()
+        LocalBackupManager.encryptStream(
+            java.io.ByteArrayInputStream("backup".toByteArray()), encrypted, passphrase
+        )
+        val bytes = encrypted.toByteArray()
+        assertThrows(IllegalArgumentException::class.java) {
+            LocalBackupManager.decryptStream(
+                java.io.ByteArrayInputStream(bytes), java.io.ByteArrayOutputStream(),
+                "incorrect horse battery".toCharArray()
+            )
+        }
+        bytes[bytes.lastIndex] = (bytes.last().toInt() xor 1).toByte()
+        assertThrows(IllegalArgumentException::class.java) {
+            LocalBackupManager.decryptStream(
+                java.io.ByteArrayInputStream(bytes), java.io.ByteArrayOutputStream(), passphrase
+            )
+        }
+    }
+
+    @Test
     fun eachBackupUsesFreshSaltAndNonce() {
         val payload = "same local backup".toByteArray()
         val passphrase = "correct horse battery".toCharArray()
