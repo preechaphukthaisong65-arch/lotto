@@ -1225,7 +1225,7 @@ class MainActivity : Activity() {
                                 addText(resultList, "ยอดจ่ายรางวัลรวม: ${formatMoney(payoutSummary.totalPayoutSatang)}", 16, navy)
                                 addText(resultList, "ยอดขายหลังหักรางวัล: ${formatMoney(payoutSummary.salesAfterPayoutSatang)}", 15, navy)
                             } else {
-                                addText(resultList, "ยังไม่มียอดจ่าย • ต้องบันทึกอัตราจ่าย snapshot ของงวดนี้ก่อน", 12, 0xFF9B2C2C.toInt())
+                                addText(resultList, "ระงับยอดจ่าย • ผลยังไม่ผ่านการตรวจสอบสองแหล่งหรือการยืนยันด้วยตนเอง", 12, 0xFF9B2C2C.toInt())
                             }
                         }
                     }
