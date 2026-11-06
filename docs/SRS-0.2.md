@@ -42,7 +42,9 @@ Only two sale categories are supported: 3-digit top (THREE_TOP) and 3-digit perm
 Support equal-price and per-number variable-amount entry. Amounts are entered numerically, totals are calculated locally, and the app must validate before commit. A successful save creates a unique immutable document identifier and must not create duplicates on repeated taps.
 
 ## 6. Limits and half-payout markers
-Limits must be configurable independently for each exact 3-digit number in THREE_TOP and THREE_TOAD. A number's limit in one category must not consume or block capacity in the other category. The system must distinguish allowed remaining capacity from rejected excess. Half-payout status is configured per number/category in the period's limit (หวยอั้น) rule; the sales screen must not offer a manual full/half selector. The posting transaction resolves and stores the status automatically from that rule, and the receipt, history, reports, and settlement read the stored status. If no half-payout rule applies, the line is full payout. Exact payout formulas remain a decision gate and must not be guessed in code.
+Limits are configured independently for each exact 3-digit number in THREE_TOP and THREE_TOAD. A number's limit in one category never consumes or blocks capacity in the other category. Explicitly blocked numbers are managed separately from monetary limits. Half-payout status is configured per number/category in the period's limit rule; the sales screen has no manual full/half selector. Posting resolves and stores the status automatically. The receipt, history, reports, and settlement read the stored status. If no half-payout rule applies, the line is full payout.
+
+Approved half-payout formula: keep the full actual stake and apply 50% of the configured normal payout rate to that line. Example: 100 baht at 70x uses 35x, producing 3,500 baht. The displayed stake must remain 100 baht; do not halve the recorded stake.
 
 ## 7. Customers and credit
 Cash customers may be anonymous or use a generic label. Credit customers require a complete identity record as configured before a credit sale can be saved. Credit balances are derived from immutable sale and payment ledger entries. Support full and partial payments with timestamps and per-customer history.
@@ -54,10 +56,14 @@ After the user confirms and saves a sale document, its source document and lines
 After a successful sale commit, generate a receipt image locally and store it on-device, linked to its source document. Include document ID, period, timestamp, number/category/amount lines, total, and half-payout labels where applicable. Receipt generation failure must be recoverable from the source document without duplicating the sale.
 
 ## 10. Results and settlement
-Official results must be imported from the Government Lottery Office (GLO) official website/API, with source URL/label, draw date, retrieval timestamp, and verification metadata retained. Imported public results are cached locally for offline use. If GLO cannot be reached or the response cannot be validated, the app must not substitute a third-party result source. Manual result entry is not the authoritative import path. Settlement is calculated from original documents and approved rule configuration, then saved as a period report. Payout rates are user-configurable in Settings and must not be hardcoded: 3-digit top and 3-digit permutation/โต๊ด each have independent configurable rates. Legacy database columns may remain for migration compatibility but must not appear as supported sale categories or editable settings. Users may change these rates for future periods. The rate values and configuration version used for a settlement must be snapshotted with the period settlement so later setting changes cannot alter historical results. Example defaults for initial setup may be 2-digit 70 baht per baht and 3-digit straight 500 baht per baht; 3-digit permutation/โต๊ด 100 baht per baht. These examples are editable and are not immutable business constants. Result categories are validated as 2-digit top/bottom or 3-digit top/bottom, with the entered number length matching the category. A 3-digit top result also matches 3-digit โต๊ด entries by digit permutation while preserving leading zeroes. The app may display matched winning lines and their stake totals, but this is not a payout calculation. After a closed period has at least one result and payout rates are configured, one immutable per-period snapshot stores all four rates and the configuration version. Later settings changes must not alter that snapshot. This snapshot is not itself a final payout settlement. Approved half-payout formula: retain the full actual stake and apply 50% of the normal payout rate to that line. Example: 100 baht stake at 70x uses 35x for a half-payout line, resulting in 3,500 baht. This must be shown consistently in result details and payout calculation. Official result source is GLO. The cancellation/refund treatment for money already physically received remains a separate accounting implementation gate.
+GLO is the sole authoritative source for draw results. The app must retrieve results from the official GLO website/API, validate the requested draw date and response structure, and retain the GLO source URL, draw date, retrieval timestamp, and verification status. For this app, THREE_TOP is the final three digits of the GLO first-prize number; THREE_TOAD wins when the purchased three digits are a permutation of that same three-digit result. Leading zeroes must be preserved. The app must not substitute third-party result sources if GLO is unavailable or the response fails validation. Imported public results are cached in the local database and remain available offline. No customer, sale, payment, or other private data may be sent to GLO.
+
+Payout rates are editable in Settings and are independent for THREE_TOP and THREE_TOAD. Legacy database columns may remain populated for migration compatibility, but must not appear as supported sale categories or editable settings. A period snapshot stores the applicable rates and configuration version so later setting changes cannot alter historical periods. The existing snapshot is a rate snapshot, not proof that payout settlement is complete.
+
+Approved half-payout formula: retain the full actual stake and apply 50% of the normal configured payout rate to that line. Example: 100 baht at 70x uses 35x and pays 3,500 baht. Do not reduce the recorded stake. End-to-end payout settlement remains gated on verified rounding, cancellation/refund accounting, and report reconciliation tests.
 
 ## 11. Reports
-Period/day sales, category totals, cash/credit breakdown, receivables, payments, outstanding balances, half-payout entries, winning entries, payout totals, and period net totals. Reports are derived from source ledgers, not manually re-entered totals. Period reports can be shared as CSV; exported reports must retain the distinction between gross document totals and any unresolved correction offsets.
+Reports are derived from source ledgers. Cancelled bills remain visible in history and cancellation reports but are excluded from active sales, limits, credit balances, and result matching. Period/day reports include active sales, category totals (THREE_TOP and THREE_TOAD), cash/credit breakdown, receivables, payments, outstanding balances, half-payout entries, winning entries, and cancellation counts/amounts. CSV export must clearly distinguish active sales from cancelled bill history. Final payout and net totals remain disabled until the settlement and refund accounting gates pass.
 
 ## 12. Storage and reliability
 Use Room/SQLite with foreign keys, indexes, transactions, stable IDs, duplicate protection, integrity checks, and local persistence across app restarts. Handle interrupted writes, low storage, corrupt database, incorrect period/customer selection, device clock drift, and restore failures.
@@ -70,30 +76,28 @@ Implemented phase-7 backup format:
 - One archive contains the Room/SQLite database and local receipt images. On Android 10 and newer it is created directly in the device's Downloads/Lotto folder through MediaStore; older supported Android versions use the app-specific Documents directory. No cloud document picker or network upload is used for export.
 - Restore authenticates/decrypts before extraction, rejects unsafe archive paths and oversized archives, checks SQLite integrity, foreign keys, schema version, and required Lotto tables, then replaces the local database and receipts with rollback protection.
 - The backup passphrase is not stored by the app and cannot be recovered. Losing it makes that backup unreadable.
-- Supported restore schema versions are 1 through 7, subject to the app's registered Room migrations. Restore never accepts a database newer than the app.
+- Supported restore schema versions are 1 through 8, subject to the app's registered Room migrations. Restore never accepts a database newer than the app.
 - Android Auto Backup is disabled in the manifest. Backup files are user-managed and must be stored securely.
 
 ## 14. Security
-No in-app PIN, user accounts, staff roles, or per-module permissions. The device's Android screen lock is the device-level access protection. Preserve immutable records and audit events. Use a passphrase-derived key for exported backup encryption; do not hardcode keys.
+No in-app PIN, user accounts, staff roles, or per-module permissions. The device's Android screen lock is the device-level access protection. Internet access is permitted only for explicitly requested public GLO result retrieval; the app must never transmit private customer, sales, credit, payment, or receipt data. Core sales, customer, credit, report, and backup functions must work offline. Preserve immutable records and audit events. Use a passphrase-derived key for exported backup encryption.
 
-Phase-7 implemented protections:
-- Application data remains inside the Android app sandbox; no internet permission, cloud service, or synchronization is added.
+Implemented protections:
+- Application data remains inside the Android app sandbox; no cloud database, backend, account service, or synchronization.
 - Android system backup is disabled (allowBackup=false).
 - Exported backup data is encrypted with a portable passphrase-derived key and authenticated encryption; the passphrase is held only in memory during the operation and cleared afterwards.
 - Restore validates contents before replacement and rolls back to the prior database/receipts if installation or Room re-open validation fails.
-- In-app PIN enrollment, user accounts, roles, and per-module permissions are explicitly out of scope. The backup passphrase remains separate from device screen-lock security.
+- In-app PIN enrollment, user accounts, roles, and per-module permissions are explicitly out of scope. The backup passphrase is separate from device screen-lock security.
 
 ## 15. Acceptance tests
-Install/launch; create period; all entry types; variable amounts; limit enforcement; half-payout labeling; cash/credit customers; partial/full payments; receipt image generation; immutable documents; settlement; reports; backup/restore; airplane-mode operation; process death/restart; and failure recovery on a physical Android device.
+Install/launch; create period; accept only THREE_TOP and THREE_TOAD sales; reject all unsupported categories and wrong digit lengths; preserve leading zeroes; enforce independent limits and blocked numbers; auto-label half-payout; cash/credit customers; partial/full payments; receipt generation; immutable confirmed bills; cancellation audit, duplicate-cancel rejection, cancelled-bill exclusion from limits/reports/credit/results; GLO result retrieval and validation; result caching and offline access; rate snapshots; reports; backup/restore; airplane-mode core operation; process death/restart; and failure recovery on a physical Android device.
 
 Phase-7 automated acceptance coverage includes encryption/decryption round trip, wrong-passphrase rejection, tamper detection, and minimum passphrase length. Restore validation additionally checks archive paths, archive size, SQLite integrity, foreign keys, schema version, required tables, and rollback on replacement failure. Manual cross-device restore and physical-device interruption testing remain required.
 
-## 16. Unresolved decisions — do not invent
-1. Exact half-payout formula and precedence.
-2. Limit aggregation rules across top/bottom/toad.
-3. Authoritative result source and verification process.
-4. Accounting report definitions and correction offsets.
-5. PIN roles and per-module permissions.
+## 16. Remaining implementation gates
+1. Verify the live GLO API request/response contract and complete real-network integration tests.
+2. Define and implement cash-refund accounting when a cash bill is cancelled after money has physically changed hands.
+3. Verify payout rounding, settlement totals, and report reconciliation end to end.
 
 Any wagering, payout, or related functionality must undergo applicable legal/compliance review before operational release. Until decisions are approved, these calculations must remain disabled or clearly marked unconfigured.
 
