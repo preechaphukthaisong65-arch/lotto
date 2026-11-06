@@ -105,9 +105,9 @@ class SaleCancellationDaoTest {
 
         val secondId = "cash-refund-overflow"
         dao.postSale(
-            SaleDocumentEntity(secondId, periodId, null, "CASH", 1_000L, now + 2_000L, "Asia/Bangkok"),
+            SaleDocumentEntity(secondId, periodId, null, "CASH", 1_000L, now, "Asia/Bangkok"),
             listOf(SaleLineEntity("cash-refund-overflow-line", secondId, periodId, "654", "THREE_TOP", 1_000L, false)),
-            AuditEventEntity("cash-refund-overflow-sale-audit", "SALE_DOCUMENT", secondId, "POSTED", "test", now + 2_000L)
+            AuditEventEntity("cash-refund-overflow-sale-audit", "SALE_DOCUMENT", secondId, "POSTED", "test", now)
         )
         assertThrows(IllegalArgumentException::class.java) {
             dao.cancelSaleDocument(
