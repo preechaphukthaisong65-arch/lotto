@@ -1740,6 +1740,7 @@ class MainActivity : Activity() {
                                         appendLine("documents,${report.documentCount}")
                                         appendLine("cancelled_bills,${cancellations.size}")
                                         appendLine("cancelled_original_amount_satang,${cancelledOriginalAmount}")
+                                        appendLine("cash_refunded_from_cancelled_bills_satang,${cashRefunded}")
                                         appendLine("gross_sales_satang,${report.grossSalesSatang}")
                                         appendLine("cash_sales_satang,${report.cashSalesSatang}")
                                         appendLine("credit_sales_satang,${report.creditSalesSatang}")
