@@ -385,62 +385,133 @@ class MainActivity : Activity() {
                     Toast.makeText(this, "เอกสารอ้างอิงต้องเป็นบิลต้นฉบับในงวดที่กำลังเปิดอยู่", Toast.LENGTH_LONG).show()
                     return@runOnUiThread
                 }
+
+                val categories = listOf(
+                    "2 ตัวบน" to "TWO_TOP",
+                    "2 ตัวล่าง" to "TWO_BOTTOM",
+                    "3 ตัวบน" to "THREE_TOP",
+                    "3 ตัวล่าง" to "THREE_BOTTOM",
+                    "3 ตัวโต๊ด" to "THREE_TOAD"
+                )
                 val customerType = Spinner(this).apply {
-                    adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("CASH", "CREDIT"))
+                    adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("เงินสด", "เงินเชื่อ"))
                 }
                 val customer = Spinner(this).apply {
                     adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
-                        listOf("เลือกข้อมูลลูกค้าเงินเชื่อ") + creditCustomers.map { it.displayName })
+                        listOf("เลือกลูกค้าเงินเชื่อ") + creditCustomers.map { it.displayName })
                 }
-                val entries = EditText(this).apply {
-                    hint = "เลข,ประเภท,จำนวนเงิน,HALF/FULL\\n12,TWO_TOP,20,FULL\\n123,THREE_TOAD,10,HALF"
-                    minLines = 5
-                    gravity = android.view.Gravity.TOP
-                    inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
-                }
+                val rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 val totalPreview = TextView(this).apply {
-                    text = "ยอดรวม: กรุณากรอกรายการ"
-                    textSize = 14f
+                    text = "ยอดรวม 0 รายการ: 0.00 บาท"
+                    textSize = 16f
                     setTextColor(navy)
-                    setPadding(0, dp(8), 0, dp(4))
+                    setPadding(0, dp(12), 0, dp(8))
                 }
-                entries.addTextChangedListener(object : TextWatcher {
-                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                        try {
-                            val parsed = SaleEntryParser.parse(s?.toString().orEmpty())
-                            totalPreview.text = "ยอดรวม " + parsed.size + " รายการ: " + formatMoney(SaleEntryParser.totalSatang(parsed))
-                        } catch (e: Exception) {
-                            totalPreview.text = "ตรวจสอบรายการ: " + e.message
+
+                fun buildEntriesText(): String = (0 until rows.childCount).mapNotNull { index ->
+                    val row = rows.getChildAt(index) as? LinearLayout ?: return@mapNotNull null
+                    val number = row.getChildAt(0) as EditText
+                    val category = row.getChildAt(1) as Spinner
+                    val amount = row.getChildAt(2) as EditText
+                    val half = row.getChildAt(3) as CheckBox
+                    val numberText = number.text.toString().trim()
+                    val amountText = amount.text.toString().trim()
+                    if (numberText.isBlank() && amountText.isBlank()) return@mapNotNull null
+                    "$numberText,${categories[category.selectedItemPosition].second},$amountText,${if (half.isChecked) "HALF" else "FULL"}"
+                }.joinToString("\n")
+
+                fun refreshTotal() {
+                    try {
+                        val parsed = SaleEntryParser.parse(buildEntriesText())
+                        totalPreview.text = "ยอดรวม ${parsed.size} รายการ: ${formatMoney(SaleEntryParser.totalSatang(parsed))}"
+                    } catch (e: Exception) {
+                        totalPreview.text = "กรอกรายการให้ครบ • ${e.message ?: "ข้อมูลยังไม่สมบูรณ์"}"
+                    }
+                }
+
+                fun addEntryRow() {
+                    val number = EditText(this).apply {
+                        hint = "เลข"
+                        inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                        setSingleLine(true)
+                    }
+                    val category = Spinner(this).apply {
+                        adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, categories.map { it.first })
+                    }
+                    val amount = EditText(this).apply {
+                        hint = "บาท"
+                        inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                        setSingleLine(true)
+                    }
+                    val half = CheckBox(this).apply { text = "ครึ่ง" }
+                    val remove = TextView(this).apply {
+                        text = "ลบ"
+                        setTextColor(0xFFB3261E.toInt())
+                        setPadding(dp(8), dp(10), dp(8), dp(10))
+                        setOnClickListener {
+                            if (rows.childCount > 1) rows.removeView(parent as android.view.View)
+                            refreshTotal()
                         }
                     }
-                    override fun afterTextChanged(s: Editable?) = Unit
-                })
-                val form = LinearLayout(this).apply {
+                    val row = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                        addView(number, LinearLayout.LayoutParams(0, dp(52), 1.0f))
+                        addView(category, LinearLayout.LayoutParams(0, dp(52), 1.35f))
+                        addView(amount, LinearLayout.LayoutParams(0, dp(52), 1.0f))
+                        addView(half, LinearLayout.LayoutParams(-2, dp(52)))
+                        addView(remove, LinearLayout.LayoutParams(-2, dp(52)))
+                    }
+                    number.addTextChangedListener(object : TextWatcher {
+                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = refreshTotal()
+                        override fun afterTextChanged(s: Editable?) = Unit
+                    })
+                    amount.addTextChangedListener(object : TextWatcher {
+                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = refreshTotal()
+                        override fun afterTextChanged(s: Editable?) = Unit
+                    })
+                    category.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+                        override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+                        override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) = refreshTotal()
+                    }
+                    half.setOnCheckedChangeListener { _, _ -> refreshTotal() }
+                    rows.addView(row)
+                }
+
+                addEntryRow()
+                val addRowButton = android.widget.Button(this).apply {
+                    text = "＋ เพิ่มรายการ"
+                    setOnClickListener { addEntryRow() }
+                }
+                val formContent = LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL
-                    setPadding(dp(20), dp(8), dp(20), 0)
+                    setPadding(dp(16), dp(8), dp(16), dp(8))
                     addView(TextView(this@MainActivity).apply { text = "ประเภทลูกค้า" })
                     addView(customerType)
-                    addView(TextView(this@MainActivity).apply { text = "ลูกค้าเงินเชื่อ (ใช้เมื่อเลือก CREDIT)" })
+                    addView(TextView(this@MainActivity).apply { text = "เลือกลูกค้าเงินเชื่อ (เมื่อเลือกเงินเชื่อ)" })
                     addView(customer)
-                    addView(TextView(this@MainActivity).apply { text = "รายการขาย" })
-                    addView(entries)
+                    addView(TextView(this@MainActivity).apply { text = "รายการ: เลข • ประเภท • ราคา • จ่ายครึ่ง" })
+                    addView(rows)
+                    addView(addRowButton)
                     addView(totalPreview)
                 }
-                val dialog = AlertDialog.Builder(this).setTitle("บันทึกบิล • ${period.title}").setView(form)
+                val scroll = ScrollView(this).apply { addView(formContent) }
+                val dialog = AlertDialog.Builder(this).setTitle("บันทึกบิล • ${period.title}").setView(scroll)
                     .setNegativeButton("กลับ", null).setPositiveButton("บันทึก", null).create()
                 dialog.setOnShowListener {
                     val saveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                     saveButton.setOnClickListener {
                         if (!saveButton.isEnabled) return@setOnClickListener
                         try {
-                            val type = customerType.selectedItem.toString()
+                            val type = if (customerType.selectedItemPosition == 0) "CASH" else "CREDIT"
                             val selectedCustomer = if (type == "CREDIT") {
                                 val index = customer.selectedItemPosition - 1
                                 require(index >= 0 && index < creditCustomers.size) { "กรุณาเลือกลูกค้าเงินเชื่อ" }
                                 creditCustomers[index]
                             } else null
-                            val parsed = SaleEntryParser.parse(entries.text.toString())
+                            val parsed = SaleEntryParser.parse(buildEntriesText())
                             val now = System.currentTimeMillis()
                             val documentId = UUID.randomUUID().toString()
                             val total = SaleEntryParser.totalSatang(parsed)
@@ -489,7 +560,6 @@ class MainActivity : Activity() {
             }
         }
     }
-
 
 
     private fun showSalesHistory() {
