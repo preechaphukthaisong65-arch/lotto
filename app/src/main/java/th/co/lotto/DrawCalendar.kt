@@ -131,6 +131,10 @@ object DrawCalendarService {
         listOf(lottery.dates.take(3).joinToString(","), huay.dates.take(3).joinToString(",")).joinToString("|")
 
     fun confirmManualDate(context: Context, date: LocalDate): DrawCalendarState {
+        val currentState = readState(context)
+        require(currentState.status == "DISAGREEMENT" || currentState.status == "USER_CONFIRMED") {
+            "ข้อมูลสองเว็บไซต์ไม่ได้อยู่ในสถานะขัดแย้งที่อนุญาตให้ยืนยันวันด้วยตนเอง"
+        }
         val lottery = CalendarAuditLog.latest(context, "LOTTERYCHECKS") ?: error("ยังไม่มีข้อมูลจาก LotteryChecks")
         val huay = CalendarAuditLog.latest(context, "HUAYREVIEW") ?: error("ยังไม่มีข้อมูลจาก HuayReview")
         require(date.isAfter(LocalDate.now(BANGKOK))) { "วันออกรางวัลต้องเป็นวันในอนาคต" }
