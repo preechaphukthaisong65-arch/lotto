@@ -60,10 +60,10 @@ GLO is the sole authoritative source for draw results. The app must retrieve res
 
 Payout rates are editable in Settings and are independent for THREE_TOP and THREE_TOAD. Legacy database columns may remain populated for migration compatibility, but must not appear as supported sale categories or editable settings. A period snapshot stores the applicable rates and configuration version so later setting changes cannot alter historical periods. The existing snapshot is a rate snapshot, not proof that payout settlement is complete.
 
-Approved half-payout formula: retain the full actual stake and apply 50% of the normal configured payout rate to that line. Example: 100 baht at 70x uses 35x and pays 3,500 baht. Do not reduce the recorded stake. End-to-end payout settlement remains gated on verified rounding, cancellation/refund accounting, and report reconciliation tests.
+Approved half-payout formula: retain the full actual stake and apply 50% of the normal configured payout rate to that line. Example: 100 baht at 70x uses 35x and pays 3,500 baht. Do not reduce the recorded stake. Payout is calculated per winning line and rounded HALF_UP to the nearest satang before line payouts are summed. Sales after payout = active gross sales minus total winning payouts; this is not net profit and does not include cash refunds for cancelled cash bills.
 
 ## 11. Reports
-Reports are derived from source ledgers. Cancelled bills remain visible in sales history and period cancellation summaries but are excluded from active sales, limits, credit balances, and result matching. Period/day reports include active sales, category totals (THREE_TOP and THREE_TOAD), cash/credit breakdown, receivables, payments, outstanding balances, and half-payout entries. Cancelled bill history is inspectable in sales history with its reason, timestamp, and original amount. CSV export includes active sales only. Final payout and net totals remain disabled until the settlement and refund accounting gates pass.
+Reports are derived from source ledgers. Cancelled bills remain visible in sales history and period cancellation summaries but are excluded from active sales, limits, credit balances, and result matching. Period/day reports include active sales, category totals (THREE_TOP and THREE_TOAD), cash/credit breakdown, receivables, payments, outstanding balances, half-payout entries, winning payouts, and sales-after-payout totals when a rate snapshot exists. Cancelled bill history is inspectable in sales history and period summaries with its reason, timestamp, and original amount. CSV export includes active sales and a separate cancellation summary. Sales-after-payout is not net profit and excludes cash-refund accounting.
 
 ## 12. Storage and reliability
 Use Room/SQLite with foreign keys, indexes, transactions, stable IDs, duplicate protection, integrity checks, and local persistence across app restarts. Handle interrupted writes, low storage, corrupt database, incorrect period/customer selection, device clock drift, and restore failures.
@@ -97,7 +97,7 @@ Phase-7 automated acceptance coverage includes encryption/decryption round trip,
 ## 16. Remaining implementation gates
 1. Complete live real-network integration tests for the GLO API request/response contract.
 2. Define and implement cash-refund accounting when a cash bill is cancelled after money has physically changed hands.
-3. Verify payout rounding, settlement totals, and report reconciliation end to end.
+3. Verify payout totals and sales-after-payout report reconciliation end to end using representative sale/result fixtures.
 4. Confirm permission to use GLO open-result data in a commercial workflow; the GLO Data Catalog currently lists a Creative Commons Non-Commercial license for the result dataset.
 
 Any wagering, payout, or related functionality must undergo applicable legal/compliance review before operational release. Until decisions are approved, these calculations must remain disabled or clearly marked unconfigured.
