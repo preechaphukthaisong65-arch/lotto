@@ -1,5 +1,6 @@
 package com.lotto.app.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,9 +35,12 @@ enum class HomeMenuOption(
 }
 
 @Composable
-fun HomeMenuItem(option: HomeMenuOption) {
+fun HomeMenuItem(
+    option: HomeMenuOption,
+    onClick: () -> Unit = {}
+) {
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier
