@@ -252,6 +252,14 @@ abstract class LottoDao {
     @Query("SELECT * FROM sale_cancellations WHERE documentId = :documentId LIMIT 1")
     abstract fun getSaleCancellation(documentId: String): SaleCancellationEntity?
 
+    @Query("""
+        SELECT sc.* FROM sale_cancellations sc
+        INNER JOIN sale_documents sd ON sd.documentId = sc.documentId
+        WHERE sd.periodId = :periodId
+        ORDER BY sc.cancelledAtEpochMillis DESC
+    """)
+    abstract fun getSaleCancellationsForPeriod(periodId: String): List<SaleCancellationEntity>
+
     @Transaction
     open fun cancelSaleDocument(cancellation: SaleCancellationEntity, audit: AuditEventEntity) {
         require(cancellation.cancellationId.isNotBlank()) { "Cancellation ID is required" }
