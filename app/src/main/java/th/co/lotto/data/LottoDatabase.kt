@@ -373,6 +373,11 @@ abstract class LottoDatabase : RoomDatabase() {
             db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_periods_status_createdAtEpochMillis ON draw_periods(status, createdAtEpochMillis)")
             db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_draw_periods_single_prepared ON draw_periods(status) WHERE status = 'PREPARED'")
             db.execSQL("CREATE INDEX IF NOT EXISTS index_sale_lines_period_number_category ON sale_lines(periodId, numberText, betCategory)")
+            val sourceChecksExist = db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='draw_source_checks'").use { it.moveToFirst() }
+            if (sourceChecksExist) {
+                db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_draw_source_check_update BEFORE UPDATE ON draw_source_checks BEGIN SELECT RAISE(ABORT, 'source check immutable'); END")
+                db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_draw_source_check_delete BEFORE DELETE ON draw_source_checks BEGIN SELECT RAISE(ABORT, 'source check immutable'); END")
+            }
         }
 
         fun closeForRestore() {
