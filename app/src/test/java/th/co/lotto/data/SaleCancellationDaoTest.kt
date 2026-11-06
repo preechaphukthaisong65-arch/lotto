@@ -65,6 +65,7 @@ class SaleCancellationDaoTest {
         assertEquals(0, dao.getSalesForPeriod(periodId).size)
         assertEquals(1, dao.searchSales(periodId, "").size)
         assertEquals("บันทึกเลขผิด", dao.getSaleCancellation(documentId)?.reason)
+        assertEquals(0L, dao.getSaleCancellation(documentId)?.cashRefundedSatang)
         assertNotNull(dao.getAuditEvents("cancel-1").firstOrNull())
         assertThrows(SQLiteException::class.java) {
             database!!.openHelper.writableDatabase.execSQL(
@@ -82,6 +83,39 @@ class SaleCancellationDaoTest {
                 AuditEventEntity("audit-cancel-2", "SALE_CANCELLATION", "cancel-2", "CANCELLED", "duplicate", now + 2_000L)
             )
         }
+    }
+
+    @Test
+    fun cashRefundAmountIsPersistedAndCannotExceedOriginalBill() {
+        val dao = createDatabase()
+        val now = System.currentTimeMillis()
+        val periodId = "period-cash-refund"
+        dao.insertPeriod(DrawPeriodEntity(periodId, "งวดคืนเงินสด", now + 86_400_000L, "OPEN", null, now, null, now))
+        val documentId = "cash-refund-sale"
+        dao.postSale(
+            SaleDocumentEntity(documentId, periodId, null, "CASH", 10_000L, now, "Asia/Bangkok"),
+            listOf(SaleLineEntity("cash-refund-line", documentId, periodId, "321", "THREE_TOP", 10_000L, false)),
+            AuditEventEntity("cash-refund-sale-audit", "SALE_DOCUMENT", documentId, "POSTED", "test", now)
+        )
+        dao.cancelSaleDocument(
+            SaleCancellationEntity("cash-refund-cancel", documentId, 10_000L, "คืนเงินบางส่วน", now + 1_000L, 3_500L),
+            AuditEventEntity("cash-refund-audit", "SALE_CANCELLATION", "cash-refund-cancel", "CANCELLED", "refund=3500", now + 1_000L)
+        )
+        assertEquals(3_500L, dao.getSaleCancellation(documentId)?.cashRefundedSatang)
+
+        val secondId = "cash-refund-overflow"
+        dao.postSale(
+            SaleDocumentEntity(secondId, periodId, null, "CASH", 1_000L, now + 2_000L, "Asia/Bangkok"),
+            listOf(SaleLineEntity("cash-refund-overflow-line", secondId, periodId, "654", "THREE_TOP", 1_000L, false)),
+            AuditEventEntity("cash-refund-overflow-sale-audit", "SALE_DOCUMENT", secondId, "POSTED", "test", now + 2_000L)
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.cancelSaleDocument(
+                SaleCancellationEntity("cash-refund-overflow-cancel", secondId, 1_000L, "ยอดคืนเกิน", now + 3_000L, 1_001L),
+                AuditEventEntity("cash-refund-overflow-audit", "SALE_CANCELLATION", "cash-refund-overflow-cancel", "CANCELLED", "test", now + 3_000L)
+            )
+        }
+        assertNull(dao.getSaleCancellation(secondId))
     }
 
     @Test
