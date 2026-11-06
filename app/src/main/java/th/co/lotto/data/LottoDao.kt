@@ -76,6 +76,12 @@ abstract class LottoDao {
 
         val period = getPeriod(document.periodId) ?: error("Draw period not found")
         require(period.status == "OPEN") { "Draw period is closed" }
+        document.correctionOfDocumentId?.let { originalId ->
+            val original = getSaleDocument(originalId) ?: error("Original sale document not found")
+            require(original.periodId == document.periodId) { "Correction must stay in the original draw period" }
+            require(original.correctionOfDocumentId == null) { "A correction document cannot be used as an original" }
+            require(original.documentId != document.documentId) { "A document cannot reference itself" }
+        }
 
         when (document.customerType) {
             "CASH" -> {
