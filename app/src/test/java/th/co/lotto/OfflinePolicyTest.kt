@@ -14,7 +14,7 @@ import org.robolectric.RuntimeEnvironment
 class OfflinePolicyTest {
     @Test
     fun appDoesNotRequestInternetOrAndroidSystemBackup() {
-        val context = RuntimeEnvironment.getApplication<Context>()
+        val context = RuntimeEnvironment.getApplication() as Context
         val applicationInfo = context.packageManager.getApplicationInfo(context.packageName, 0)
         val packageInfo = context.packageManager.getPackageInfo(
             context.packageName,
