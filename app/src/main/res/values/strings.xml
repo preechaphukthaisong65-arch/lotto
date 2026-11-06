@@ -1,5 +1,3 @@
 <resources>
     <string name="app_name">Lotto</string>
-    <string name="foundation_status">Android offline foundation is ready.</string>
-    <string name="local_data_notice">This starter app stores no user data in the cloud. No betting or wagering features are included.</string>
 </resources>
