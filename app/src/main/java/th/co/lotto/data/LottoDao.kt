@@ -573,9 +573,6 @@ abstract class LottoDao {
         require(result.sourceLabel.startsWith("AUTO-COMPARED") || result.sourceLabel.startsWith("MANUAL-GLO")) { "Result must be confirmed by matching public sources or manual GLO verification" }
         val period = getPeriod(result.periodId) ?: error("Draw period not found")
         require(period.status == "CLOSED") { "Results can only be recorded for a closed draw period" }
-        require(getDrawResults(result.periodId).none { it.resultType == result.resultType }) {
-            "An official result for this category is already recorded for the period"
-        }
         require(audit.eventId.isNotBlank() && audit.entityType == "DRAW_RESULT" &&
             audit.entityId == result.resultId && audit.action == "POSTED") {
             "Result audit event does not match the result"
@@ -690,14 +687,14 @@ abstract class LottoDao {
         val results = getDrawResults(periodId)
         val latestCheckTime = maxOf(first.fetchedAtEpochMillis, second.fetchedAtEpochMillis)
         if (first.firstPrizeNumber == second.firstPrizeNumber && first.twoBottomNumber == second.twoBottomNumber) {
-            val top = results.firstOrNull { it.resultType == "THREE_TOP" } ?: return false
-            val bottom = results.firstOrNull { it.resultType == "TWO_BOTTOM" } ?: return false
+            val top = results.filter { it.resultType == "THREE_TOP" }.maxByOrNull { it.importedAtEpochMillis } ?: return false
+            val bottom = results.filter { it.resultType == "TWO_BOTTOM" }.maxByOrNull { it.importedAtEpochMillis } ?: return false
             return top.sourceLabel.startsWith("AUTO-COMPARED") &&
                 bottom.sourceLabel.startsWith("AUTO-COMPARED") &&
                 top.importedAtEpochMillis >= latestCheckTime && bottom.importedAtEpochMillis >= latestCheckTime
         }
-        val top = results.firstOrNull { it.resultType == "THREE_TOP" } ?: return false
-        val bottom = results.firstOrNull { it.resultType == "TWO_BOTTOM" } ?: return false
+        val top = results.filter { it.resultType == "THREE_TOP" }.maxByOrNull { it.importedAtEpochMillis } ?: return false
+        val bottom = results.filter { it.resultType == "TWO_BOTTOM" }.maxByOrNull { it.importedAtEpochMillis } ?: return false
         return top.sourceLabel.startsWith("MANUAL-GLO") &&
             bottom.sourceLabel.startsWith("MANUAL-GLO") &&
             top.importedAtEpochMillis >= latestCheckTime && bottom.importedAtEpochMillis >= latestCheckTime
