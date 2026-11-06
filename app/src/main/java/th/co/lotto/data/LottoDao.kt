@@ -21,6 +21,47 @@ abstract class LottoDao {
     @Query("SELECT * FROM draw_periods WHERE status = 'OPEN' ORDER BY createdAtEpochMillis DESC LIMIT 1")
     abstract fun getOpenPeriod(): DrawPeriodEntity?
 
+    @Query("SELECT * FROM draw_periods WHERE status = 'PREPARED' ORDER BY scheduledOpenEpochMillis ASC LIMIT 1")
+    abstract fun getPreparedPeriod(): DrawPeriodEntity?
+
+    @Query("""
+        SELECT * FROM draw_periods
+        WHERE status = 'PREPARED' AND scheduledOpenEpochMillis IS NOT NULL
+          AND scheduledOpenEpochMillis <= :nowEpochMillis
+        ORDER BY scheduledOpenEpochMillis ASC LIMIT 1
+    """)
+    abstract fun getDuePreparedPeriod(nowEpochMillis: Long): DrawPeriodEntity?
+
+    @Query("""
+        UPDATE draw_periods
+        SET status = 'CLOSED', salesCloseEpochMillis = :closedAtEpochMillis
+        WHERE periodId = :periodId AND status = 'OPEN'
+    """)
+    abstract fun closeOpenPeriod(periodId: String, closedAtEpochMillis: Long): Int
+
+    @Query("""
+        UPDATE draw_periods SET status = 'OPEN'
+        WHERE periodId = :periodId AND status = 'PREPARED'
+          AND scheduledOpenEpochMillis IS NOT NULL
+          AND scheduledOpenEpochMillis <= :nowEpochMillis
+          AND NOT EXISTS (SELECT 1 FROM draw_periods WHERE status = 'OPEN')
+    """)
+    abstract fun openPreparedPeriod(periodId: String, nowEpochMillis: Long): Int
+
+    @Transaction
+    open fun closePeriod(periodId: String, closedAtEpochMillis: Long) {
+        require(closeOpenPeriod(periodId, closedAtEpochMillis) == 1) {
+            "Only an open period can be closed"
+        }
+    }
+
+    @Transaction
+    open fun openDuePeriod(nowEpochMillis: Long): DrawPeriodEntity? {
+        val prepared = getDuePreparedPeriod(nowEpochMillis) ?: return null
+        if (openPreparedPeriod(prepared.periodId, nowEpochMillis) != 1) return null
+        return getPeriod(prepared.periodId)
+    }
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract fun insertCustomer(customer: CustomerEntity)
 
