@@ -33,7 +33,7 @@ abstract class LottoDatabase : RoomDatabase() {
 
         @Volatile private var INSTANCE: LottoDatabase? = null
 
-        private fun installIntegrityGuards(db: SupportSQLiteDatabase) {
+        internal fun installIntegrityGuards(db: SupportSQLiteDatabase) {
             // A second OPEN period is rejected without rewriting or deleting existing records.
             db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS prevent_multiple_open_periods_insert
