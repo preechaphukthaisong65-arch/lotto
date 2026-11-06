@@ -174,9 +174,9 @@ class MainActivity : Activity() {
                 val days = java.time.temporal.ChronoUnit.DAYS.between(
                     java.time.LocalDate.now(java.time.ZoneId.of("Asia/Bangkok")), date
                 )
-                addCard(currentBody, "งวด " + (index + 1) + " • " +
-                    date.format(java.time.format.DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale("th", "TH"))),
-                    if (days >= 0) "เหลือ " + days + " วัน" else "วันที่ผ่านไปแล้ว") { }
+                addText(currentBody, "งวด " + (index + 1) + " • " +
+                    date.format(java.time.format.DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale("th", "TH"))) +
+                    " • " + (if (days >= 0) "เหลือ " + days + " วัน" else "วันที่ผ่านไปแล้ว"), 14, navy)
             }
         } else {
             if (state.lotteryChecksDates.isNotEmpty()) {
