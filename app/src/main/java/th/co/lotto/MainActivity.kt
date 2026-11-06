@@ -1165,15 +1165,29 @@ class MainActivity : Activity() {
                             if (results.isNotEmpty()) {
                                 addText(resultList, "สรุปรายการที่ตรงกับผลหวย", 16, navy)
                                 if (matches.isEmpty()) addText(resultList, "ไม่พบรายการขายที่ถูกรางวัลจากผลที่บันทึก", 13, ink)
+                                val grossSales = documents.fold(0L) { total, document ->
+                                    Math.addExact(total, document.totalAmountSatang)
+                                }
+                                val payoutSummary = settlementSnapshot?.let {
+                                    runCatching { PayoutCalculator.calculatePeriod(matches, it, grossSales) }.getOrNull()
+                                }
                                 matches.forEach { match ->
                                     val totalStake = match.lines.fold(0L) { total, line -> Math.addExact(total, line.amountSatang) }
+                                    val matchPayout = payoutSummary?.linePayouts
+                                        ?.filter { it.resultId == match.resultId && it.line.betCategory == match.betCategory }
+                                        ?.fold(0L) { total, item -> Math.addExact(total, item.payoutSatang) }
                                     addText(resultList,
-                                        "${match.resultType} • ${match.winningNumber} • ${categoryLabel(match.betCategory)} • ${match.lines.size} รายการ • ยอดแทง ${formatMoney(totalStake)}",
+                                        "${match.resultType} • ${match.winningNumber} • ${categoryLabel(match.betCategory)} • ${match.lines.size} รายการ • ยอดแทง ${formatMoney(totalStake)}" +
+                                            (matchPayout?.let { " • ยอดจ่าย ${formatMoney(it)}" } ?: ""),
                                         13, ink)
                                 }
-                                addText(resultList,
-                                    "เป็นสรุปการจับคู่เลขเท่านั้น ยังไม่ใช่ยอดจ่ายรางวัลหรือยอดสุทธิ",
-                                    12, 0xFF9B2C2C.toInt())
+                                if (payoutSummary != null) {
+                                    addText(resultList, "ยอดจ่ายรางวัลรวม: ${formatMoney(payoutSummary.totalPayoutSatang)}", 16, navy)
+                                    addText(resultList, "ยอดขายหลังหักรางวัล: ${formatMoney(payoutSummary.salesAfterPayoutSatang)}", 15, navy)
+                                    addText(resultList, "คำนวณจากอัตราจ่าย snapshot และปัดเศษ HALF_UP เป็นสตางค์แยกทีละรายการ", 12, 0xFF526171.toInt())
+                                } else {
+                                    addText(resultList, "ยังคำนวณยอดจ่ายไม่ได้ • ต้องบันทึกอัตราจ่ายประจำงวดก่อน หรือมีข้อผิดพลาดในการคำนวณ", 12, 0xFF9B2C2C.toInt())
+                                }
                             }
                         }
                     }
