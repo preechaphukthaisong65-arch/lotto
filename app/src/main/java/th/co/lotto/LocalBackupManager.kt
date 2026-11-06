@@ -77,18 +77,8 @@ object LocalBackupManager {
             }
             require(archiveFile.length() in 1..maxBackupBytes.toLong()) { "ข้อมูลสำรองมีขนาดเกิน 256 MB" }
 
-            val salt = ByteArray(saltSize).also(SecureRandom()::nextBytes)
-            val nonce = ByteArray(nonceSize).also(SecureRandom()::nextBytes)
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.ENCRYPT_MODE, deriveKey(passphrase, salt), GCMParameterSpec(128, nonce))
-            val header = DataOutputStream(destination)
-            header.write(magic)
-            header.writeInt(iterations)
-            header.write(salt)
-            header.write(nonce)
-            header.flush()
-            javax.crypto.CipherOutputStream(destination, cipher).use { encryptedOutput ->
-                FileInputStream(archiveFile).use { it.copyTo(encryptedOutput) }
+            FileInputStream(archiveFile).use { input ->
+                encryptStream(input, destination, passphrase)
             }
         } finally {
             archiveFile.delete()
@@ -105,42 +95,8 @@ object LocalBackupManager {
         val extractedDb = File(staging, "lotto-local.db")
         val extractedReceipts = File(staging, "receipts")
         try {
-            val input = DataInputStream(encryptedInput)
-            val header = ByteArray(magic.size)
-            input.readFully(header)
-            require(header.contentEquals(magic)) { "รูปแบบไฟล์สำรองไม่ถูกต้อง" }
-            val rounds = input.readInt()
-            require(rounds in 100_000..1_000_000) { "ค่าความปลอดภัยของไฟล์สำรองไม่ถูกต้อง" }
-            val salt = ByteArray(saltSize).also(input::readFully)
-            val nonce = ByteArray(nonceSize).also(input::readFully)
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.DECRYPT_MODE, deriveKey(passphrase, salt, rounds), GCMParameterSpec(128, nonce))
-            var encryptedCount = magic.size + 4 + saltSize + nonceSize
-            var plainCount = 0L
-            try {
-                FileOutputStream(archiveFile).use { output ->
-                    val buffer = ByteArray(8192)
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        encryptedCount = Math.addExact(encryptedCount, count)
-                        require(encryptedCount <= maxBackupBytes + 64) { "ไฟล์สำรองมีขนาดเกิน 256 MB" }
-                        val decoded = cipher.update(buffer, 0, count)
-                        if (decoded != null && decoded.isNotEmpty()) {
-                            plainCount = Math.addExact(plainCount, decoded.size.toLong())
-                            require(plainCount <= maxBackupBytes) { "ข้อมูลสำรองมีขนาดเกินกำหนด" }
-                            output.write(decoded)
-                        }
-                    }
-                    val finalBytes = cipher.doFinal()
-                    if (finalBytes.isNotEmpty()) {
-                        plainCount = Math.addExact(plainCount, finalBytes.size.toLong())
-                        require(plainCount <= maxBackupBytes) { "ข้อมูลสำรองมีขนาดเกินกำหนด" }
-                        output.write(finalBytes)
-                    }
-                }
-            } catch (_: AEADBadTagException) {
-                throw IllegalArgumentException("รหัสผ่านไม่ถูกต้องหรือไฟล์สำรองถูกแก้ไข")
+            FileOutputStream(archiveFile).use { output ->
+                decryptStream(encryptedInput, output, passphrase)
             }
             require(archiveFile.isFile && archiveFile.length() > 0L) { "ไฟล์สำรองไม่มีข้อมูล" }
 
@@ -251,6 +207,67 @@ object LocalBackupManager {
             }
         } finally {
             staging.deleteRecursively()
+        }
+    }
+
+    internal fun encryptStream(input: java.io.InputStream, destination: java.io.OutputStream, passphrase: CharArray) {
+        validatePassphrase(passphrase)
+        val salt = ByteArray(saltSize).also(SecureRandom()::nextBytes)
+        val nonce = ByteArray(nonceSize).also(SecureRandom()::nextBytes)
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, deriveKey(passphrase, salt), GCMParameterSpec(128, nonce))
+        val header = DataOutputStream(destination)
+        header.write(magic)
+        header.writeInt(iterations)
+        header.write(salt)
+        header.write(nonce)
+        header.flush()
+        javax.crypto.CipherOutputStream(destination, cipher).use { encryptedOutput ->
+            input.copyTo(encryptedOutput)
+        }
+    }
+
+    internal fun decryptStream(
+        encryptedInput: java.io.InputStream,
+        destination: java.io.OutputStream,
+        passphrase: CharArray
+    ) {
+        validatePassphrase(passphrase)
+        val input = DataInputStream(encryptedInput)
+        val header = ByteArray(magic.size)
+        input.readFully(header)
+        require(header.contentEquals(magic)) { "รูปแบบไฟล์สำรองไม่ถูกต้อง" }
+        val rounds = input.readInt()
+        require(rounds in 100_000..1_000_000) { "ค่าความปลอดภัยของไฟล์สำรองไม่ถูกต้อง" }
+        val salt = ByteArray(saltSize).also(input::readFully)
+        val nonce = ByteArray(nonceSize).also(input::readFully)
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, deriveKey(passphrase, salt, rounds), GCMParameterSpec(128, nonce))
+        var encryptedCount = magic.size + 4 + saltSize + nonceSize
+        var plainCount = 0L
+        try {
+            val buffer = ByteArray(8192)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                encryptedCount = Math.addExact(encryptedCount, count)
+                require(encryptedCount <= maxBackupBytes + 64) { "ไฟล์สำรองมีขนาดเกิน 256 MB" }
+                val decoded = cipher.update(buffer, 0, count)
+                if (decoded != null && decoded.isNotEmpty()) {
+                    plainCount = Math.addExact(plainCount, decoded.size.toLong())
+                    require(plainCount <= maxBackupBytes) { "ข้อมูลสำรองมีขนาดเกินกำหนด" }
+                    destination.write(decoded)
+                }
+            }
+            val finalBytes = cipher.doFinal()
+            if (finalBytes.isNotEmpty()) {
+                plainCount = Math.addExact(plainCount, finalBytes.size.toLong())
+                require(plainCount <= maxBackupBytes) { "ข้อมูลสำรองมีขนาดเกินกำหนด" }
+                destination.write(finalBytes)
+            }
+            destination.flush()
+        } catch (_: AEADBadTagException) {
+            throw IllegalArgumentException("รหัสผ่านไม่ถูกต้องหรือไฟล์สำรองถูกแก้ไข")
         }
     }
 
