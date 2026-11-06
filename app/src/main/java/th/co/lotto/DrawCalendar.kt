@@ -176,15 +176,15 @@ private object LotteryChecksCalendarClient {
 private object HuayReviewCalendarClient {
     fun fetch(today: LocalDate): CalendarSourceSnapshot {
         val currentYear = today.year + 543
-        val urls = listOf(
-            "https://huayreview.net/calendar-$currentYear/",
-            "https://huayreview.net/calendar-" + (currentYear + 1) + "/"
+        val pages = listOf(
+            "https://huayreview.net/calendar-$currentYear/" to currentYear,
+            "https://huayreview.net/calendar-" + (currentYear + 1) + "/" to (currentYear + 1)
         )
         val dates = linkedSetOf<LocalDate>()
         val errors = mutableListOf<String>()
-        urls.forEach { address ->
+        pages.forEach { (address, pageYear) ->
             runCatching {
-                dates.addAll(DrawCalendarService.parseHuayReview(httpGet(address), currentYear, today))
+                dates.addAll(DrawCalendarService.parseHuayReview(httpGet(address), pageYear, today))
             }.onFailure { errors.add(it.message ?: "fetch failed") }
         }
         val sorted = dates.sorted().take(12)
@@ -192,7 +192,7 @@ private object HuayReviewCalendarClient {
             "ไม่พบวันงวดในปฏิทิน HuayReview" +
                 if (errors.isNotEmpty()) ": " + errors.joinToString("; ") else ""
         }
-        return CalendarSourceSnapshot("HUAYREVIEW", sorted, System.currentTimeMillis(), urls.joinToString(";"))
+        return CalendarSourceSnapshot("HUAYREVIEW", sorted, System.currentTimeMillis(), pages.joinToString(";") { it.first })
     }
 }
 
@@ -231,7 +231,12 @@ private object CalendarAuditLog {
     fun latest(context: Context, sourceId: String): CalendarSourceSnapshot? {
         val file = File(context.filesDir, FILE_NAME)
         if (!file.exists()) return null
-        return file.useLines { lines -> lines.mapNotNull { parseLine(it) }.lastOrNull { it.sourceId == sourceId } }
+        return file.useLines { lines ->
+            val records = lines.mapNotNull { parseLine(it) }.filter { it.sourceId == sourceId }.toList()
+            val latest = records.lastOrNull() ?: return@useLines null
+            if (latest.successful) latest
+            else latest.copy(dates = records.lastOrNull { it.successful }?.dates.orEmpty())
+        }
     }
 
     private fun parseLine(line: String): CalendarSourceSnapshot? {
