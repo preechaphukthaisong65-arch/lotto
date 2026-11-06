@@ -19,7 +19,7 @@ Lotto is being developed as an Android-only, offline-first application. The on-d
 - Payout rules and other unresolved decisions in SRS 0.2 are intentionally not guessed or enabled.
 
 ## Build debug APK
-The workflow is `.github/workflows/android-build.yml`. Pushes to `main`, `feature/**`, and `srs-0.2-offline` trigger a debug build. On a successful run, download the `lotto-debug-apk` artifact and extract `app-debug.apk`.
+The workflow is `.github/workflows/android-build.yml`. Pushes to `main`, `feature/**`, and `srs-0.2-offline` trigger Android lint, unit/database tests, and a debug APK build. The `lotto-debug-apk` artifact includes `app-debug.apk`, its SHA-256 checksum, build metadata (commit/branch/run), and Room schemas.
 
 ## Toolchain
 - JDK 17
