@@ -115,7 +115,6 @@ class LottoDatabaseIntegrityTest {
     fun saleHistoryCanSearchByDocumentOrNumberAndFilterByPeriod() {
         dao.insertPeriod(period("period-1"))
         val first = SaleDocumentEntity("sale-123", "period-1", null, "CASH", 2_000L, 10L, "Asia/Bangkok")
-        val second = SaleDocumentEntity("sale-456", "period-2", null, "CASH", 3_000L, 20L, "Asia/Bangkok")
         dao.postSale(first, listOf(SaleLineEntity("line-1", "sale-123", "period-1", "12", "TWO_TOP", 2_000L, false)),
             AuditEventEntity("event-1", "SALE_DOCUMENT", "sale-123", "POSTED", "test", 10L))
         database.openHelper.writableDatabase.execSQL("UPDATE draw_periods SET status = 'CLOSED' WHERE periodId = 'period-1'")
