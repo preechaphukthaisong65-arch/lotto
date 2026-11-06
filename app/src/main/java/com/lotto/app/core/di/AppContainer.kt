@@ -3,7 +3,9 @@ package com.lotto.app.core.di
 import android.content.Context
 import androidx.room.Room
 import com.lotto.app.data.local.LottoDatabase
+import com.lotto.app.data.repository.RoomSaleRepository
 import com.lotto.app.data.repository.RoomSettingsRepository
+import com.lotto.app.data.repository.SaleRepository
 import com.lotto.app.data.repository.SettingsRepository
 
 class AppContainer(context: Context) {
@@ -11,9 +13,15 @@ class AppContainer(context: Context) {
         context.applicationContext,
         LottoDatabase::class.java,
         LottoDatabase.DATABASE_NAME
-    ).build()
+    )
+        .addMigrations(LottoDatabase.MIGRATION_1_2)
+        .build()
 
     val settingsRepository: SettingsRepository by lazy {
         RoomSettingsRepository(database.appSettingDao())
+    }
+
+    val saleRepository: SaleRepository by lazy {
+        RoomSaleRepository(database.saleDao())
     }
 }
