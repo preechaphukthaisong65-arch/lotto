@@ -27,12 +27,12 @@ private val homeMenuOptions = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    onOpenSale: () -> Unit
+) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("หน้าหลัก") }
-            )
+            TopAppBar(title = { Text("หน้าหลัก") })
         }
     ) { innerPadding ->
         Column(
@@ -51,7 +51,10 @@ fun HomeScreen() {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(homeMenuOptions) { option ->
-                    HomeMenuItem(option = option)
+                    HomeMenuItem(
+                        option = option,
+                        onClick = if (option == HomeMenuOption.Sell) onOpenSale else ({})
+                    )
                 }
             }
         }
