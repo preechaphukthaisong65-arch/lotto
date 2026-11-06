@@ -12,7 +12,8 @@ data class DrawPeriodEntity(
     val drawDateEpochMillis: Long?,
     val status: String,
     val salesCloseEpochMillis: Long?,
-    val createdAtEpochMillis: Long
+    val createdAtEpochMillis: Long,
+    val scheduledOpenEpochMillis: Long? = null
 )
 
 @Entity(tableName = "customers", indices = [Index(value = ["phone"])])
