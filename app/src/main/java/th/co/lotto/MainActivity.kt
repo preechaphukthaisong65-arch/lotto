@@ -37,6 +37,7 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.concurrent.Executors
 import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationManagerCompat
 
 class MainActivity : Activity() {
     private val io = Executors.newSingleThreadExecutor()
@@ -174,6 +175,19 @@ class MainActivity : Activity() {
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
 
         val state = stateOverride ?: DrawCalendarService.readState(applicationContext)
+        val notificationEnabled = NotificationManagerCompat.from(this).areNotificationsEnabled() &&
+            (Build.VERSION.SDK_INT < 33 ||
+                ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
+        addText(
+            currentBody,
+            if (notificationEnabled) {
+                "สถานะแจ้งเตือน: อนุญาตแล้ว • ระบบตรวจปฏิทินรายวันและแจ้งเตือนเมื่อมีวันยืนยัน"
+            } else {
+                "สถานะแจ้งเตือน: ยังไม่ได้อนุญาต • วันที่ยืนยันและจำนวนวันที่เหลือจะแสดงในหน้านี้ แต่ Android จะไม่ส่งการแจ้งเตือน"
+            },
+            12,
+            if (notificationEnabled) 0xFF26734D.toInt() else 0xFF9B2C2C.toInt()
+        )
         val statusText = when (state.status) {
             "CONFIRMED" -> "ยืนยันวันงวดจากทั้งสองเว็บไซต์แล้ว"
             "DISAGREEMENT" -> "วันงวดไม่ตรงกัน • รอยืนยัน"
