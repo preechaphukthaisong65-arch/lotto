@@ -1,7 +1,6 @@
 package th.co.lotto.data
 
 import androidx.room.Room
-import android.content.Context
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -19,7 +18,7 @@ class PayoutRateSettingsTest {
     @Before
     fun setUp() {
         database = Room.inMemoryDatabaseBuilder(
-            RuntimeEnvironment.getApplication<Context>(),
+            RuntimeEnvironment.getApplication(),
             LottoDatabase::class.java
         ).allowMainThreadQueries().build()
         dao = database.lottoDao()
