@@ -179,6 +179,16 @@ abstract class LottoDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS draw_source_checks (checkId TEXT NOT NULL PRIMARY KEY, periodId TEXT NOT NULL, sourceId TEXT NOT NULL, drawDateIso TEXT NOT NULL, firstPrizeNumber TEXT NOT NULL, threeTopNumber TEXT NOT NULL, twoBottomNumber TEXT NOT NULL, sourceUrl TEXT NOT NULL, fetchedAtEpochMillis INTEGER NOT NULL, FOREIGN KEY(periodId) REFERENCES draw_periods(periodId) ON UPDATE NO ACTION ON DELETE RESTRICT)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_source_checks_periodId_sourceId ON draw_source_checks(periodId, sourceId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_source_checks_periodId_fetchedAtEpochMillis ON draw_source_checks(periodId, fetchedAtEpochMillis)")
+                db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_draw_source_check_update BEFORE UPDATE ON draw_source_checks BEGIN SELECT RAISE(ABORT, 'source check immutable'); END")
+                db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_draw_source_check_delete BEFORE DELETE ON draw_source_checks BEGIN SELECT RAISE(ABORT, 'source check immutable'); END")
+            }
+        }
+
         @Volatile private var INSTANCE: LottoDatabase? = null
 
         internal fun installIntegrityGuards(db: SupportSQLiteDatabase) {
@@ -378,7 +388,7 @@ abstract class LottoDatabase : RoomDatabase() {
                 LottoDatabase::class.java,
                 "lotto-local.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
