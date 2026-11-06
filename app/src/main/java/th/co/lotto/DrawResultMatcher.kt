@@ -37,20 +37,33 @@ object DrawResultMatcher {
     fun findMatches(
         results: List<DrawResultEntity>,
         saleLines: List<SaleLineEntity>
-    ): List<WinningLineMatch> = results.mapNotNull { result ->
+    ): List<WinningLineMatch> = results.flatMap { result ->
         val category = aliases[result.resultType.trim().uppercase(java.util.Locale.ROOT)]
             ?: aliases[result.resultType.trim()]
-            ?: return@mapNotNull null
+            ?: return@flatMap emptyList()
         val expectedLength = if (category.startsWith("TWO_")) 2 else 3
         if (result.winningNumber.length != expectedLength ||
-            !result.winningNumber.all { it in '0'..'9' }) return@mapNotNull null
-        val matches = saleLines.filter {
-            it.periodId == result.periodId &&
-                it.betCategory == category &&
-                it.numberText == result.winningNumber
+            !result.winningNumber.all { it in '0'..'9' }) return@flatMap emptyList()
+
+        val categoriesToCheck = when (category) {
+            "THREE_TOP" -> listOf("THREE_TOP", "THREE_TOAD")
+            else -> listOf(category)
         }
-        if (matches.isEmpty()) null else WinningLineMatch(
-            result.resultId, result.resultType, result.winningNumber, category, matches
-        )
+        categoriesToCheck.mapNotNull { betCategory ->
+            val matches = saleLines.filter { line ->
+                if (line.periodId != result.periodId || line.betCategory != betCategory) {
+                    false
+                } else if (betCategory == "THREE_TOAD" && category == "THREE_TOP") {
+                    line.numberText.length == 3 &&
+                        line.numberText.all { it in '0'..'9' } &&
+                        line.numberText.toCharArray().sorted() == result.winningNumber.toCharArray().sorted()
+                } else {
+                    line.numberText == result.winningNumber
+                }
+            }
+            if (matches.isEmpty()) null else WinningLineMatch(
+                result.resultId, result.resultType, result.winningNumber, betCategory, matches
+            )
+        }
     }
 }

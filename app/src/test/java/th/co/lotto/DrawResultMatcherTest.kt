@@ -31,6 +31,24 @@ class DrawResultMatcherTest {
     }
 
     @Test
+    fun threeDigitTopResultMatchesToadByDigitPermutation() {
+        val result = DrawResultEntity("r-top", "p1", "THREE_TOP", "123", "official", null, 1L)
+        val lines = listOf(
+            SaleLineEntity("straight", "d1", "p1", "123", "THREE_TOP", 1_000L, false),
+            SaleLineEntity("toad-1", "d2", "p1", "321", "THREE_TOAD", 2_000L, false),
+            SaleLineEntity("toad-2", "d3", "p1", "132", "THREE_TOAD", 3_000L, true),
+            SaleLineEntity("wrong", "d4", "p1", "124", "THREE_TOAD", 4_000L, false),
+            SaleLineEntity("other-period", "d5", "p2", "213", "THREE_TOAD", 5_000L, false)
+        )
+
+        val matches = DrawResultMatcher.findMatches(listOf(result), lines)
+
+        assertEquals(2, matches.size)
+        assertEquals(listOf("straight"), matches.first { it.betCategory == "THREE_TOP" }.lines.map { it.lineId })
+        assertEquals(setOf("toad-1", "toad-2"), matches.first { it.betCategory == "THREE_TOAD" }.lines.map { it.lineId }.toSet())
+    }
+
+    @Test
     fun unknownOrWrongLengthResultTypeIsNotMatched() {
         val results = listOf(
             DrawResultEntity("r1", "p1", "unknown", "12", "manual", null, 1L),
