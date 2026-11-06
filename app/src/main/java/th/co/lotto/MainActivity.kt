@@ -116,7 +116,7 @@ class MainActivity : Activity() {
         addCard(currentBody, "บัญชีเงินเชื่อ", "ยอดค้างและประวัติรับชำระ") { showCreditLedger() }
         addCard(currentBody, "รับชำระเงิน", "บันทึกรับชำระเต็มจำนวนหรือบางส่วน") { showCreditLedger() }
         addCard(currentBody, "เลขอั้นและเลขเต็ม", "กำหนดวงเงินแยกตามประเภทเลข") { showLimits() }
-        addCard(currentBody, "ผลหวยและสรุปยอด", "บันทึกผลและตรวจสอบยอดตามงวด") { showNotReady("ผลหวยและสรุปยอด") }
+        addCard(currentBody, "ผลหวยและสรุปยอด", "บันทึกผลพร้อมแหล่งที่มาและข้อมูลตรวจสอบ") { showResults() }
         addCard(currentBody, "รายงาน", "รายงานยอดขาย ลูกหนี้ และยอดคงเหลือ") { showReports() }
         addCard(currentBody, "ตั้งค่าและ PIN", "กำหนดค่าระบบและสิทธิ์การเข้าถึง") { showNotReady("ตั้งค่าและ PIN") }
         addCard(currentBody, "สำรองและกู้คืน", "สำรองข้อมูลลงไฟล์ในเครื่อง") { showNotReady("สำรองและกู้คืน") }
@@ -1006,6 +1006,100 @@ class MainActivity : Activity() {
             }
         }
         dialog.show()
+    }
+
+    private fun showResults() {
+        base("ผลหวย")
+        addButton(currentBody, "กลับหน้าหลัก") { showHome() }
+        io.execute {
+            val dao = database.lottoDao()
+            val periods = dao.getPeriods()
+            runOnUiThread {
+                if (periods.isEmpty()) {
+                    addText(currentBody, "ยังไม่มีงวดหวย", 14, ink)
+                    return@runOnUiThread
+                }
+                val picker = Spinner(this).apply {
+                    adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
+                        periods.map { "\${it.title} • \${when (it.status) { "CLOSED" -> "ปิดงวด"; "OPEN" -> "เปิดขาย"; else -> "เตรียมเปิด" }}" })
+                }
+                currentBody.addView(picker)
+                val resultList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                addButton(currentBody, "แสดงผลที่บันทึก") {
+                    resultList.removeAllViews()
+                    val selected = periods[picker.selectedItemPosition]
+                    io.execute {
+                        val results = dao.getDrawResults(selected.periodId)
+                        runOnUiThread {
+                            if (results.isEmpty()) addText(resultList, "ยังไม่มีผลหวยที่บันทึกในงวดนี้", 13, ink)
+                            results.forEach { result ->
+                                val verified = if (result.verifiedAtEpochMillis == null) "ยังไม่ยืนยัน" else
+                                    "ยืนยันแล้ว " + SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(result.verifiedAtEpochMillis))
+                                addCard(resultList, "\${result.resultType}: \${result.winningNumber}",
+                                    "แหล่งที่มา: \${result.sourceLabel} • $verified") { }
+                            }
+                        }
+                    }
+                }
+                addButton(currentBody, "＋ บันทึกผลหวย") {
+                    val selected = periods[picker.selectedItemPosition]
+                    if (selected.status != "CLOSED") {
+                        Toast.makeText(this, "ต้องปิดงวดก่อนจึงจะบันทึกผลหวยได้", Toast.LENGTH_LONG).show()
+                        return@addButton
+                    }
+                    val type = EditText(this).apply { hint = "ประเภทผล (เช่น รางวัลที่ 1, 2 ตัวล่าง)" }
+                    val number = EditText(this).apply {
+                        hint = "เลขผลรางวัล"
+                        inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                    }
+                    val source = EditText(this).apply { hint = "แหล่งที่มาของผลหวย" }
+                    val verified = CheckBox(this).apply { text = "ตรวจสอบผลแล้ว" }
+                    val form = LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(dp(20), dp(8), dp(20), 0)
+                        addView(type); addView(number); addView(source); addView(verified)
+                    }
+                    val dialog = AlertDialog.Builder(this).setTitle("บันทึกผล • \${selected.title}").setView(form)
+                        .setNegativeButton("กลับ", null).setPositiveButton("บันทึก", null).create()
+                    dialog.setOnShowListener {
+                        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                            val resultType = type.text.toString().trim()
+                            val winningNumber = number.text.toString().trim()
+                            val sourceLabel = source.text.toString().trim()
+                            if (resultType.isBlank()) { type.error = "กรุณาระบุประเภทผล"; return@setOnClickListener }
+                            if (winningNumber.isBlank() || !winningNumber.all { it in '0'..'9' }) {
+                                number.error = "กรุณากรอกตัวเลขให้ถูกต้อง"; return@setOnClickListener
+                            }
+                            if (sourceLabel.isBlank()) { source.error = "กรุณาระบุแหล่งที่มา"; return@setOnClickListener }
+                            val now = System.currentTimeMillis()
+                            val result = th.co.lotto.data.DrawResultEntity(
+                                UUID.randomUUID().toString(), selected.periodId, resultType,
+                                winningNumber, sourceLabel, if (verified.isChecked) now else null, now
+                            )
+                            val audit = AuditEventEntity(
+                                UUID.randomUUID().toString(), "DRAW_RESULT", result.resultId,
+                                "POSTED", "Result recorded from manual entry", now
+                            )
+                            io.execute {
+                                try {
+                                    dao.postDrawResult(result, audit)
+                                    runOnUiThread {
+                                        Toast.makeText(this, "บันทึกผลหวยแล้ว", Toast.LENGTH_SHORT).show()
+                                        dialog.dismiss()
+                                        showResults()
+                                    }
+                                } catch (e: Exception) {
+                                    runOnUiThread { Toast.makeText(this, "บันทึกผลไม่สำเร็จ: \${e.message}", Toast.LENGTH_LONG).show() }
+                                }
+                            }
+                        }
+                    }
+                    dialog.show()
+                }
+                currentBody.addView(resultList)
+                addText(currentBody, "ขณะนี้บันทึกผลและประวัติการตรวจสอบได้แล้ว แต่ยังไม่คำนวณยอดจ่ายหรือยอดสุทธิ จนกว่าจะอนุมัติสูตรและกฎการจับคู่ผล", 13, 0xFF9B2C2C.toInt())
+            }
+        }
     }
 
     private fun showReports() {
