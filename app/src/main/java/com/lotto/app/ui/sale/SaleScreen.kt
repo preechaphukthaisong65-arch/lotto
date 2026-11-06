@@ -50,14 +50,15 @@ fun SaleScreen(
     var lastName by remember { mutableStateOf("") }
     var cashSelected by remember { mutableStateOf(true) }
     var creditSelected by remember { mutableStateOf(false) }
-    var cashAmount by remember { mutableStateOf("0") }
-    var creditAmount by remember { mutableStateOf("0") }
+    var cashAmount by remember { mutableStateOf("") }
+    var creditAmount by remember { mutableStateOf("") }
 
     val total = threeDigitEntries.sumOf {
         (it.straightAmount.toLongOrNull() ?: 0L) + (it.boxAmount.toLongOrNull() ?: 0L)
     } + twoDigitEntries.sumOf {
         (it.topAmount.toLongOrNull() ?: 0L) + (it.bottomAmount.toLongOrNull() ?: 0L)
     }
+    val paymentSelected = cashSelected || creditSelected
     val splitValid = !(cashSelected && creditSelected) ||
         ((cashAmount.toLongOrNull() ?: 0L) + (creditAmount.toLongOrNull() ?: 0L) == total)
 
@@ -93,7 +94,7 @@ fun SaleScreen(
                         label = "ยืนยัน / บันทึก",
                         confirmationTitle = "ยืนยันการบันทึกการขาย",
                         confirmationMessage = "ตรวจสอบรายการและยอดรวมก่อนยืนยัน",
-                        enabled = total > 0L && splitValid
+                        enabled = total > 0L && paymentSelected && splitValid
                     )
                 }
             }
