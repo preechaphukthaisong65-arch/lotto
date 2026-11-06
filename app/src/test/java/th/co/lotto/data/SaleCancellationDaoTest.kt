@@ -1,0 +1,107 @@
+package th.co.lotto.data
+
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import java.util.UUID
+
+@RunWith(RobolectricTestRunner::class)
+class SaleCancellationDaoTest {
+    private var database: LottoDatabase? = null
+
+    private fun createDatabase(): LottoDao {
+        val context = RuntimeEnvironment.getApplication()
+        database = Room.inMemoryDatabaseBuilder(context, LottoDatabase::class.java)
+            .allowMainThreadQueries()
+            .addCallback(object : RoomDatabase.Callback() {
+                override fun onCreate(db: SupportSQLiteDatabase) {
+                    LottoDatabase.installIntegrityGuards(db)
+                }
+            })
+            .build()
+        return database!!.lottoDao()
+    }
+
+    @After
+    fun closeDatabase() {
+        database?.close()
+    }
+
+    @Test
+    fun cancellationIsAuditedAndExcludedFromActiveSalesAndLimits() {
+        val dao = createDatabase()
+        val now = System.currentTimeMillis()
+        val periodId = "period-1"
+        dao.insertPeriod(DrawPeriodEntity(periodId, "งวดทดสอบ", now + 86_400_000L, "OPEN", null, now, null, now))
+
+        val documentId = "sale-1"
+        val document = SaleDocumentEntity(documentId, periodId, null, "CASH", 10_000L, now, "Asia/Bangkok")
+        val line = SaleLineEntity("line-1", documentId, periodId, "123", "THREE_TOP", 10_000L, false)
+        dao.postSale(
+            document,
+            listOf(line),
+            AuditEventEntity("audit-sale", "SALE_DOCUMENT", documentId, "POSTED", "test sale", now)
+        )
+
+        assertEquals(10_000L, dao.getSoldAmountForNumber(periodId, "123", "THREE_TOP"))
+        val cancellation = SaleCancellationEntity("cancel-1", documentId, 10_000L, "บันทึกเลขผิด", now + 1_000L)
+        dao.cancelSaleDocument(
+            cancellation,
+            AuditEventEntity("audit-cancel", "SALE_CANCELLATION", "cancel-1", "CANCELLED", "test cancellation", now + 1_000L)
+        )
+
+        assertNotNull(dao.getSaleCancellation(documentId))
+        assertEquals(0L, dao.getSoldAmountForNumber(periodId, "123", "THREE_TOP"))
+        assertEquals(0, dao.getSalesForPeriod(periodId).size)
+        assertEquals(1, dao.searchSales(periodId, "").size)
+        assertEquals("บันทึกเลขผิด", dao.getSaleCancellation(documentId)?.reason)
+        assertNotNull(dao.getAuditEvents("cancel-1").firstOrNull())
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.cancelSaleDocument(
+                cancellation.copy(cancellationId = "cancel-2"),
+                AuditEventEntity("audit-cancel-2", "SALE_CANCELLATION", "cancel-2", "CANCELLED", "duplicate", now + 2_000L)
+            )
+        }
+    }
+
+    @Test
+    fun billWithPostedCreditPaymentCannotBeCancelled() {
+        val dao = createDatabase()
+        val now = System.currentTimeMillis()
+        val periodId = "period-credit"
+        dao.insertPeriod(DrawPeriodEntity(periodId, "งวดเครดิต", now + 86_400_000L, "OPEN", null, now, null, now))
+        val customerId = "customer-1"
+        dao.postCustomer(
+            CustomerEntity(customerId, "ลูกค้าทดสอบ", "0812345678", "ข้อมูลยืนยัน", "CREDIT", now),
+            AuditEventEntity("audit-customer", "CUSTOMER", customerId, "CREATED", "test customer", now)
+        )
+        val documentId = "credit-sale"
+        dao.postSale(
+            SaleDocumentEntity(documentId, periodId, customerId, "CREDIT", 5_000L, now, "Asia/Bangkok"),
+            listOf(SaleLineEntity("credit-line", documentId, periodId, "456", "THREE_TOAD", 5_000L, false)),
+            AuditEventEntity("audit-credit-sale", "SALE_DOCUMENT", documentId, "POSTED", "test credit sale", now)
+        )
+        dao.postPayment(
+            PaymentEntryEntity("payment-1", documentId, customerId, 1_000L, now + 500L, "CASH", null),
+            AuditEventEntity("audit-payment", "PAYMENT", "payment-1", "POSTED", "test payment", now + 500L)
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.cancelSaleDocument(
+                SaleCancellationEntity("cancel-credit", documentId, 5_000L, "ต้องการยกเลิก", now + 1_000L),
+                AuditEventEntity("audit-cancel-credit", "SALE_CANCELLATION", "cancel-credit", "CANCELLED", "test", now + 1_000L)
+            )
+        }
+        assertNull(dao.getSaleCancellation(documentId))
+        assertEquals(5_000L, dao.getCreditSalesTotal(customerId))
+    }
+}
