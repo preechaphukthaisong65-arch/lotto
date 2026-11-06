@@ -1456,12 +1456,19 @@ class MainActivity : Activity() {
         addText(currentBody, "สำคัญ: หากลืมรหัสผ่าน จะไม่สามารถกู้คืนข้อมูลจากไฟล์สำรองได้ โปรดเก็บรหัสผ่านแยกจากโทรศัพท์", 13, 0xFF9B2C2C.toInt())
         addButton(currentBody, "สร้างไฟล์สำรองเข้ารหัส") { promptBackupPassphrase() }
         addButton(currentBody, "กู้คืนจากไฟล์สำรอง") {
-            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                addCategory(Intent.CATEGORY_OPENABLE)
-                type = "application/octet-stream"
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            startActivityForResult(intent, backupRestoreRequest)
+            AlertDialog.Builder(this)
+                .setTitle("ยืนยันการกู้คืนข้อมูล")
+                .setMessage("การกู้คืนจะแทนที่ฐานข้อมูลและใบเสร็จที่อยู่ในเครื่องด้วยข้อมูลจากไฟล์สำรอง ต้องการดำเนินการต่อหรือไม่")
+                .setNegativeButton("ยกเลิก", null)
+                .setPositiveButton("เลือกไฟล์สำรอง") { _, _ ->
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "application/octet-stream"
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivityForResult(intent, backupRestoreRequest)
+                }
+                .show()
         }
         addText(currentBody, "การกู้คืนจะแทนที่ฐานข้อมูลและใบเสร็จปัจจุบัน หลังตรวจสอบไฟล์และฐานข้อมูลผ่านแล้วเท่านั้น", 12, 0xFF9B2C2C.toInt())
         addText(currentBody, "ไม่มีการส่งข้อมูลขึ้น Cloud และไม่มีการเชื่อมต่อเซิร์ฟเวอร์", 12, 0xFF526171.toInt())
@@ -1494,6 +1501,8 @@ class MainActivity : Activity() {
                             return@setOnClickListener
                         }
                         pendingBackupPassphrase = a.toCharArray()
+                        first.text.clear()
+                        second.text.clear()
                         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
                         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                             addCategory(Intent.CATEGORY_OPENABLE)
@@ -1519,6 +1528,7 @@ class MainActivity : Activity() {
                 dialog.setOnShowListener {
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                         val passphrase = field.text.toString().toCharArray()
+                        field.text.clear()
                         if (passphrase.size < 10) {
                             Toast.makeText(this, "รหัสผ่านไม่ถูกต้อง", Toast.LENGTH_LONG).show()
                             return@setOnClickListener
