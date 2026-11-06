@@ -1,5 +1,7 @@
 package th.co.lotto.data
 
+import th.co.lotto.PeriodSchedule
+
 import android.database.sqlite.SQLiteException
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -308,29 +310,37 @@ class LottoDatabaseIntegrityTest {
     }
 
     @Test
-    fun straightAndToadBlockedNumberRulesAreIndependent() {
+    fun threeDigitBlockedCategoriesAreIndependent() {
         dao.insertPeriod(period("period-1"))
-        dao.setNumberBlocked("straight-123", "period-1", "THREE_STRAIGHT", "123", true, 10L, "straight-event")
-        val straight = SaleDocumentEntity("sale-straight", "period-1", null, "CASH", 100L, 11L, "Asia/Bangkok")
+        dao.setNumberBlocked("top-123", "period-1", "THREE_TOP", "123", true, 10L, "top-event")
+
+        val top = SaleDocumentEntity("sale-top-123", "period-1", null, "CASH", 100L, 11L, "Asia/Bangkok")
         assertThrows(IllegalArgumentException::class.java) {
-            dao.postSale(straight,
-                listOf(SaleLineEntity("line-straight", "sale-straight", "period-1", "123", "THREE_TOP", 100L, false)),
-                AuditEventEntity("sale-event-straight", "SALE_DOCUMENT", "sale-straight", "POSTED", "test", 11L))
+            dao.postSale(top,
+                listOf(SaleLineEntity("line-top-123", "sale-top-123", "period-1", "123", "THREE_TOP", 100L, false)),
+                AuditEventEntity("sale-event-top-123", "SALE_DOCUMENT", "sale-top-123", "POSTED", "test", 11L))
         }
 
-        val toad = SaleDocumentEntity("sale-toad", "period-1", null, "CASH", 100L, 12L, "Asia/Bangkok")
+        val bottom = SaleDocumentEntity("sale-bottom-123", "period-1", null, "CASH", 100L, 12L, "Asia/Bangkok")
+        dao.postSale(bottom,
+            listOf(SaleLineEntity("line-bottom-123", "sale-bottom-123", "period-1", "123", "THREE_BOTTOM", 100L, false)),
+            AuditEventEntity("sale-event-bottom-123", "SALE_DOCUMENT", "sale-bottom-123", "POSTED", "test", 12L))
+
+        val toad = SaleDocumentEntity("sale-toad-123", "period-1", null, "CASH", 100L, 13L, "Asia/Bangkok")
         dao.postSale(toad,
-            listOf(SaleLineEntity("line-toad", "sale-toad", "period-1", "123", "THREE_TOAD", 100L, false)),
-            AuditEventEntity("sale-event-toad", "SALE_DOCUMENT", "sale-toad", "POSTED", "test", 12L))
+            listOf(SaleLineEntity("line-toad-123", "sale-toad-123", "period-1", "123", "THREE_TOAD", 100L, false)),
+            AuditEventEntity("sale-event-toad-123", "SALE_DOCUMENT", "sale-toad-123", "POSTED", "test", 13L))
 
-        dao.setNumberBlocked("toad-123", "period-1", "THREE_TOAD", "123", true, 13L, "toad-event")
-        val toadBlocked = SaleDocumentEntity("sale-toad-blocked", "period-1", null, "CASH", 100L, 14L, "Asia/Bangkok")
+        dao.setNumberBlocked("toad-123", "period-1", "THREE_TOAD", "123", true, 14L, "toad-event")
+        val blockedToad = SaleDocumentEntity("sale-toad-blocked", "period-1", null, "CASH", 100L, 15L, "Asia/Bangkok")
         assertThrows(IllegalArgumentException::class.java) {
-            dao.postSale(toadBlocked,
+            dao.postSale(blockedToad,
                 listOf(SaleLineEntity("line-toad-blocked", "sale-toad-blocked", "period-1", "123", "THREE_TOAD", 100L, false)),
-                AuditEventEntity("sale-event-toad-blocked", "SALE_DOCUMENT", "sale-toad-blocked", "POSTED", "test", 14L))
+                AuditEventEntity("sale-event-toad-blocked", "SALE_DOCUMENT", "sale-toad-blocked", "POSTED", "test", 15L))
         }
-        assertEquals(1, dao.documentExists("sale-toad"))
+        assertEquals(1, dao.documentExists("sale-bottom-123"))
+        assertEquals(1, dao.documentExists("sale-toad-123"))
+        assertEquals(0, dao.documentExists("sale-top-123"))
         assertEquals(0, dao.documentExists("sale-toad-blocked"))
     }
 
