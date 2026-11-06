@@ -13,20 +13,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.lotto.app.ui.HomeScreen
+import com.lotto.app.ui.credit.CreditAccountsScreen
 import com.lotto.app.ui.history.HistoryScreen
 import com.lotto.app.ui.reports.ReportDetailScreen
 import com.lotto.app.ui.reports.ReportsScreen
 import com.lotto.app.ui.sale.SaleScreen
 
 private enum class AppScreen {
-    Home,
-    Sale,
-    History,
-    Reports,
-    TotalSales,
-    CurrentSales,
-    SalesHistory,
-    Performance
+    Home, Sale, History, CreditAccounts, Reports, TotalSales, CurrentSales, SalesHistory, Performance
 }
 
 class MainActivity : ComponentActivity() {
@@ -50,7 +44,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         hideSystemBars()
-        val saleRepository = (application as LottoApplication).container.saleRepository
+        val container = (application as LottoApplication).container
+        val saleRepository = container.saleRepository
+        val creditAccountRepository = container.creditAccountRepository
 
         setContent {
             MaterialTheme {
@@ -61,17 +57,17 @@ class MainActivity : ComponentActivity() {
                             onBack = { currentScreen = AppScreen.Home.name },
                             onSave = { draft ->
                                 val saleId = saleRepository.saveConfirmedSale(draft)
-                                Toast.makeText(
-                                    this,
-                                    "บันทึกการขายเรียบร้อย เลขที่รายการ $saleId",
-                                    Toast.LENGTH_LONG
-                                ).show()
+                                Toast.makeText(this, "บันทึกการขายเรียบร้อย เลขที่รายการ $saleId", Toast.LENGTH_LONG).show()
                                 currentScreen = AppScreen.Home.name
                                 saleId
                             }
                         )
                         AppScreen.History.name -> HistoryScreen(
                             saleRepository = saleRepository,
+                            onBack = { currentScreen = AppScreen.Home.name }
+                        )
+                        AppScreen.CreditAccounts.name -> CreditAccountsScreen(
+                            repository = creditAccountRepository,
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
                         AppScreen.Reports.name -> ReportsScreen(
@@ -100,7 +96,8 @@ class MainActivity : ComponentActivity() {
                         else -> HomeScreen(
                             onOpenSale = { currentScreen = AppScreen.Sale.name },
                             onOpenReports = { currentScreen = AppScreen.Reports.name },
-                            onOpenHistory = { currentScreen = AppScreen.History.name }
+                            onOpenHistory = { currentScreen = AppScreen.History.name },
+                            onOpenCreditAccounts = { currentScreen = AppScreen.CreditAccounts.name }
                         )
                     }
                 }
