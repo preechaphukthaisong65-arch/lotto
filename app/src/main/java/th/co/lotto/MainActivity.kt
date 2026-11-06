@@ -702,32 +702,38 @@ class MainActivity : Activity() {
 
     private fun showLimits() {
         base("เลขอั้นและเลขเต็ม")
-        addButton(currentBody, "＋ เพิ่ม/กำหนดวงเงินเลข") { createLimitDialog() }
         addButton(currentBody, "จัดการเลขไม่รับ") { showBlockedNumbers() }
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
         io.execute {
             val dao = database.lottoDao()
             PeriodSchedule.advance(dao, System.currentTimeMillis())
-            val period = dao.getOpenPeriod()
-            val rules = period?.let { dao.getLimitRules(it.periodId) } ?: emptyList()
-            val soldByRule = rules.associate { rule ->
-                rule.ruleId to dao.getSoldAmountForNumber(period!!.periodId, rule.numberText, rule.betCategory)
-            }
+            val periods = dao.getPeriods().filter { it.status == "OPEN" || it.status == "PREPARED" }
+            val rulesByPeriod = periods.associate { it.periodId to dao.getLimitRules(it.periodId) }
+            val soldByRule = periods.flatMap { period ->
+                rulesByPeriod[period.periodId].orEmpty().map { rule ->
+                    rule.ruleId to dao.getSoldAmountForNumber(period.periodId, rule.numberText, rule.betCategory)
+                }
+            }.toMap()
             runOnUiThread {
-                addText(currentBody, period?.let { "งวด: ${it.title}" } ?: "ไม่มีงวดเปิดอยู่", 14, ink)
-                addText(currentBody, "วงเงินแยกตามประเภท 2 ตัวบน/ล่าง และ 3 ตัวบน/ล่าง/โต๊ด", 12, 0xFF526171.toInt())
-                if (rules.isEmpty()) addText(currentBody, "ยังไม่มีการกำหนดเลขอั้น/เลขเต็ม", 13, ink)
-                rules.forEach { rule ->
-                    val sold = soldByRule[rule.ruleId] ?: 0L
-                    val remaining = (rule.maximumAmountSatang - sold).coerceAtLeast(0L)
-                    val status = when {
-                        !rule.enabled -> "ปิดใช้งาน"
-                        remaining == 0L -> "เต็มแล้ว"
-                        else -> "ยังรับได้"
-                    }
-                    addCard(currentBody, "${rule.numberText} • ${categoryLabel(rule.betCategory)}",
-                        "วงเงิน ${formatMoney(rule.maximumAmountSatang)} • ขายแล้ว ${formatMoney(sold)} • คงเหลือ ${formatMoney(remaining)} • $status") {
-                        createLimitDialog(rule)
+                addText(currentBody, "วงเงินแยกตาม 2 ตัวบน/ล่าง และ 3 ตัวบน/ล่าง/โต๊ด ไม่รวมข้ามประเภท", 12, 0xFF526171.toInt())
+                if (periods.isEmpty()) addText(currentBody, "ไม่มีงวดเปิดหรือเตรียมไว้", 14, ink)
+                periods.forEach { period ->
+                    addText(currentBody, "งวด: ${period.title} • ${if (period.status == "OPEN") "เปิดรับขาย" else "เตรียมเปิด"}", 14, navy)
+                    addButton(currentBody, "＋ เพิ่มวงเงินในงวดนี้") { createLimitDialog(targetPeriod = period) }
+                    val rules = rulesByPeriod[period.periodId].orEmpty()
+                    if (rules.isEmpty()) addText(currentBody, "ยังไม่มีการกำหนดเลขอั้น/เลขเต็ม", 12, ink)
+                    rules.forEach { rule ->
+                        val sold = soldByRule[rule.ruleId] ?: 0L
+                        val remaining = (rule.maximumAmountSatang - sold).coerceAtLeast(0L)
+                        val status = when {
+                            !rule.enabled -> "ปิดใช้งาน"
+                            remaining == 0L -> "เต็มแล้ว"
+                            else -> "ยังรับได้"
+                        }
+                        addCard(currentBody, "${rule.numberText} • ${categoryLabel(rule.betCategory)}",
+                            "วงเงิน ${formatMoney(rule.maximumAmountSatang)} • ขายแล้ว ${formatMoney(sold)} • คงเหลือ ${formatMoney(remaining)} • $status") {
+                            createLimitDialog(rule, period)
+                        }
                     }
                 }
             }
@@ -858,7 +864,7 @@ class MainActivity : Activity() {
         dialog.show()
     }
 
-    private fun createLimitDialog(existing: NumberLimitRuleEntity? = null) {
+    private fun createLimitDialog(existing: NumberLimitRuleEntity? = null, targetPeriod: DrawPeriodEntity? = null) {
         val categories = listOf("TWO_TOP", "TWO_BOTTOM", "THREE_TOP", "THREE_BOTTOM", "THREE_TOAD")
         val number = EditText(this).apply {
             hint = "เลข 2 หรือ 3 หลัก"
@@ -904,8 +910,9 @@ class MainActivity : Activity() {
                     io.execute {
                         try {
                             val dao = database.lottoDao()
-                            val periodId = existing?.periodId ?: dao.getOpenPeriod()?.periodId
-                                ?: error("ไม่มีงวดเปิดอยู่")
+                            val periodId = existing?.periodId ?: targetPeriod?.periodId
+                                ?: dao.getOpenPeriod()?.periodId ?: dao.getPreparedPeriod()?.periodId
+                                ?: error("ไม่มีงวดเปิดหรือเตรียมไว้")
                             val rule = NumberLimitRuleEntity(
                                 ruleId, periodId, n.length, cat, n, maxSatang, enabledValue
                             )
