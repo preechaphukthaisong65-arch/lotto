@@ -28,7 +28,8 @@ private val homeMenuOptions = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onOpenSale: () -> Unit
+    onOpenSale: () -> Unit,
+    onOpenReports: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -53,7 +54,11 @@ fun HomeScreen(
                 items(homeMenuOptions) { option ->
                     HomeMenuItem(
                         option = option,
-                        onClick = if (option == HomeMenuOption.Sell) onOpenSale else ({})
+                        onClick = when (option) {
+                            HomeMenuOption.Sell -> onOpenSale
+                            HomeMenuOption.Reports -> onOpenReports
+                            else -> ({})
+                        }
                     )
                 }
             }
