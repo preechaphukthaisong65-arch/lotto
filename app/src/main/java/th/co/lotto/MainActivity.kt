@@ -1141,58 +1141,7 @@ class MainActivity : Activity() {
                 currentBody.addView(picker)
                 val resultList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 addButton(currentBody, "แสดงผลที่บันทึก") {
-                    resultList.removeAllViews()
-                    val selected = periods[picker.selectedItemPosition]
-                    io.execute {
-                        val results = dao.getDrawResults(selected.periodId)
-                        val settlementSnapshot = dao.getSettlementSnapshot(selected.periodId)
-                        val documents = dao.getSalesForPeriod(selected.periodId)
-                        val saleLines = documents.flatMap { dao.getLinesForDocument(it.documentId) }
-                        val matches = th.co.lotto.DrawResultMatcher.findMatches(results, saleLines)
-                        runOnUiThread {
-                            if (settlementSnapshot == null) {
-                                addText(resultList, "อัตราจ่ายงวดนี้: ยังไม่ได้บันทึก snapshot", 12, 0xFF9B2C2C.toInt())
-                            } else {
-                                addText(resultList,
-                                    "อัตราจ่ายที่ตรึงไว้ • รุ่น ${settlementSnapshot.payoutConfigVersion} • 3 ตัวบน ${BigDecimal.valueOf(settlementSnapshot.threeTopRateHundredths, 2).stripTrailingZeros().toPlainString()} • 3 ตัวโต๊ด ${BigDecimal.valueOf(settlementSnapshot.threeToadRateHundredths, 2).stripTrailingZeros().toPlainString()}",
-                                    12, navy)
-                            }
-                            if (results.isEmpty()) addText(resultList, "ยังไม่มีผลหวยที่บันทึกในงวดนี้", 13, ink)
-                            results.forEach { result ->
-                                val verified = if (result.verifiedAtEpochMillis == null) "ยังไม่ยืนยัน" else
-                                    "ยืนยันแล้ว " + SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(result.verifiedAtEpochMillis))
-                                addCard(resultList, "${categoryLabel(result.resultType)}: ${result.winningNumber}",
-                                    "แหล่งที่มา: ${result.sourceLabel} • $verified") { }
-                            }
-                            if (results.isNotEmpty()) {
-                                addText(resultList, "สรุปรายการที่ตรงกับผลหวย", 16, navy)
-                                if (matches.isEmpty()) addText(resultList, "ไม่พบรายการขายที่ถูกรางวัลจากผลที่บันทึก", 13, ink)
-                                val grossSales = documents.fold(0L) { total, document ->
-                                    Math.addExact(total, document.totalAmountSatang)
-                                }
-                                val payoutSummary = settlementSnapshot?.let {
-                                    runCatching { PayoutCalculator.calculatePeriod(matches, it, grossSales) }.getOrNull()
-                                }
-                                matches.forEach { match ->
-                                    val totalStake = match.lines.fold(0L) { total, line -> Math.addExact(total, line.amountSatang) }
-                                    val matchPayout = payoutSummary?.linePayouts
-                                        ?.filter { it.resultId == match.resultId && it.line.betCategory == match.betCategory }
-                                        ?.fold(0L) { total, item -> Math.addExact(total, item.payoutSatang) }
-                                    addText(resultList,
-                                        "${match.resultType} • ${match.winningNumber} • ${categoryLabel(match.betCategory)} • ${match.lines.size} รายการ • ยอดแทง ${formatMoney(totalStake)}" +
-                                            (matchPayout?.let { " • ยอดจ่าย ${formatMoney(it)}" } ?: ""),
-                                        13, ink)
-                                }
-                                if (payoutSummary != null) {
-                                    addText(resultList, "ยอดจ่ายรางวัลรวม: ${formatMoney(payoutSummary.totalPayoutSatang)}", 16, navy)
-                                    addText(resultList, "ยอดขายหลังหักรางวัล: ${formatMoney(payoutSummary.salesAfterPayoutSatang)}", 15, navy)
-                                    addText(resultList, "คำนวณจากอัตราจ่าย snapshot และปัดเศษ HALF_UP เป็นสตางค์แยกทีละรายการ", 12, 0xFF526171.toInt())
-                                } else {
-                                    addText(resultList, "ยังคำนวณยอดจ่ายไม่ได้ • ต้องบันทึกอัตราจ่ายประจำงวดก่อน หรือมีข้อผิดพลาดในการคำนวณ", 12, 0xFF9B2C2C.toInt())
-                                }
-                            }
-                        }
-                    }
+                    renderSavedResults(periods[picker.selectedItemPosition].periodId, resultList)
                 }
                 addButton(currentBody, "บันทึกอัตราจ่ายประจำงวด") {
                     val selectedPeriod = periods[picker.selectedItemPosition]
@@ -1339,7 +1288,63 @@ class MainActivity : Activity() {
                     }
                 }
                 currentBody.addView(resultList)
+                if (selectedPeriodId != null) renderSavedResults(selectedPeriodId, resultList)
                 addText(currentBody, "ผลรางวัลนำเข้าจาก GLO โดยตรงเท่านั้น • หาก GLO ไม่พร้อมใช้งาน ระบบจะไม่ใช้ผลจากเว็บอื่นแทน • ผลที่บันทึกแล้วใช้งานออฟไลน์ได้", 12, 0xFF526171.toInt())
+            }
+        }
+    }
+
+    private fun renderSavedResults(periodId: String, resultList: LinearLayout) {
+        resultList.removeAllViews()
+        io.execute {
+            val dao = database.lottoDao()
+            val results = dao.getDrawResults(periodId)
+            val snapshot = dao.getSettlementSnapshot(periodId)
+            val documents = dao.getSalesForPeriod(periodId)
+            val saleLines = documents.flatMap { dao.getLinesForDocument(it.documentId) }
+            val matches = DrawResultMatcher.findMatches(results, saleLines)
+            val grossSales = documents.fold(0L) { total, document ->
+                Math.addExact(total, document.totalAmountSatang)
+            }
+            val payoutSummary = snapshot?.let {
+                runCatching { PayoutCalculator.calculatePeriod(matches, it, grossSales) }.getOrNull()
+            }
+            runOnUiThread {
+                if (snapshot == null) {
+                    addText(resultList, "อัตราจ่ายงวดนี้: ยังไม่ได้บันทึก snapshot", 12, 0xFF9B2C2C.toInt())
+                } else {
+                    addText(resultList,
+                        "อัตราจ่ายที่ตรึงไว้ • รุ่น ${snapshot.payoutConfigVersion} • 3 ตัวบน ${BigDecimal.valueOf(snapshot.threeTopRateHundredths, 2).stripTrailingZeros().toPlainString()} • 3 ตัวโต๊ด ${BigDecimal.valueOf(snapshot.threeToadRateHundredths, 2).stripTrailingZeros().toPlainString()}",
+                        12, navy)
+                }
+                if (results.isEmpty()) addText(resultList, "ยังไม่มีผลหวยที่บันทึกในงวดนี้", 13, ink)
+                results.forEach { result ->
+                    val verified = if (result.verifiedAtEpochMillis == null) "ยังไม่ยืนยัน" else
+                        "ยืนยันแล้ว " + SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")).format(Date(result.verifiedAtEpochMillis))
+                    addCard(resultList, "${categoryLabel(result.resultType)}: ${result.winningNumber}",
+                        "แหล่งที่มา: ${result.sourceLabel} • $verified") { }
+                }
+                if (results.isNotEmpty()) {
+                    addText(resultList, "สรุปรายการที่ตรงกับผลหวย", 16, navy)
+                    if (matches.isEmpty()) addText(resultList, "ไม่พบรายการขายที่ถูกรางวัลจากผลที่บันทึก", 13, ink)
+                    matches.forEach { match ->
+                        val totalStake = match.lines.fold(0L) { total, line -> Math.addExact(total, line.amountSatang) }
+                        val matchPayout = payoutSummary?.linePayouts
+                            ?.filter { it.resultId == match.resultId && it.line.betCategory == match.betCategory }
+                            ?.fold(0L) { total, item -> Math.addExact(total, item.payoutSatang) }
+                        addText(resultList,
+                            "${match.resultType} • ${match.winningNumber} • ${categoryLabel(match.betCategory)} • ${match.lines.size} รายการ • ยอดแทง ${formatMoney(totalStake)}" +
+                                (matchPayout?.let { " • ยอดจ่าย ${formatMoney(it)}" } ?: ""),
+                            13, ink)
+                    }
+                    if (payoutSummary != null) {
+                        addText(resultList, "ยอดจ่ายรางวัลรวม: ${formatMoney(payoutSummary.totalPayoutSatang)}", 16, navy)
+                        addText(resultList, "ยอดขายหลังหักรางวัล: ${formatMoney(payoutSummary.salesAfterPayoutSatang)}", 15, navy)
+                        addText(resultList, "คำนวณจากอัตราจ่าย snapshot และปัดเศษ HALF_UP เป็นสตางค์แยกทีละรายการ", 12, 0xFF526171.toInt())
+                    } else {
+                        addText(resultList, "ยังคำนวณยอดจ่ายไม่ได้ • ต้องบันทึกอัตราจ่ายประจำงวดก่อน หรือมีข้อผิดพลาดในการคำนวณ", 12, 0xFF9B2C2C.toInt())
+                    }
+                }
             }
         }
     }
