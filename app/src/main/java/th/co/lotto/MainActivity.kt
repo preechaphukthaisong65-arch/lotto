@@ -1231,9 +1231,16 @@ class MainActivity : Activity() {
                     val selectedPeriod = periods[picker.selectedItemPosition]
                     io.execute {
                         val savedResults = dao.getDrawResults(selectedPeriod.periodId)
+                        val snapshot = dao.getSettlementSnapshot(selectedPeriod.periodId)
                         val documents = dao.getSalesForPeriod(selectedPeriod.periodId)
                         val lines = documents.flatMap { dao.getLinesForDocument(it.documentId) }
                         val matches = th.co.lotto.DrawResultMatcher.findMatches(savedResults, lines)
+                        val grossSales = documents.fold(0L) { total, document ->
+                            Math.addExact(total, document.totalAmountSatang)
+                        }
+                        val payoutSummary = snapshot?.let {
+                            runCatching { PayoutCalculator.calculatePeriod(matches, it, grossSales) }.getOrNull()
+                        }
                         runOnUiThread {
                             if (savedResults.isEmpty()) addText(resultList, "ยังไม่มีผลหวยสำหรับตรวจสอบ", 13, ink)
                             else if (matches.isEmpty()) addText(resultList, "ยังไม่พบรายการขายที่ตรงกับผลที่บันทึก", 13, ink)
@@ -1242,14 +1249,18 @@ class MainActivity : Activity() {
                                     "${match.resultType} • เลข ${match.winningNumber} • ${categoryLabel(match.betCategory)}",
                                     15, navy)
                                 match.lines.forEach { line ->
+                                    val payout = payoutSummary?.linePayouts?.firstOrNull { it.line.lineId == line.lineId }?.payoutSatang
                                     addText(resultList,
-                                        "บิล ${line.documentId.take(8)} • ยอดแทง ${formatMoney(line.amountSatang)}${if (line.halfPayout) " • จ่ายครึ่งตามกฎงวด" else ""}",
+                                        "บิล ${line.documentId.take(8)} • ยอดแทง ${formatMoney(line.amountSatang)}${if (line.halfPayout) " • จ่ายครึ่งตามกฎงวด" else ""}${payout?.let { " • รางวัล ${formatMoney(it)}" } ?: ""}",
                                         13, ink)
                                 }
                             }
-                            addText(resultList,
-                                "ผลนี้เป็นการจับคู่รายการขายเท่านั้น ยังไม่ใช่ยอดจ่ายเงินจริง • สูตรจ่ายครึ่งกำหนดแล้ว แต่ยังต้องยืนยันการปัดเศษและบัญชีเงินคืน",
-                                12, 0xFF9B2C2C.toInt())
+                            if (payoutSummary != null) {
+                                addText(resultList, "ยอดจ่ายรางวัลรวม: ${formatMoney(payoutSummary.totalPayoutSatang)}", 16, navy)
+                                addText(resultList, "ยอดขายหลังหักรางวัล: ${formatMoney(payoutSummary.salesAfterPayoutSatang)}", 15, navy)
+                            } else {
+                                addText(resultList, "ยังไม่มียอดจ่าย • ต้องบันทึกอัตราจ่าย snapshot ของงวดนี้ก่อน", 12, 0xFF9B2C2C.toInt())
+                            }
                         }
                     }
                 }
