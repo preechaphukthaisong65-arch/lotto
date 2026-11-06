@@ -157,6 +157,68 @@ abstract class LottoDatabase : RoomDatabase() {
 
             // Enforce period/document relationships even if a DAO insert is called outside postSale().
             db.execSQL("""
+                CREATE TRIGGER IF NOT EXISTS validate_sale_line_category_insert
+                BEFORE INSERT ON sale_lines
+                WHEN NEW.betCategory NOT IN ('THREE_TOP', 'THREE_TOAD')
+                  OR length(NEW.numberText) != 3
+                  OR NEW.numberText GLOB '*[^0-9]*'
+                BEGIN
+                    SELECT RAISE(ABORT, 'Only three-digit top and toad sale lines are supported');
+                END
+            """.trimIndent())
+            db.execSQL("""
+                CREATE TRIGGER IF NOT EXISTS validate_limit_rule_category_insert
+                BEFORE INSERT ON number_limit_rules
+                WHEN NEW.numberLength != 3
+                  OR length(NEW.numberText) != 3
+                  OR NEW.betCategory NOT IN ('THREE_TOP', 'THREE_TOAD')
+                  OR NEW.numberText GLOB '*[^0-9]*'
+                BEGIN
+                    SELECT RAISE(ABORT, 'Only three-digit top and toad limits are supported');
+                END
+            """.trimIndent())
+            db.execSQL("""
+                CREATE TRIGGER IF NOT EXISTS validate_limit_rule_category_update
+                BEFORE UPDATE ON number_limit_rules
+                WHEN NEW.numberLength != 3
+                  OR length(NEW.numberText) != 3
+                  OR NEW.betCategory NOT IN ('THREE_TOP', 'THREE_TOAD')
+                  OR NEW.numberText GLOB '*[^0-9]*'
+                BEGIN
+                    SELECT RAISE(ABORT, 'Only three-digit top and toad limits are supported');
+                END
+            """.trimIndent())
+            db.execSQL("""
+                CREATE TRIGGER IF NOT EXISTS validate_number_block_category_insert
+                BEFORE INSERT ON number_block_rules
+                WHEN length(NEW.numberText) != 3
+                  OR NEW.blockCategory NOT IN ('THREE_TOP', 'THREE_TOAD')
+                  OR NEW.numberText GLOB '*[^0-9]*'
+                BEGIN
+                    SELECT RAISE(ABORT, 'Only three-digit top and toad blocked numbers are supported');
+                END
+            """.trimIndent())
+            db.execSQL("""
+                CREATE TRIGGER IF NOT EXISTS validate_number_block_category_update
+                BEFORE UPDATE ON number_block_rules
+                WHEN length(NEW.numberText) != 3
+                  OR NEW.blockCategory NOT IN ('THREE_TOP', 'THREE_TOAD')
+                  OR NEW.numberText GLOB '*[^0-9]*'
+                BEGIN
+                    SELECT RAISE(ABORT, 'Only three-digit top and toad blocked numbers are supported');
+                END
+            """.trimIndent())
+            db.execSQL("""
+                CREATE TRIGGER IF NOT EXISTS validate_draw_result_category_insert
+                BEFORE INSERT ON draw_results
+                WHEN NEW.resultType NOT IN ('THREE_TOP', '3 ตัวบน')
+                  OR length(NEW.winningNumber) != 3
+                  OR NEW.winningNumber GLOB '*[^0-9]*'
+                BEGIN
+                    SELECT RAISE(ABORT, 'Only official three-digit top results are supported');
+                END
+            """.trimIndent())
+            db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS validate_limit_rule_period_insert
                 BEFORE INSERT ON number_limit_rules
                 WHEN NOT EXISTS (SELECT 1 FROM draw_periods WHERE periodId = NEW.periodId)
