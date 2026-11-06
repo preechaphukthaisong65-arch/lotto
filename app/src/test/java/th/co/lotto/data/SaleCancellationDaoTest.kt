@@ -143,6 +143,13 @@ class SaleCancellationDaoTest {
         assertEquals(0L, dao.getCreditSalesTotal(customerId))
         assertEquals(0, dao.getCreditDocumentsForCustomer(customerId).size)
         assertThrows(IllegalArgumentException::class.java) {
+            dao.cancelSaleDocument(
+                SaleCancellationEntity("cancel-credit-refund", documentId, 7_500L, "ห้ามบันทึกคืนเงินสดให้บิลเครดิต", now + 1_500L, 1_000L),
+                AuditEventEntity("audit-credit-refund", "SALE_CANCELLATION", "cancel-credit-refund", "CANCELLED", "invalid cash refund", now + 1_500L)
+            )
+        }
+        assertNull(dao.getSaleCancellation(documentId))
+        assertThrows(IllegalArgumentException::class.java) {
             dao.postPayment(
                 PaymentEntryEntity("payment-after-cancel", documentId, customerId, 1_000L, now + 2_000L, "CASH", null),
                 AuditEventEntity("audit-payment-after-cancel", "PAYMENT", "payment-after-cancel", "POSTED", "test", now + 2_000L)
