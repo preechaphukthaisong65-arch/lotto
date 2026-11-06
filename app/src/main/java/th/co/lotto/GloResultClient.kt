@@ -99,47 +99,72 @@ class GloResultClient(
             require(drawDate == requestedDateIso) {
                 "GLO draw date mismatch: requested $requestedDateIso, received $drawDate"
             }
-            val firstPrize = result.getJSONObject("data")
-                .getJSONObject("first")
-                .getJSONArray("number")
-            require(firstPrize.length() > 0) { "GLO first-prize number is missing" }
-            var firstEntry: JSONObject? = null
-            var firstRound = Int.MAX_VALUE
-            for (index in 0 until firstPrize.length()) {
-                val candidate = firstPrize.getJSONObject(index)
-                val round = candidate.optInt("round", index + 1)
-                if (round < firstRound) {
-                    firstRound = round
-                    firstEntry = candidate
-                }
-            }
-            val firstNumber = requireNotNull(firstEntry).getString("value").trim()
+            val data = result.getJSONObject("data")
+            val firstNumber = extractFirstPrize(data)
             require(firstNumber.length == 6 && firstNumber.all { it in '0'..'9' }) {
                 "GLO first-prize number must contain exactly six digits"
             }
-            val lastTwo = extractLastTwo(result.getJSONObject("data"))
+            val lastTwo = extractLastTwo(data)
             require(lastTwo.length == 2 && lastTwo.all { it in '0'..'9' }) { "GLO last-two result must contain exactly two digits" }
             return GloTopResult(drawDate, firstNumber, firstNumber.takeLast(3), lastTwo, sourceUrl, fetchedAtEpochMillis)
         }
-        private fun extractLastTwo(data: JSONObject): String {
-            val keys=setOf("last2","lasttwo","lasttwodigits","runningnumberbacktwo","runningnumberback2")
-            fun value(v:Any?):String?=when(v) {
-                is String -> v.trim().takeIf{it.length==2 && it.all{ch->ch in '0'..'9'}}
-                is JSONObject -> {
-                    val direct=v.optString("value").ifBlank{v.optString("number")}
-                    direct.takeIf{it.length==2 && it.all{ch->ch in '0'..'9'}}
-                     ?: v.optJSONArray("number")?.let{a->(0 until a.length()).asSequence().mapNotNull{i->value(a.opt(i))}.firstOrNull()}
+
+        private fun extractFirstPrize(data: JSONObject): String {
+            val direct = data.optJSONObject("first")?.optJSONArray("number")
+            val prizes = data.optJSONArray("prizes")
+            val numbers = direct ?: prizes?.let { array ->
+                (0 until array.length()).asSequence()
+                    .mapNotNull { array.optJSONObject(it) }
+                    .firstOrNull { it.optString("id").equals("prizeFirst", ignoreCase = true) }
+                    ?.optJSONArray("number")
+            } ?: error("GLO first-prize number is missing")
+            val candidates = (0 until numbers.length()).mapNotNull { index ->
+                when (val item = numbers.opt(index)) {
+                    is JSONObject -> item.optString("value").takeIf { it.isNotBlank() }
+                        ?.let { item.optInt("round", index + 1) to it.trim() }
+                    is String -> item.trim().takeIf { it.isNotBlank() }?.let { (index + 1) to it }
+                    else -> null
                 }
-                is org.json.JSONArray -> (0 until v.length()).asSequence().mapNotNull{i->value(v.opt(i))}.firstOrNull()
+            }
+            return candidates.minByOrNull { it.first }?.second
+                ?: error("GLO first-prize number is missing")
+        }
+
+        private fun extractLastTwo(data: JSONObject): String {
+            val acceptedIds = setOf("last2", "lasttwo", "lasttwodigits", "runningnumberbacktwo", "runningnumberback2")
+            fun valid(value: String): String? =
+                value.trim().takeIf { it.length == 2 && it.all { digit -> digit in '0'..'9' } }
+            fun valueOf(value: Any?): String? = when (value) {
+                is String -> valid(value)
+                is JSONObject -> valid(value.optString("value"))
+                    ?: valid(value.optString("number"))
+                    ?: value.optJSONArray("number")?.let { array ->
+                        (0 until array.length()).asSequence().mapNotNull { valueOf(array.opt(it)) }.firstOrNull()
+                    }
+                is org.json.JSONArray -> (0 until value.length()).asSequence()
+                    .mapNotNull { valueOf(value.opt(it)) }.firstOrNull()
                 else -> null
             }
-            fun scan(obj:JSONObject):String? {
-                val iter=obj.keys()
-                while(iter.hasNext()) {
-                    val key=iter.next(); val v=obj.opt(key)
-                    if(key.lowercase(Locale.ROOT).filter{it.isLetterOrDigit()} in keys) value(v)?.let{found->return found}
-                    if(v is JSONObject) scan(v)?.let{found->return found}
-                    if(v is org.json.JSONArray) for(i in 0 until v.length()) if(v.opt(i) is JSONObject) scan(v.getJSONObject(i))?.let{found->return found}
+            fun scan(value: Any?): String? {
+                when (value) {
+                    is JSONObject -> {
+                        val keys = value.keys()
+                        while (keys.hasNext()) {
+                            val key = keys.next()
+                            val child = value.opt(key)
+                            val normalizedKey = key.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() }
+                            if (normalizedKey in acceptedIds) valueOf(child)?.let { return it }
+                            if (child is JSONObject) {
+                                val id = child.optString("id").lowercase(Locale.ROOT)
+                                    .filter { it.isLetterOrDigit() }
+                                if (id in acceptedIds) valueOf(child.opt("number") ?: child.opt("value"))?.let { return it }
+                            }
+                            scan(child)?.let { return it }
+                        }
+                    }
+                    is org.json.JSONArray -> {
+                        for (index in 0 until value.length()) scan(value.opt(index))?.let { return it }
+                    }
                 }
                 return null
             }
