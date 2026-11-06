@@ -127,6 +127,16 @@ abstract class LottoDao {
     @Query("SELECT * FROM sale_documents WHERE documentId = :documentId LIMIT 1")
     abstract fun getSaleDocument(documentId: String): SaleDocumentEntity?
 
+    @Query("""
+        SELECT DISTINCT sd.* FROM sale_documents sd
+        LEFT JOIN sale_lines sl ON sl.documentId = sd.documentId
+        WHERE (:periodId IS NULL OR sd.periodId = :periodId)
+          AND (:searchText = '' OR sd.documentId LIKE '%' || :searchText || '%'
+               OR sl.numberText LIKE '%' || :searchText || '%')
+        ORDER BY sd.createdAtEpochMillis DESC
+    """)
+    abstract fun searchSales(periodId: String?, searchText: String): List<SaleDocumentEntity>
+
     @Query("SELECT COALESCE(SUM(amountSatang), 0) FROM payment_entries WHERE documentId = :documentId")
     abstract fun getPaymentsTotalForDocument(documentId: String): Long
 
