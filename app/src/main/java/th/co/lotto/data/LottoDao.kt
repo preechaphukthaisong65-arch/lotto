@@ -141,6 +141,9 @@ abstract class LottoDao {
     open fun postSale(document: SaleDocumentEntity, lines: List<SaleLineEntity>, audit: AuditEventEntity) {
         require(document.documentId.isNotBlank()) { "Document ID is required" }
         require(lines.isNotEmpty()) { "A sale must contain at least one line" }
+        require(document.correctionOfDocumentId == null) {
+            "Confirmed bills cannot be corrected; cancel the bill and create a new independent bill"
+        }
         require(document.totalAmountSatang > 0L) { "Sale total must be positive" }
         require(lines.all { it.lineId.isNotBlank() }) { "Every sale line requires an ID" }
         require(lines.map { it.lineId }.distinct().size == lines.size) { "Duplicate sale line ID" }
