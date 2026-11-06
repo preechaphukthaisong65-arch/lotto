@@ -121,7 +121,6 @@ object DrawCalendarService {
 
     internal fun parseHuayReview(html: String, pageYear: Int, today: LocalDate): List<LocalDate> {
         val dates = linkedSetOf<LocalDate>()
-        dates.addAll(fullDateMatches(htmlToText(html)))
         val rowRegex = Regex("(?is)<tr\\b[^>]*>(.*?)</tr>")
         val dayRegex = Regex("""(\d{1,2})\s*(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.)""")
         for (row in rowRegex.findAll(html)) {
