@@ -32,7 +32,7 @@ object LocalBackupManager {
     private const val saltSize = 16
     private const val nonceSize = 12
     private const val maxBackupBytes = 256 * 1024 * 1024
-    private const val currentSchemaVersion = 7
+    private const val currentSchemaVersion = 8
 
     fun writeEncryptedBackup(
         context: Context,
