@@ -24,7 +24,7 @@ class DrawSourceComparisonTest {
         val comparison = DrawSourceComparison(
             "2026-11-01",
             result("LOTTERYCHECKS", "004615", "03"),
-            result("HUAYREVIEW", "04615", "3")
+            result("HUAYREVIEW", "104615", "03")
         )
         assertTrue(comparison.mismatch)
     }
