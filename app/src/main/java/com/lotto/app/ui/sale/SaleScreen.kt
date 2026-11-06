@@ -261,7 +261,7 @@ fun SaleScreen(
             }
             item { Divider() }
             item { Text("3 ตัว", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
-            itemsIndexed(threeDigitEntries, key = { _, entry -> entry.id }) { index, entry ->
+            itemsIndexed(threeDigitEntries, key = { _, entry -> "three-${entry.id}" }) { index, entry ->
                 SaleNumberRow(
                     digitCount = 3,
                     firstDigit = entry.firstDigit,
@@ -286,7 +286,7 @@ fun SaleScreen(
             }
             item { Divider() }
             item { Text("2 ตัว", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
-            itemsIndexed(twoDigitEntries, key = { _, entry -> entry.id }) { index, entry ->
+            itemsIndexed(twoDigitEntries, key = { _, entry -> "two-${entry.id}" }) { index, entry ->
                 SaleNumberRow(
                     digitCount = 2,
                     firstDigit = entry.firstDigit,
