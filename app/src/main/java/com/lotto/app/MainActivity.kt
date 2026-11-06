@@ -1,6 +1,7 @@
 package com.lotto.app
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
@@ -29,7 +30,11 @@ class MainActivity : ComponentActivity() {
                         AppScreen.Sale.name -> SaleScreen(
                             onBack = { currentScreen = AppScreen.Home.name },
                             onSave = {
-                                // Persistence and receipt generation will be connected later.
+                                Toast.makeText(
+                                    this,
+                                    "หน้าขายยังอยู่ระหว่างพัฒนา ข้อมูลยังไม่ได้บันทึก",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                         )
                         else -> HomeScreen(
