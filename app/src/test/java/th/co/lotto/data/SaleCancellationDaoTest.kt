@@ -84,6 +84,38 @@ class SaleCancellationDaoTest {
     }
 
     @Test
+    fun cancelledUnpaidCreditBillIsRemovedFromCustomerBalance() {
+        val dao = createDatabase()
+        val now = System.currentTimeMillis()
+        val periodId = "period-credit-cancel"
+        dao.insertPeriod(DrawPeriodEntity(periodId, "งวดยกเลิกเครดิต", now + 86_400_000L, "OPEN", null, now, null, now))
+        val customerId = "customer-cancel"
+        dao.postCustomer(
+            CustomerEntity(customerId, "ลูกค้าเครดิต", "0891234567", "ข้อมูลยืนยัน", "CREDIT", now),
+            AuditEventEntity("audit-customer-cancel", "CUSTOMER", customerId, "CREATED", "test", now)
+        )
+        val documentId = "credit-cancelled"
+        dao.postSale(
+            SaleDocumentEntity(documentId, periodId, customerId, "CREDIT", 7_500L, now, "Asia/Bangkok"),
+            listOf(SaleLineEntity("credit-line-cancelled", documentId, periodId, "789", "THREE_TOP", 7_500L, false)),
+            AuditEventEntity("audit-credit-cancelled", "SALE_DOCUMENT", documentId, "POSTED", "test", now)
+        )
+        dao.cancelSaleDocument(
+            SaleCancellationEntity("cancel-unpaid-credit", documentId, 7_500L, "ลูกค้าเปลี่ยนใจ", now + 1_000L),
+            AuditEventEntity("audit-cancel-unpaid-credit", "SALE_CANCELLATION", "cancel-unpaid-credit", "CANCELLED", "test", now + 1_000L)
+        )
+
+        assertEquals(0L, dao.getCreditSalesTotal(customerId))
+        assertEquals(0, dao.getCreditDocumentsForCustomer(customerId).size)
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.postPayment(
+                PaymentEntryEntity("payment-after-cancel", documentId, customerId, 1_000L, now + 2_000L, "CASH", null),
+                AuditEventEntity("audit-payment-after-cancel", "PAYMENT", "payment-after-cancel", "POSTED", "test", now + 2_000L)
+            )
+        }
+    }
+
+    @Test
     fun databaseRejectsUnsupportedSaleCategoriesAndTwoDigitNumbers() {
         val dao = createDatabase()
         val now = System.currentTimeMillis()
