@@ -52,6 +52,7 @@ object PayoutCalculator {
                 else -> error("Unsupported payout category: ${match.betCategory}")
             }
             match.lines.map { line ->
+                require(line.periodId == snapshot.periodId) { "Matched line belongs to a different draw period" }
                 require(line.betCategory == match.betCategory) { "Matched line category mismatch" }
                 WinningLinePayout(
                     resultId = match.resultId,
