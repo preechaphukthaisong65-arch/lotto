@@ -354,8 +354,8 @@ class MainActivity : Activity() {
 
     private fun showSales() {
         base("หน้าขาย")
-        addText(currentBody, "กรอกรายการบรรทัดละ 1 รายการ: เลข,ประเภท,จำนวนเงิน,HALF หรือ FULL", 13, ink)
-        addText(currentBody, "ราคาเท่ากัน: ใส่ยอดเงินเดียวกันทุกบรรทัด • ราคาไม่เท่ากัน: ใส่ยอดแยกแต่ละบรรทัด\nตัวอย่าง: 12,TWO_TOP,20,FULL  •  123,THREE_TOAD,10,HALF", 12, 0xFF526171.toInt())
+        addText(currentBody, "เพิ่มรายการเลข ประเภท และจำนวนเงิน ระบบจะตรวจสอบกฎหวยอั้นและกำหนดสถานะจ่ายครึ่งให้อัตโนมัติ", 13, ink)
+        addText(currentBody, "ราคาเท่ากัน: ใส่ยอดเงินเท่ากันทุกบรรทัด • ราคาไม่เท่ากัน: ใส่ยอดแยกแต่ละบรรทัด", 12, 0xFF526171.toInt())
         addButton(currentBody, "＋ บันทึกบิลขาย") { createSaleDialog() }
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
         io.execute {
@@ -413,11 +413,10 @@ class MainActivity : Activity() {
                     val number = row.getChildAt(0) as EditText
                     val category = row.getChildAt(1) as Spinner
                     val amount = row.getChildAt(2) as EditText
-                    val half = row.getChildAt(3) as CheckBox
                     val numberText = number.text.toString().trim()
                     val amountText = amount.text.toString().trim()
                     if (numberText.isBlank() && amountText.isBlank()) return@mapNotNull null
-                    "$numberText,${categories[category.selectedItemPosition].second},$amountText,${if (half.isChecked) "HALF" else "FULL"}"
+                    "$numberText,${categories[category.selectedItemPosition].second},$amountText"
                 }.joinToString("\n")
 
                 fun refreshTotal() {
@@ -443,7 +442,6 @@ class MainActivity : Activity() {
                         inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
                         setSingleLine(true)
                     }
-                    val half = CheckBox(this).apply { text = "ครึ่ง" }
                     val remove = TextView(this).apply {
                         text = "ลบ"
                         setTextColor(0xFFB3261E.toInt())
@@ -459,7 +457,6 @@ class MainActivity : Activity() {
                         addView(number, LinearLayout.LayoutParams(0, dp(52), 1.0f))
                         addView(category, LinearLayout.LayoutParams(0, dp(52), 1.35f))
                         addView(amount, LinearLayout.LayoutParams(0, dp(52), 1.0f))
-                        addView(half, LinearLayout.LayoutParams(-2, dp(52)))
                         addView(remove, LinearLayout.LayoutParams(-2, dp(52)))
                     }
                     number.addTextChangedListener(object : TextWatcher {
@@ -476,7 +473,6 @@ class MainActivity : Activity() {
                         override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
                         override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) = refreshTotal()
                     }
-                    half.setOnCheckedChangeListener { _, _ -> refreshTotal() }
                     rows.addView(row)
                 }
 
@@ -492,7 +488,7 @@ class MainActivity : Activity() {
                     addView(customerType)
                     addView(TextView(this@MainActivity).apply { text = "เลือกลูกค้าเงินเชื่อ (เมื่อเลือกเงินเชื่อ)" })
                     addView(customer)
-                    addView(TextView(this@MainActivity).apply { text = "รายการ: เลข • ประเภท • ราคา • จ่ายครึ่ง" })
+                    addView(TextView(this@MainActivity).apply { text = "รายการ: เลข • ประเภท • ราคา (สถานะจ่ายครึ่งตรวจจากกฎหวยอั้น)" })
                     addView(rows)
                     addView(addRowButton)
                     addView(totalPreview)
@@ -521,7 +517,7 @@ class MainActivity : Activity() {
                             )
                             val lines = parsed.map { entry ->
                                 SaleLineEntity(UUID.randomUUID().toString(), documentId, period.periodId,
-                                    entry.number, entry.category, entry.amountSatang, entry.halfPayout)
+                                    entry.number, entry.category, entry.amountSatang, false)
                             }
                             val audit = AuditEventEntity(UUID.randomUUID().toString(), "SALE_DOCUMENT",
                                 documentId, "POSTED", "Sale posted from sales screen", now)
@@ -530,8 +526,9 @@ class MainActivity : Activity() {
                                 try {
                                     PeriodSchedule.advance(dao, System.currentTimeMillis())
                                     dao.postSale(document, lines, audit)
+                                    val savedLines = dao.getLinesForDocument(documentId)
                                     try {
-                                        val receipt = ReceiptRenderer.render(this, document, period.title, lines)
+                                        val receipt = ReceiptRenderer.render(this, document, period.title, savedLines)
                                         runOnUiThread {
                                             Toast.makeText(this, "บันทึกบิลสำเร็จ • ใบเสร็จบันทึกในเครื่องแล้ว", Toast.LENGTH_LONG).show()
                                             addText(currentBody, "บิลล่าสุด: ${documentId.take(8)} • ใบเสร็จ: ${receipt.name}", 12, ink)
@@ -957,10 +954,14 @@ class MainActivity : Activity() {
             text = "เปิดใช้กฎวงเงิน"
             isChecked = existing?.enabled ?: true
         }
+        val halfPayout = CheckBox(this).apply {
+            text = "เลขนี้จ่ายครึ่งอัตโนมัติ"
+            isChecked = existing?.halfPayout ?: false
+        }
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
-            addView(number); addView(category); addView(maximum); addView(enabled)
+            addView(number); addView(category); addView(maximum); addView(enabled); addView(halfPayout)
         }
         val title = if (existing == null) "กำหนดเลขอั้น/เลขเต็ม" else "แก้ไขวงเงิน ${existing.numberText}"
         val dialog = AlertDialog.Builder(this).setTitle(title).setView(form)
@@ -978,6 +979,7 @@ class MainActivity : Activity() {
                     require(maxSatang > 0L) { "วงเงินต้องมากกว่า 0" }
                     val ruleId = existing?.ruleId ?: UUID.randomUUID().toString()
                     val enabledValue = enabled.isChecked
+                    val halfPayoutValue = halfPayout.isChecked
                     io.execute {
                         try {
                             val dao = database.lottoDao()
@@ -985,7 +987,7 @@ class MainActivity : Activity() {
                                 ?: dao.getOpenPeriod()?.periodId ?: dao.getPreparedPeriod()?.periodId
                                 ?: error("ไม่มีงวดเปิดหรือเตรียมไว้")
                             val rule = NumberLimitRuleEntity(
-                                ruleId, periodId, n.length, cat, n, maxSatang, enabledValue
+                                ruleId, periodId, n.length, cat, n, maxSatang, enabledValue, halfPayoutValue
                             )
                             dao.saveLimitRule(rule)
                             runOnUiThread {
