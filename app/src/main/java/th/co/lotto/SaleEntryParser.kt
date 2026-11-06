@@ -15,7 +15,7 @@ data class ParsedSaleEntry(
  * are rejected rather than silently rounded.
  */
 object SaleEntryParser {
-    private val moneyPattern = Regex("""[0-9]+(?:\\.[0-9]{1,2})?""")
+    private val moneyPattern = Regex("""[0-9]+(?:\.[0-9]{1,2})?""")
 
     fun parse(text: String): List<ParsedSaleEntry> {
         val entries = text.lineSequence()
