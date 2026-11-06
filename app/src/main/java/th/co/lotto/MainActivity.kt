@@ -1202,9 +1202,10 @@ class MainActivity : Activity() {
                         val grossSales = documents.fold(0L) { total, document ->
                             Math.addExact(total, document.totalAmountSatang)
                         }
-                        val payoutSummary = snapshot?.let {
+                        val verified = dao.isResultVerificationComplete(selectedPeriod.periodId)
+                        val payoutSummary = if (verified) snapshot?.let {
                             runCatching { PayoutCalculator.calculatePeriod(matches, it, grossSales) }.getOrNull()
-                        }
+                        } else null
                         runOnUiThread {
                             if (savedResults.isEmpty()) addText(resultList, "ยังไม่มีผลหวยสำหรับตรวจสอบ", 13, ink)
                             else if (matches.isEmpty()) addText(resultList, "ยังไม่พบรายการขายที่ตรงกับผลที่บันทึก", 13, ink)
@@ -1494,8 +1495,9 @@ class MainActivity : Activity() {
                             val payments = documents.associate { it.documentId to dao.getPaymentsTotalForDocument(it.documentId) }
                             val drawResults = dao.getDrawResults(period.periodId)
                             val snapshot = dao.getSettlementSnapshot(period.periodId)
+                            val verified = dao.isResultVerificationComplete(period.periodId)
                             val matches = DrawResultMatcher.findMatches(drawResults, lines)
-                            val payoutSummary = snapshot?.let {
+                            val payoutSummary = if (verified) snapshot?.let {
                                 runCatching { PayoutCalculator.calculatePeriod(matches, it, documents.fold(0L) { total, doc ->
                                     Math.addExact(total, doc.totalAmountSatang)
                                 }) }.getOrNull()
@@ -1518,7 +1520,7 @@ class MainActivity : Activity() {
                                     addText(results, "ยอดจ่ายรางวัลรวม: ${formatMoney(payoutSummary.totalPayoutSatang)}", 16, navy)
                                     addText(results, "ยอดขายหลังหักรางวัล: ${formatMoney(payoutSummary.salesAfterPayoutSatang)}", 15, navy)
                                 } else {
-                                    addText(results, "ยังไม่มียอดจ่ายรางวัล • ต้องมีผล GLO และ snapshot อัตราจ่ายของงวด", 12, 0xFF9B2C2C.toInt())
+                                    addText(results, "ระงับยอดจ่ายรางวัล • ผลยังไม่ผ่านการตรวจสอบจากสองเว็บไซต์หรือการยืนยันด้วยตนเอง", 12, 0xFF9B2C2C.toInt())
                                 }
                                 addText(results, "ยอดแยกประเภท", 16, navy)
                                 report.categoryTotalsSatang.forEach { (category, amount) ->
