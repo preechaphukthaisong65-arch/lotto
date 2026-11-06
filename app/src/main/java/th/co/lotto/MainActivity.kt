@@ -1316,6 +1316,10 @@ class MainActivity : Activity() {
                     io.execute {
                         try {
                             val documents = dao.getSalesForPeriod(period.periodId)
+                            val cancellations = dao.getSaleCancellationsForPeriod(period.periodId)
+                            val cancelledOriginalAmount = cancellations.fold(0L) { total, item ->
+                                Math.addExact(total, item.originalAmountSatang)
+                            }
                             val lines = documents.flatMap { dao.getLinesForDocument(it.documentId) }
                             val payments = documents.associate { it.documentId to dao.getPaymentsTotalForDocument(it.documentId) }
                             val report = PeriodReportEngine.calculate(
@@ -1330,6 +1334,7 @@ class MainActivity : Activity() {
                                 addText(results, "เงินเชื่อ: ${formatMoney(report.creditSalesSatang)}", 14, ink)
                                 addText(results, "รับชำระแล้ว: ${formatMoney(report.paymentsReceivedSatang)}", 14, ink)
                                 addText(results, "ยอดค้างเงินเชื่อ: ${formatMoney(report.outstandingCreditSatang)}", 14, ink)
+                                addText(results, "บิลที่ยกเลิก: ${cancellations.size} ฉบับ • ยอดเดิมรวม ${formatMoney(cancelledOriginalAmount)}", 14, ink)
                                 addText(results, "เลขจ่ายครึ่ง: ${report.halfPayoutLineCount} รายการ • ยอดขาย ${formatMoney(report.halfPayoutAmountSatang)}", 14, ink)
                                 addText(results, "ยอดแยกประเภท", 16, navy)
                                 report.categoryTotalsSatang.forEach { (category, amount) ->
@@ -1339,17 +1344,15 @@ class MainActivity : Activity() {
                                 report.dailyGrossSalesSatang.forEach { (date, amount) ->
                                     addText(results, "$date • ${formatMoney(amount)}", 14, ink)
                                 }
-                                if (report.correctionDocumentCount > 0) {
-                                    addText(results, "มีเอกสารแก้ไข ${report.correctionDocumentCount} ฉบับ • ยอดขายรวมข้างต้นนับรวมเอกสารแก้ไขด้วย และยังไม่หักกลบเป็นยอดสุทธิ", 13, 0xFF9B2C2C.toInt())
-                                }
-                                addText(results, "ยังไม่คำนวณยอดจ่ายรางวัล กำไร หรือยอดสุทธิ จนกว่าจะกำหนดสูตรและกฎบัญชีตาม SRS 0.2", 13, 0xFF9B2C2C.toInt())
+                                addText(results, "ยอดขายรวมไม่รวมบิลที่ยกเลิก • ยอดบิลยกเลิกแสดงแยกด้านบน", 12, 0xFF526171.toInt())
+                                addText(results, "ยังไม่คำนวณยอดจ่ายรางวัลหรือยอดหลังหักรางวัล • รอการยืนยันการปัดเศษและวิธีบันทึกเงินคืนจากบิลเงินสดที่ยกเลิก", 13, 0xFF9B2C2C.toInt())
                                 addButton(results, "ส่งออกรายงาน CSV") {
                                     val csv = buildString {
                                         appendLine("section,value")
                                         appendLine("period,\"${period.title.replace("\"", "\"\"")}\"")
                                         appendLine("documents,${report.documentCount}")
-                                        appendLine("original_documents,${report.originalDocumentCount}")
-                                        appendLine("correction_documents,${report.correctionDocumentCount}")
+                                        appendLine("cancelled_bills,${cancellations.size}")
+                                        appendLine("cancelled_original_amount_satang,${cancelledOriginalAmount}")
                                         appendLine("gross_sales_satang,${report.grossSalesSatang}")
                                         appendLine("cash_sales_satang,${report.cashSalesSatang}")
                                         appendLine("credit_sales_satang,${report.creditSalesSatang}")
