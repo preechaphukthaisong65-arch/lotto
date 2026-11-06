@@ -29,6 +29,7 @@ class DrawCalendarParserTest {
     @Test
     fun parsesHuayReviewTableWithMonthYearRows() {
         val html = """
+            <p>งวด 16 ธันวาคม 2569 เลื่อนไปเป็น 17 ธันวาคม 2569</p>
             <table>
               <tr><td>พ.ย. 2569</td><td>อาทิตย์ 1 พ.ย. · จันทร์ 16 พ.ย.</td></tr>
               <tr><td>ธ.ค. 2569</td><td>อังคาร 1 ธ.ค. · พฤหัสบดี 17 ธ.ค.</td></tr>
