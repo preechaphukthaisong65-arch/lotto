@@ -2,7 +2,7 @@ package th.co.lotto
 import th.co.lotto.data.DrawResultEntity
 import th.co.lotto.data.SaleLineEntity
 data class WinningLineMatch(val resultId:String,val resultType:String,val winningNumber:String,val betCategory:String,val lines:List<SaleLineEntity>)
-/** TWO_TOP derives from first-prize tail; TWO_BOTTOM is official GLO last-two. */
+/** TWO_TOP derives from first-prize tail; TWO_BOTTOM uses the published last-two result. */
 object DrawResultMatcher {
  private val aliases=mapOf("THREE_TOP" to "THREE_TOP","3 ตัวบน" to "THREE_TOP","3บน" to "THREE_TOP","TWO_BOTTOM" to "TWO_BOTTOM","2 ตัวล่าง" to "TWO_BOTTOM","2ล่าง" to "TWO_BOTTOM")
  fun findMatches(results:List<DrawResultEntity>,saleLines:List<SaleLineEntity>):List<WinningLineMatch> =
