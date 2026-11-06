@@ -766,7 +766,8 @@ class MainActivity : Activity() {
                     rules.forEach { rule ->
                         val typeLabel = when (rule.blockCategory) {
                             "TWO_DIGIT" -> "2 ตัว (บน/ล่าง)"
-                            "THREE_STRAIGHT" -> "3 ตัวเต็ง (บน/ล่าง)"
+                            "THREE_TOP" -> "3 ตัวบน"
+                            "THREE_BOTTOM" -> "3 ตัวล่าง"
                             "THREE_TOAD" -> "3 ตัวโต๊ด"
                             else -> rule.blockCategory
                         }
@@ -807,8 +808,8 @@ class MainActivity : Activity() {
             hint = "เลข 2 หรือ 3 หลัก"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
-        val labels = listOf("2 ตัว (บน/ล่าง)", "3 ตัวเต็ง (บน/ล่าง)", "3 ตัวโต๊ด")
-        val categories = listOf("TWO_DIGIT", "THREE_STRAIGHT", "THREE_TOAD")
+        val labels = listOf("2 ตัว (บน/ล่าง)", "3 ตัวบน", "3 ตัวล่าง", "3 ตัวโต๊ด")
+        val categories = listOf("TWO_DIGIT", "THREE_TOP", "THREE_BOTTOM", "THREE_TOAD")
         val category = Spinner(this).apply {
             adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, labels)
         }
