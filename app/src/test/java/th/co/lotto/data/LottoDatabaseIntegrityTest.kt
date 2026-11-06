@@ -218,7 +218,7 @@ class LottoDatabaseIntegrityTest {
     fun drawResultsRequireClosedPeriodAndAreImmutableWithAudit() {
         dao.insertPeriod(period("period-1"))
         val openResult = DrawResultEntity(
-            "result-open", "period-1", "TWO_BOTTOM", "12", "manual", null, 10L
+            "result-open", "period-1", "THREE_TOP", "12", "GLO", null, 10L
         )
         val openAudit = AuditEventEntity(
             "result-open-event", "DRAW_RESULT", "result-open", "POSTED", "test", 10L
@@ -227,7 +227,7 @@ class LottoDatabaseIntegrityTest {
             dao.postDrawResult(openResult, openAudit)
         }
         database.openHelper.writableDatabase.execSQL("UPDATE draw_periods SET status = 'CLOSED' WHERE periodId = 'period-1'")
-        val result = openResult.copy(resultId = "result-closed", verifiedAtEpochMillis = 20L, importedAtEpochMillis = 20L)
+        val result = openResult.copy(resultId = "result-closed", winningNumber = "123", sourceLabel = "GLO", verifiedAtEpochMillis = 20L, importedAtEpochMillis = 20L)
         val audit = openAudit.copy(eventId = "result-event", entityId = "result-closed", createdAtEpochMillis = 20L)
         dao.postDrawResult(result, audit)
         assertEquals(1, dao.getDrawResults("period-1").size)
@@ -245,16 +245,16 @@ class LottoDatabaseIntegrityTest {
     fun saleHistoryCanSearchByDocumentOrNumberAndFilterByPeriod() {
         dao.insertPeriod(period("period-1"))
         val first = SaleDocumentEntity("document-alpha", "period-1", null, "CASH", 2_000L, 10L, "Asia/Bangkok")
-        dao.postSale(first, listOf(SaleLineEntity("line-1", "document-alpha", "period-1", "12", "TWO_TOP", 2_000L, false)),
+        dao.postSale(first, listOf(SaleLineEntity("line-1", "document-alpha", "period-1", "123", "THREE_TOP", 2_000L, false)),
             AuditEventEntity("event-1", "SALE_DOCUMENT", "document-alpha", "POSTED", "test", 10L))
         database.openHelper.writableDatabase.execSQL("UPDATE draw_periods SET status = 'CLOSED' WHERE periodId = 'period-1'")
         dao.insertPeriod(period("period-2"))
         val second = SaleDocumentEntity("document-beta", "period-2", null, "CASH", 3_000L, 20L, "Asia/Bangkok")
-        dao.postSale(second, listOf(SaleLineEntity("line-2", "document-beta", "period-2", "123", "THREE_TOAD", 3_000L, true)),
+        dao.postSale(second, listOf(SaleLineEntity("line-2", "document-beta", "period-2", "456", "THREE_TOAD", 3_000L, true)),
             AuditEventEntity("event-2", "SALE_DOCUMENT", "document-beta", "POSTED", "test", 20L))
 
-        assertEquals(listOf("document-alpha"), dao.searchSales("period-1", "12").map { it.documentId })
-        assertEquals(listOf("document-beta"), dao.searchSales(null, "123").map { it.documentId })
+        assertEquals(listOf("document-alpha"), dao.searchSales("period-1", "123").map { it.documentId })
+        assertEquals(listOf("document-beta"), dao.searchSales(null, "456").map { it.documentId })
         assertEquals(listOf("document-alpha"), dao.searchSales(null, "alpha").map { it.documentId })
         assertEquals(2, dao.searchSales(null, "").size)
     }
