@@ -397,6 +397,24 @@ abstract class LottoDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract fun insertDrawResult(result: DrawResultEntity)
 
+    @Transaction
+    open fun postDrawResult(result: DrawResultEntity, audit: AuditEventEntity) {
+        require(result.resultId.isNotBlank()) { "Result ID is required" }
+        require(result.resultType.isNotBlank()) { "Result type is required" }
+        require(result.winningNumber.isNotBlank() && result.winningNumber.all { it in '0'..'9' }) {
+            "Winning number must contain digits only"
+        }
+        require(result.sourceLabel.isNotBlank()) { "Result source is required" }
+        val period = getPeriod(result.periodId) ?: error("Draw period not found")
+        require(period.status == "CLOSED") { "Results can only be recorded for a closed draw period" }
+        require(audit.eventId.isNotBlank() && audit.entityType == "DRAW_RESULT" &&
+            audit.entityId == result.resultId && audit.action == "POSTED") {
+            "Result audit event does not match the result"
+        }
+        insertDrawResult(result)
+        insertAuditEvent(audit)
+    }
+
     @Query("SELECT * FROM draw_results WHERE periodId = :periodId ORDER BY importedAtEpochMillis DESC")
     abstract fun getDrawResults(periodId: String): List<DrawResultEntity>
 
