@@ -59,6 +59,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DrawCalendarReminder.ensureScheduled(applicationContext)
+        PeriodScheduleReminder.ensureScheduled(applicationContext)
         showHome()
     }
 
