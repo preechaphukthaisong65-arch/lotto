@@ -170,6 +170,9 @@ abstract class LottoDao {
         require(scheduledClose == null || System.currentTimeMillis() < scheduledClose) {
             "Sales cutoff time has passed"
         }
+        require(document.correctionOfDocumentId == null) {
+            "Editing or correcting a confirmed bill is disabled; cancel it and create a new bill"
+        }
         document.correctionOfDocumentId?.let { originalId ->
             val original = getSaleDocument(originalId) ?: error("Original sale document not found")
             require(original.periodId == document.periodId) { "Correction must stay in the original draw period" }
