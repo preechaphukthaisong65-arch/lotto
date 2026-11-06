@@ -15,9 +15,8 @@ import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 /**
- * Local draw-period schedule. It is evaluated while the app is active and
- * whenever a sale is about to be posted; missed transitions are caught up
- * on the next foreground check.
+ * Local draw-period schedule. Foreground checks and a periodic WorkManager
+ * worker evaluate it; missed transitions are caught up on the next run.
  */
 object PeriodSchedule {
     private val bangkokZone: ZoneId = ZoneId.of("Asia/Bangkok")
