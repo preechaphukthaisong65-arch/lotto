@@ -125,7 +125,7 @@ data class NumberLimitRuleEntity(
 data class NumberBlockRuleEntity(
     @PrimaryKey val ruleId: String,
     val periodId: String,
-    /** TWO_DIGIT, THREE_TOP, THREE_BOTTOM, or THREE_TOAD */
+    /** THREE_TOP or THREE_TOAD only */
     val blockCategory: String,
     val numberText: String,
     val blocked: Boolean,
