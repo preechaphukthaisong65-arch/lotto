@@ -351,11 +351,15 @@ object DrawCalendarReminder {
             prefs.edit().remove("last_mismatch_alert").apply()
             val previous = prefs.getString("last_confirmed_dates", "").orEmpty()
             if (previous.isNotBlank() && previous != current) {
-                val oldDate = previous.substringBefore(",")
-                val newDate = state.confirmedDates.firstOrNull()?.toString().orEmpty()
-                if (oldDate != newDate && newDate.isNotBlank()) {
+                val oldDates = previous.split(",")
+                val newDates = state.confirmedDates.map { it.toString() }
+                val changedIndex = (0 until maxOf(oldDates.size, newDates.size))
+                    .firstOrNull { oldDates.getOrNull(it) != newDates.getOrNull(it) }
+                if (changedIndex != null) {
+                    val oldDate = oldDates.getOrNull(changedIndex) ?: "ไม่มีรายการเดิม"
+                    val newDate = newDates.getOrNull(changedIndex) ?: "ไม่มีรายการใหม่"
                     post(context, 800001, "มีการเปลี่ยนวันออกรางวัล",
-                        "วันงวดถัดไปเปลี่ยนจาก $oldDate เป็น $newDate ตามสถานะ " +
+                        "งวดลำดับ ${changedIndex + 1} เปลี่ยนจาก $oldDate เป็น $newDate ตามสถานะ " +
                             if (state.status == "USER_CONFIRMED") "ที่ผู้ใช้ยืนยัน" else "ที่ทั้งสองเว็บไซต์ยืนยันตรงกัน")
                 }
             }
