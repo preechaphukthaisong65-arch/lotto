@@ -1239,66 +1239,55 @@ class MainActivity : Activity() {
                         }
                     }
                 }
-                addButton(currentBody, "＋ บันทึกผลหวย") {
+                addButton(currentBody, "＋ ดึงผลรางวัลจากเว็บไซต์ GLO") {
                     val selected = periods[picker.selectedItemPosition]
                     if (selected.status != "CLOSED") {
-                        Toast.makeText(this, "ต้องปิดงวดก่อนจึงจะบันทึกผลหวยได้", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, "ต้องปิดงวดก่อนจึงจะดึงผลรางวัลได้", Toast.LENGTH_LONG).show()
                         return@addButton
                     }
-                    val type = Spinner(this).apply {
-                        adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
-                            listOf("3 ตัวบน", "3 ตัวโต๊ด"))
+                    val drawDate = selected.drawDateEpochMillis
+                    if (drawDate == null) {
+                        Toast.makeText(this, "กรุณากำหนดวันที่ออกรางวัลของงวดนี้ก่อน", Toast.LENGTH_LONG).show()
+                        return@addButton
                     }
-                    val number = EditText(this).apply {
-                        hint = "เลขผลรางวัล"
-                        inputType = android.text.InputType.TYPE_CLASS_NUMBER
-                    }
-                    val source = EditText(this).apply { hint = "แหล่งที่มาของผลหวย" }
-                    val verified = CheckBox(this).apply { text = "ตรวจสอบผลแล้ว" }
-                    val form = LinearLayout(this).apply {
-                        orientation = LinearLayout.VERTICAL
-                        setPadding(dp(20), dp(8), dp(20), 0)
-                        addView(type); addView(number); addView(source); addView(verified)
-                    }
-                    val dialog = AlertDialog.Builder(this).setTitle("บันทึกผล • ${selected.title}").setView(form)
-                        .setNegativeButton("กลับ", null).setPositiveButton("บันทึก", null).create()
-                    dialog.setOnShowListener {
-                        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                            val resultType = if (type.selectedItemPosition == 0) "THREE_TOP" else "THREE_TOAD"
-                            val winningNumber = number.text.toString().trim()
-                            val sourceLabel = source.text.toString().trim()
-                            val expectedLength = 3
-                            if (winningNumber.length != expectedLength || !winningNumber.all { it in '0'..'9' }) {
-                                number.error = "กรุณากรอกเลข $expectedLength หลักให้ถูกต้อง"; return@setOnClickListener
+                    io.execute {
+                        try {
+                            require(dao.getDrawResults(selected.periodId).none { it.resultType == "THREE_TOP" }) {
+                                "งวดนี้มีผลรางวัล 3 ตัวบนบันทึกไว้แล้ว ไม่สามารถนำเข้าซ้ำ"
                             }
-                            if (sourceLabel.isBlank()) { source.error = "กรุณาระบุแหล่งที่มา"; return@setOnClickListener }
-                            val now = System.currentTimeMillis()
+                            val official = GloResultClient().fetchTopResult(drawDate)
+                            val now = official.fetchedAtEpochMillis
                             val result = th.co.lotto.data.DrawResultEntity(
-                                UUID.randomUUID().toString(), selected.periodId, resultType,
-                                winningNumber, sourceLabel, if (verified.isChecked) now else null, now
+                                UUID.randomUUID().toString(),
+                                selected.periodId,
+                                "THREE_TOP",
+                                official.threeTopNumber,
+                                "GLO Official API • ${official.sourceUrl} • รางวัลที่ 1 ${official.firstPrizeNumber}",
+                                now,
+                                now
                             )
                             val audit = AuditEventEntity(
-                                UUID.randomUUID().toString(), "DRAW_RESULT", result.resultId,
-                                "POSTED", "Result recorded from manual entry", now
+                                UUID.randomUUID().toString(),
+                                "DRAW_RESULT",
+                                result.resultId,
+                                "IMPORTED_GLO",
+                                "GLO draw ${official.drawDateIso}; first prize ${official.firstPrizeNumber}; THREE_TOP ${official.threeTopNumber}; fetchedAt=$now",
+                                now
                             )
-                            io.execute {
-                                try {
-                                    dao.postDrawResult(result, audit)
-                                    runOnUiThread {
-                                        Toast.makeText(this, "บันทึกผลหวยแล้ว", Toast.LENGTH_SHORT).show()
-                                        dialog.dismiss()
-                                        showResults()
-                                    }
-                                } catch (e: Exception) {
-                                    runOnUiThread { Toast.makeText(this, "บันทึกผลไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
-                                }
+                            dao.postDrawResult(result, audit)
+                            runOnUiThread {
+                                Toast.makeText(this, "นำเข้าผล GLO แล้ว • 3 ตัวบน ${official.threeTopNumber}", Toast.LENGTH_LONG).show()
+                                showResults()
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                Toast.makeText(this, "ดึงผลจาก GLO ไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show()
                             }
                         }
                     }
-                    dialog.show()
                 }
                 currentBody.addView(resultList)
-                addText(currentBody, "ขณะนี้บันทึกผลและประวัติการตรวจสอบได้แล้ว แต่ยังไม่คำนวณยอดจ่ายหรือยอดสุทธิ จนกว่าจะอนุมัติสูตรและกฎการจับคู่ผล", 13, 0xFF9B2C2C.toInt())
+                addText(currentBody, "ผลรางวัลนำเข้าจาก GLO โดยตรงเท่านั้น • หาก GLO ไม่พร้อมใช้งาน ระบบจะไม่ใช้ผลจากเว็บอื่นแทน • ผลที่บันทึกแล้วใช้งานออฟไลน์ได้", 12, 0xFF526171.toInt())
             }
         }
     }
