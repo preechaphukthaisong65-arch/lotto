@@ -13,11 +13,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.lotto.app.ui.HomeScreen
+import com.lotto.app.ui.reports.ReportDetailScreen
+import com.lotto.app.ui.reports.ReportsScreen
 import com.lotto.app.ui.sale.SaleScreen
 
 private enum class AppScreen {
     Home,
-    Sale
+    Sale,
+    Reports,
+    TotalSales,
+    Performance
 }
 
 class MainActivity : ComponentActivity() {
@@ -61,8 +66,22 @@ class MainActivity : ComponentActivity() {
                                 saleId
                             }
                         )
+                        AppScreen.Reports.name -> ReportsScreen(
+                            onBack = { currentScreen = AppScreen.Home.name },
+                            onOpenTotalSales = { currentScreen = AppScreen.TotalSales.name },
+                            onOpenPerformance = { currentScreen = AppScreen.Performance.name }
+                        )
+                        AppScreen.TotalSales.name -> ReportDetailScreen(
+                            title = "ยอดขายทั้งหมด",
+                            onBack = { currentScreen = AppScreen.Reports.name }
+                        )
+                        AppScreen.Performance.name -> ReportDetailScreen(
+                            title = "ยอดผลประกอบการ",
+                            onBack = { currentScreen = AppScreen.Reports.name }
+                        )
                         else -> HomeScreen(
-                            onOpenSale = { currentScreen = AppScreen.Sale.name }
+                            onOpenSale = { currentScreen = AppScreen.Sale.name },
+                            onOpenReports = { currentScreen = AppScreen.Reports.name }
                         )
                     }
                 }
