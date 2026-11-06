@@ -19,5 +19,7 @@ data class DrawSourceCheckEntity(
     val threeTopNumber: String,
     val twoBottomNumber: String,
     val sourceUrl: String,
-    val fetchedAtEpochMillis: Long
+    val fetchedAtEpochMillis: Long,
+    val checkStatus: String = "SUCCESS",
+    val errorMessage: String? = null
 )
