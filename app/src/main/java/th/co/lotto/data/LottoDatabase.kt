@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DrawResultEntity::class,
         AuditEventEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -27,6 +27,13 @@ abstract class LottoDatabase : RoomDatabase() {
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                installIntegrityGuards(db)
+            }
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE draw_periods ADD COLUMN scheduledOpenEpochMillis INTEGER")
                 installIntegrityGuards(db)
             }
         }
@@ -125,6 +132,7 @@ abstract class LottoDatabase : RoomDatabase() {
             db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_audit_delete BEFORE DELETE ON audit_events BEGIN SELECT RAISE(ABORT, 'Audit events are immutable'); END")
 
             db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_periods_status_createdAtEpochMillis ON draw_periods(status, createdAtEpochMillis)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_draw_periods_single_prepared ON draw_periods(status) WHERE status = 'PREPARED'")
             db.execSQL("CREATE INDEX IF NOT EXISTS index_sale_lines_period_number_category ON sale_lines(periodId, numberText, betCategory)")
         }
 
@@ -134,7 +142,7 @@ abstract class LottoDatabase : RoomDatabase() {
                 LottoDatabase::class.java,
                 "lotto-local.db"
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
