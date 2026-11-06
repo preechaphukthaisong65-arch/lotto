@@ -13,7 +13,10 @@ Lotto is being developed as an Android-only, offline-first application. The on-d
 - Room/SQLite local schema for periods, customers, sale documents/lines, payments, limits, results, and audit events.
 - Atomic sale-posting DAO method and database triggers protecting posted sale documents and lines from update/delete.
 - Initial home navigation, period creation/list, and customer creation/list.
-- Sales, credit/payment workflows, limit engine, receipts, settlement, PIN, and encrypted backup/restore remain to be implemented and tested before the app can be called complete.
+- Sales, credit/payment workflows, period limits, receipts, result matching, reports, and immutable payout-rate snapshots are implemented on the offline branch.
+- Encrypted local backup/restore is implemented with a user-supplied passphrase; it packages the SQLite database and receipt images, validates the archive/database before replacement, and includes rollback protection.
+- PIN roles and per-module permissions remain a deliberate decision gate; no speculative role model is enabled.
+- Final physical-device and airplane-mode acceptance testing is still required.
 - Payout rules and other unresolved decisions in SRS 0.2 are intentionally not guessed or enabled.
 
 ## Build debug APK
@@ -25,4 +28,4 @@ The workflow is `.github/workflows/android-build.yml`. Pushes to `main`, `featur
 - Gradle 8.9
 - Compile SDK 35 / Minimum SDK 26
 
-This is a test build, not a signed production release.
+This is a test build, not a signed production release. Backups are portable encrypted files; keep the passphrase separately because it cannot be recovered.
