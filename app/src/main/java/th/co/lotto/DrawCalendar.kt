@@ -81,7 +81,8 @@ object DrawCalendarService {
             return DrawCalendarState("STALE", lottery.dates, huay.dates, emptyList(), latestTime,
                 "ออฟไลน์ • แสดงข้อมูลปฏิทินที่บันทึกไว้เท่านั้น ไม่ถือเป็นการยืนยันข้อมูลปัจจุบัน")
         }
-        val stale = System.currentTimeMillis() - minOf(lottery.fetchedAt, huay.fetchedAt) > 36L * 60L * 60L * 1000L
+        val checksTooFarApart = kotlin.math.abs(lottery.fetchedAt - huay.fetchedAt) > 10L * 60L * 1000L
+        val stale = System.currentTimeMillis() - minOf(lottery.fetchedAt, huay.fetchedAt) > 36L * 60L * 60L * 1000L || checksTooFarApart
         if (!lottery.successful || !huay.successful) {
             val reason = listOfNotNull(
                 lottery.error?.let { "LotteryChecks: $it" },
@@ -100,7 +101,7 @@ object DrawCalendarService {
         val hasMismatch = compareCount > confirmed.size
         if (stale) {
             return DrawCalendarState("STALE", lottery.dates, huay.dates, emptyList(), latestTime,
-                "ข้อมูลเกิน 36 ชั่วโมงแล้ว ต้องตรวจสอบใหม่ก่อนใช้ยืนยันวันงวด")
+                "ข้อมูลเก่า หรือเวลาตรวจสอบสองแหล่งห่างกันเกิน 10 นาที ต้องตรวจสอบใหม่ก่อนยืนยันวันงวด")
         }
         if (confirmed.isEmpty() || hasMismatch) {
             return DrawCalendarState("DISAGREEMENT", lottery.dates, huay.dates, emptyList(), latestTime,
