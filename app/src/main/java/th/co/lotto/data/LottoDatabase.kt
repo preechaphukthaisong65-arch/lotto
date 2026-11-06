@@ -215,6 +215,13 @@ abstract class LottoDatabase : RoomDatabase() {
             db.execSQL("CREATE INDEX IF NOT EXISTS index_sale_lines_period_number_category ON sale_lines(periodId, numberText, betCategory)")
         }
 
+        fun closeForRestore() {
+            synchronized(this) {
+                INSTANCE?.close()
+                INSTANCE = null
+            }
+        }
+
         fun getInstance(context: Context): LottoDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
