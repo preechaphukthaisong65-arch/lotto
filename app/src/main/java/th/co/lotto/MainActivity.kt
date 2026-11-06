@@ -18,6 +18,7 @@ import th.co.lotto.data.LottoDatabase
 import th.co.lotto.data.SaleDocumentEntity
 import th.co.lotto.data.SaleLineEntity
 import th.co.lotto.data.AuditEventEntity
+import th.co.lotto.data.PaymentEntryEntity
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.UUID
@@ -74,8 +75,8 @@ class MainActivity : Activity() {
         addCard(currentBody, "หน้าขาย", "บันทึกรายการขายตามงวด") { showSales() }
         addCard(currentBody, "รายการขายและประวัติ", "ค้นหาเอกสารและตรวจสอบรายการต้นฉบับ") { showNotReady("รายการขายและประวัติ") }
         addCard(currentBody, "ลูกค้า", "จัดการลูกค้าเงินสดและเงินเชื่อ") { showCustomers() }
-        addCard(currentBody, "บัญชีเงินเชื่อ", "ยอดค้างและประวัติรับชำระ") { showNotReady("บัญชีเงินเชื่อ") }
-        addCard(currentBody, "รับชำระเงิน", "บันทึกรับชำระเต็มจำนวนหรือบางส่วน") { showNotReady("รับชำระเงิน") }
+        addCard(currentBody, "บัญชีเงินเชื่อ", "ยอดค้างและประวัติรับชำระ") { showCreditLedger() }
+        addCard(currentBody, "รับชำระเงิน", "บันทึกรับชำระเต็มจำนวนหรือบางส่วน") { showCreditLedger() }
         addCard(currentBody, "เลขอั้นและเลขเต็ม", "กำหนดวงเงินแยกตามประเภทเลข") { showNotReady("เลขอั้นและเลขเต็ม") }
         addCard(currentBody, "ผลหวยและสรุปยอด", "บันทึกผลและตรวจสอบยอดตามงวด") { showNotReady("ผลหวยและสรุปยอด") }
         addCard(currentBody, "รายงาน", "รายงานยอดขาย ลูกหนี้ และยอดคงเหลือ") { showNotReady("รายงาน") }
@@ -296,6 +297,108 @@ class MainActivity : Activity() {
             }
         }
     }
+
+
+    private fun showCreditLedger() {
+        base("บัญชีเงินเชื่อ")
+        addButton(currentBody, "กลับหน้าหลัก") { showHome() }
+        io.execute {
+            val dao = database.lottoDao()
+            val customers = dao.getCustomers().filter { it.customerType == "CREDIT" }
+            val rows = customers.map { customer ->
+                val documents = dao.getCreditDocumentsForCustomer(customer.customerId)
+                val sales = documents.sumOf { it.totalAmountSatang }
+                val paid = dao.getPaymentsTotal(customer.customerId)
+                Triple(customer, documents, (sales - paid).coerceAtLeast(0L))
+            }
+            runOnUiThread {
+                if (rows.isEmpty()) addText(currentBody, "ยังไม่มีลูกค้าเงินเชื่อ", 14, ink)
+                rows.forEach { (customer, documents, balance) ->
+                    addCard(currentBody, customer.displayName,
+                        "ยอดขายเชื่อ: ${formatMoney(documents.sumOf { it.totalAmountSatang })} • คงค้าง: ${formatMoney(balance)}") {
+                        showCustomerCreditDocuments(customer.customerId, customer.displayName)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun showCustomerCreditDocuments(customerId: String, customerName: String) {
+        base("ยอดค้าง • $customerName")
+        addButton(currentBody, "กลับบัญชีเงินเชื่อ") { showCreditLedger() }
+        io.execute {
+            val dao = database.lottoDao()
+            val documents = dao.getCreditDocumentsForCustomer(customerId)
+            val rows = documents.map { doc ->
+                val paid = dao.getPaymentsTotalForDocument(doc.documentId)
+                Triple(doc, paid, (doc.totalAmountSatang - paid).coerceAtLeast(0L))
+            }
+            runOnUiThread {
+                if (rows.isEmpty()) addText(currentBody, "ไม่มีเอกสารเงินเชื่อ", 14, ink)
+                rows.forEach { (doc, paid, due) ->
+                    addCard(currentBody, "บิล ${doc.documentId.take(8)}",
+                        "ยอดบิล: ${formatMoney(doc.totalAmountSatang)} • ชำระแล้ว: ${formatMoney(paid)} • คงเหลือ: ${formatMoney(due)}") {
+                        if (due > 0L) createPaymentDialog(doc.documentId, customerId, customerName, due)
+                        else Toast.makeText(this, "บิลนี้ชำระครบแล้ว", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun createPaymentDialog(documentId: String, customerId: String, customerName: String, outstandingSatang: Long) {
+        val amount = EditText(this).apply {
+            hint = "จำนวนเงิน (บาท)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+        }
+        val method = Spinner(this).apply {
+            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
+                listOf("CASH", "BANK_TRANSFER", "OTHER"))
+        }
+        val note = EditText(this).apply { hint = "หมายเหตุ (ไม่บังคับ)" }
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), 0)
+            addView(TextView(this@MainActivity).apply { text = "ลูกค้า: $customerName" })
+            addView(TextView(this@MainActivity).apply { text = "บิล: ${documentId.take(8)} • คงเหลือ ${formatMoney(outstandingSatang)}" })
+            addView(amount); addView(method); addView(note)
+        }
+        val dialog = AlertDialog.Builder(this).setTitle("รับชำระเงิน").setView(form)
+            .setNegativeButton("กลับ", null).setPositiveButton("บันทึก", null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                try {
+                    val satang = BigDecimal(amount.text.toString().trim())
+                        .multiply(BigDecimal(100)).setScale(0, RoundingMode.HALF_UP).longValueExact()
+                    require(satang > 0L) { "จำนวนเงินต้องมากกว่า 0" }
+                    require(satang <= outstandingSatang) { "จำนวนเงินเกินยอดคงเหลือ" }
+                    val now = System.currentTimeMillis()
+                    val payment = PaymentEntryEntity(UUID.randomUUID().toString(), documentId, customerId,
+                        satang, now, method.selectedItem.toString(), note.text.toString().trim().ifBlank { null })
+                    val audit = AuditEventEntity(UUID.randomUUID().toString(), "PAYMENT",
+                        payment.paymentId, "POSTED", "Credit payment posted", now)
+                    io.execute {
+                        try {
+                            database.lottoDao().postPayment(payment, audit)
+                            runOnUiThread {
+                                Toast.makeText(this, "บันทึกรับชำระแล้ว", Toast.LENGTH_SHORT).show()
+                                showCustomerCreditDocuments(customerId, customerName)
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread { Toast.makeText(this, "บันทึกไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
+                        }
+                    }
+                    dialog.dismiss()
+                } catch (e: Exception) {
+                    Toast.makeText(this, e.message ?: "ข้อมูลไม่ถูกต้อง", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun formatMoney(satang: Long): String =
+        String.format(Locale.US, "%.2f บาท", satang / 100.0)
 
     private fun showNotReady(module: String) {
         base(module)
