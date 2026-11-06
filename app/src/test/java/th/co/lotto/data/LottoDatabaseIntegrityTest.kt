@@ -260,19 +260,26 @@ class LottoDatabaseIntegrityTest {
     }
 
     @Test
-    fun linkedCorrectionCreatesNewDocumentAndPreservesOriginal() {
+    fun confirmedBillCannotBeCorrectedAndReplacementMustBeIndependent() {
         dao.insertPeriod(period("period-1"))
         val original = SaleDocumentEntity("sale-original", "period-1", null, "CASH", 1_000L, 10L, "Asia/Bangkok")
-        dao.postSale(original, listOf(SaleLineEntity("line-original", "sale-original", "period-1", "12", "TWO_TOP", 1_000L, false)),
+        dao.postSale(original, listOf(SaleLineEntity("line-original", "sale-original", "period-1", "123", "THREE_TOP", 1_000L, false)),
             AuditEventEntity("event-original", "SALE_DOCUMENT", "sale-original", "POSTED", "test", 10L))
 
         val correction = SaleDocumentEntity("sale-correction", "period-1", null, "CASH", 2_000L, 20L,
             "Asia/Bangkok", "sale-original")
-        dao.postSale(correction, listOf(SaleLineEntity("line-correction", "sale-correction", "period-1", "21", "TWO_BOTTOM", 2_000L, true)),
-            AuditEventEntity("event-correction", "SALE_DOCUMENT", "sale-correction", "POSTED", "linked correction", 20L))
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.postSale(correction, listOf(SaleLineEntity("line-correction", "sale-correction", "period-1", "456", "THREE_TOP", 2_000L, false)),
+                AuditEventEntity("event-correction", "SALE_DOCUMENT", "sale-correction", "POSTED", "correction forbidden", 20L))
+        }
+
+        val replacement = SaleDocumentEntity("sale-replacement", "period-1", null, "CASH", 2_000L, 30L, "Asia/Bangkok")
+        dao.postSale(replacement, listOf(SaleLineEntity("line-replacement", "sale-replacement", "period-1", "456", "THREE_TOP", 2_000L, false)),
+            AuditEventEntity("event-replacement", "SALE_DOCUMENT", "sale-replacement", "POSTED", "new independent bill", 30L))
 
         assertEquals(1_000L, dao.getSaleDocument("sale-original")?.totalAmountSatang)
-        assertEquals("sale-original", dao.getSaleDocument("sale-correction")?.correctionOfDocumentId)
+        assertEquals(null, dao.getSaleDocument("sale-correction"))
+        assertEquals(null, dao.getSaleDocument("sale-replacement")?.correctionOfDocumentId)
         assertEquals(2, dao.searchSales("period-1", "").size)
     }
 
