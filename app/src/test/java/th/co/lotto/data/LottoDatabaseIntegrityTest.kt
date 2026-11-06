@@ -444,29 +444,12 @@ class LottoDatabaseIntegrityTest {
     }
 
     @Test
-    fun blockedTwoDigitNumberRejectsBothTopAndBottomUntilUnblocked() {
+    fun legacyTwoDigitBlockedCategoryIsRejected() {
         dao.insertPeriod(period("period-1"))
-        dao.setNumberBlocked("block-00", "period-1", "TWO_DIGIT", "00", true, 10L, "block-event")
-        val top = SaleDocumentEntity("sale-top", "period-1", null, "CASH", 100L, 11L, "Asia/Bangkok")
         assertThrows(IllegalArgumentException::class.java) {
-            dao.postSale(top,
-                listOf(SaleLineEntity("line-top", "sale-top", "period-1", "00", "TWO_TOP", 100L, false)),
-                AuditEventEntity("sale-event-top", "SALE_DOCUMENT", "sale-top", "POSTED", "test", 11L))
+            dao.setNumberBlocked("block-00", "period-1", "TWO_DIGIT", "00", true, 10L, "block-event")
         }
-        val bottom = SaleDocumentEntity("sale-bottom", "period-1", null, "CASH", 100L, 12L, "Asia/Bangkok")
-        assertThrows(IllegalArgumentException::class.java) {
-            dao.postSale(bottom,
-                listOf(SaleLineEntity("line-bottom", "sale-bottom", "period-1", "00", "TWO_BOTTOM", 100L, false)),
-                AuditEventEntity("sale-event-bottom", "SALE_DOCUMENT", "sale-bottom", "POSTED", "test", 12L))
-        }
-
-        dao.setNumberBlocked("block-00", "period-1", "TWO_DIGIT", "00", false, 13L, "unblock-event")
-        dao.postSale(bottom,
-            listOf(SaleLineEntity("line-bottom", "sale-bottom", "period-1", "00", "TWO_BOTTOM", 100L, false)),
-            AuditEventEntity("sale-event-bottom", "SALE_DOCUMENT", "sale-bottom", "POSTED", "test", 14L))
-
-        assertEquals(listOf("BLOCKED", "UNBLOCKED"), dao.getAuditEvents("block-00").map { it.action })
-        assertEquals(1, dao.documentExists("sale-bottom"))
+        assertEquals(0, dao.getAllNumberBlockRules("period-1").size)
     }
 
     @Test
