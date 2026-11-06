@@ -5,14 +5,14 @@ data class ThreeDigitEntry(
     val firstDigit: String = "",
     val secondDigit: String = "",
     val thirdDigit: String = "",
-    val straightAmount: String = "0",
-    val boxAmount: String = "0"
+    val straightAmount: String = "",
+    val boxAmount: String = ""
 )
 
 data class TwoDigitEntry(
     val id: Long,
     val firstDigit: String = "",
     val secondDigit: String = "",
-    val topAmount: String = "0",
-    val bottomAmount: String = "0"
+    val topAmount: String = "",
+    val bottomAmount: String = ""
 )
