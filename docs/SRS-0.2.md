@@ -42,7 +42,7 @@ Categories: 2-digit top, 2-digit bottom, 3-digit top, 3-digit bottom, and 3-digi
 Support equal-price and per-number variable-amount entry. Amounts are entered numerically, totals are calculated locally, and the app must validate before commit. A successful save creates a unique immutable document identifier and must not create duplicates on repeated taps.
 
 ## 6. Limits and half-payout markers
-Limits must be configurable separately by number length and applicable category (top/bottom/โต๊ด). The system must distinguish allowed remaining capacity from rejected excess. Half-payout conditions must be explicit on entry, receipt, history, and settlement. Exact payout formulas remain a decision gate and must not be guessed in code.
+Limits must be configurable separately by number length and applicable category (top/bottom/โต๊ด). The system must distinguish allowed remaining capacity from rejected excess. Half-payout status is configured per number/category in the period's limit (หวยอั้น) rule; the sales screen must not offer a manual full/half selector. The posting transaction resolves and stores the status automatically from that rule, and the receipt, history, reports, and settlement read the stored status. If no half-payout rule applies, the line is full payout. Exact payout formulas remain a decision gate and must not be guessed in code.
 
 ## 7. Customers and credit
 Cash customers may be anonymous or use a generic label. Credit customers require a complete identity record as configured before a credit sale can be saved. Credit balances are derived from immutable sale and payment ledger entries. Support full and partial payments with timestamps and per-customer history.
