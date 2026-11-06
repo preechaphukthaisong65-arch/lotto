@@ -32,7 +32,7 @@ object LocalBackupManager {
     private const val saltSize = 16
     private const val nonceSize = 12
     private const val maxBackupBytes = 256 * 1024 * 1024
-    private const val currentSchemaVersion = 10
+    private const val currentSchemaVersion = 11
 
     fun writeEncryptedBackup(
         context: Context,
@@ -363,6 +363,11 @@ object LocalBackupManager {
                 require(columns("payout_rate_settings").containsAll(setOf("twoTopRateHundredths", "twoBottomRateHundredths")) &&
                     columns("settlement_snapshots").containsAll(setOf("twoTopRateHundredths", "twoBottomRateHundredths"))) {
                     "ฐานข้อมูล Schema 9 ขาดคอลัมน์อัตราจ่ายเลข 2 ตัวบน/ล่าง"
+                }
+                if (version >= 11) {
+                    require(columns("sale_cancellations").contains("cashRefundedSatang")) {
+                        "ฐานข้อมูล Schema 11 ขาดคอลัมน์ยอดเงินสดที่คืนจากบิลยกเลิก"
+                    }
                 }
             }
         } finally {
