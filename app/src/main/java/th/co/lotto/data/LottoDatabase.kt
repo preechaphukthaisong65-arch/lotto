@@ -127,7 +127,32 @@ abstract class LottoDatabase : RoomDatabase() {
                     )
                 """.trimIndent())
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sale_cancellations_documentId ON sale_cancellations(documentId)")
-                db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_sale_cancellation_update BEFORE UPDATE ON sale_cancellations BEGIN SELECT RAISE(ABORT, 'Sale cancellation records are immutable'); END")
+                db.execSQL("""
+                CREATE TRIGGER IF NOT EXISTS validate_sale_cancellation_insert
+                BEFORE INSERT ON sale_cancellations
+                WHEN NEW.originalAmountSatang <= 0
+                  OR length(trim(NEW.reason)) = 0
+                  OR NOT EXISTS (
+                    SELECT 1 FROM sale_documents
+                    WHERE documentId = NEW.documentId
+                      AND totalAmountSatang = NEW.originalAmountSatang
+                  )
+                  OR EXISTS (SELECT 1 FROM payment_entries WHERE documentId = NEW.documentId)
+                  OR EXISTS (
+                    SELECT 1 FROM sale_documents sd
+                    JOIN draw_results dr ON dr.periodId = sd.periodId
+                    WHERE sd.documentId = NEW.documentId
+                  )
+                  OR EXISTS (
+                    SELECT 1 FROM sale_documents sd
+                    JOIN settlement_snapshots ss ON ss.periodId = sd.periodId
+                    WHERE sd.documentId = NEW.documentId
+                  )
+                BEGIN
+                    SELECT RAISE(ABORT, 'Sale cancellation is invalid or blocked by payment/result/settlement');
+                END
+            """.trimIndent())
+            db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_sale_cancellation_update BEFORE UPDATE ON sale_cancellations BEGIN SELECT RAISE(ABORT, 'Sale cancellation records are immutable'); END")
                 db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_sale_cancellation_delete BEFORE DELETE ON sale_cancellations BEGIN SELECT RAISE(ABORT, 'Sale cancellation records are immutable'); END")
             }
         }
@@ -283,8 +308,8 @@ abstract class LottoDatabase : RoomDatabase() {
                 WHEN NOT EXISTS (
                     SELECT 1 FROM sale_documents
                     WHERE documentId = NEW.documentId AND periodId = NEW.periodId
-                )
-                BEGIN SELECT RAISE(ABORT, 'Sale line does not match its source document'); END
+                ) OR EXISTS (SELECT 1 FROM sale_cancellations WHERE documentId = NEW.documentId)
+                BEGIN SELECT RAISE(ABORT, 'Sale line does not match an active source document'); END
             """.trimIndent())
             db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS validate_payment_parent_insert
@@ -294,8 +319,8 @@ abstract class LottoDatabase : RoomDatabase() {
                     WHERE documentId = NEW.documentId
                       AND customerId = NEW.customerId
                       AND customerType = 'CREDIT'
-                )
-                BEGIN SELECT RAISE(ABORT, 'Payment does not match a credit document'); END
+                ) OR EXISTS (SELECT 1 FROM sale_cancellations WHERE documentId = NEW.documentId)
+                BEGIN SELECT RAISE(ABORT, 'Payment does not match an active credit document'); END
             """.trimIndent())
 
             db.execSQL("CREATE TRIGGER IF NOT EXISTS prevent_settlement_snapshot_update BEFORE UPDATE ON settlement_snapshots BEGIN SELECT RAISE(ABORT, 'Settlement snapshots are immutable'); END")
