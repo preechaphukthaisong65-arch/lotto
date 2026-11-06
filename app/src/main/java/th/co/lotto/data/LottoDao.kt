@@ -270,6 +270,12 @@ abstract class LottoDao {
         val document = getSaleDocument(cancellation.documentId) ?: error("Sale document not found")
         require(getSaleCancellation(document.documentId) == null) { "This sale bill has already been cancelled" }
         require(cancellation.originalAmountSatang == document.totalAmountSatang) { "Cancellation amount does not match the original bill" }
+        require(cancellation.cashRefundedSatang in 0L..document.totalAmountSatang) {
+            "Cash refund must be between zero and the original bill amount"
+        }
+        require(document.customerType == "CASH" || cancellation.cashRefundedSatang == 0L) {
+            "Credit bills cannot record a cash refund; reverse posted payments through the approved payment workflow"
+        }
         require(getPaymentsTotalForDocument(document.documentId) == 0L) {
             "This credit bill has posted payments; a payment reversal workflow is required before cancellation"
         }
