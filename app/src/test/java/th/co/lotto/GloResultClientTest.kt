@@ -15,6 +15,7 @@ class GloResultClientTest {
           "response": {
             "result": {
               "date": "2026-07-16",
+              "status": 1,
               "data": {
                 "first": {
                   "price": "6000000",
