@@ -1239,8 +1239,8 @@ class MainActivity : Activity() {
                     }
                     io.execute {
                         try {
-                            require(dao.getDrawResults(selected.periodId).none { it.resultType == "THREE_TOP" }) {
-                                "งวดนี้มีผลรางวัล 3 ตัวบนบันทึกไว้แล้ว ไม่สามารถนำเข้าซ้ำ"
+                            require(dao.getDrawResults(selected.periodId).none { it.resultType == "THREE_TOP" || it.resultType == "TWO_BOTTOM" }) {
+                                "งวดนี้มีผลรางวัลจาก GLO บันทึกไว้แล้ว ไม่สามารถนำเข้าซ้ำ"
                             }
                             val official = GloResultClient().fetchTopResult(drawDate)
                             val now = official.fetchedAtEpochMillis
@@ -1262,6 +1262,17 @@ class MainActivity : Activity() {
                                 now
                             )
                             dao.postDrawResult(result, audit)
+                            val bottomResult = th.co.lotto.data.DrawResultEntity(
+                                UUID.randomUUID().toString(), selected.periodId, "TWO_BOTTOM",
+                                official.twoBottomNumber,
+                                "GLO Official API • ${official.sourceUrl} • เลขท้าย 2 ตัว",
+                                now, now
+                            )
+                            dao.postDrawResult(bottomResult, AuditEventEntity(
+                                UUID.randomUUID().toString(), "DRAW_RESULT", bottomResult.resultId, "POSTED",
+                                "GLO draw ${official.drawDateIso}; TWO_BOTTOM ${official.twoBottomNumber}; fetchedAt=$now",
+                                now
+                            ))
                             val snapshotMessage = try {
                                 val rates = dao.getPayoutRateSettings()
                                 if (rates == null) {
