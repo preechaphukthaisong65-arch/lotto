@@ -30,17 +30,14 @@ private val homeMenuOptions = listOf(
 fun HomeScreen(
     onOpenSale: () -> Unit,
     onOpenReports: () -> Unit,
-    onOpenHistory: () -> Unit
+    onOpenHistory: () -> Unit,
+    onOpenCreditAccounts: () -> Unit
 ) {
     Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("หน้าหลัก") })
-        }
+        topBar = { TopAppBar(title = { Text("หน้าหลัก") }) }
     ) { innerPadding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+            modifier = Modifier.fillMaxSize().padding(innerPadding)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -59,6 +56,7 @@ fun HomeScreen(
                             HomeMenuOption.Sell -> onOpenSale
                             HomeMenuOption.Reports -> onOpenReports
                             HomeMenuOption.History -> onOpenHistory
+                            HomeMenuOption.CreditAccounts -> onOpenCreditAccounts
                             else -> ({})
                         }
                     )
