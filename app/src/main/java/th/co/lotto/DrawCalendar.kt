@@ -139,8 +139,8 @@ object DrawCalendarService {
         }
         val lottery = CalendarAuditLog.latest(context, "LOTTERYCHECKS") ?: error("ยังไม่มีข้อมูลจาก LotteryChecks")
         val huay = CalendarAuditLog.latest(context, "HUAYREVIEW") ?: error("ยังไม่มีข้อมูลจาก HuayReview")
-        val currentState = readState(context)
-        val lastAgreedDate = currentState.confirmedDates.lastOrNull()
+        val lastAgreedDate = currentState.lotteryChecksDates.zip(currentState.huayReviewDates)
+            .takeWhile { it.first == it.second }.lastOrNull()?.first
         require(date.isAfter(lastAgreedDate ?: LocalDate.now(BANGKOK))) {
             "วันที่ยืนยันต้องอยู่หลังงวดล่าสุดที่ทั้งสองเว็บไซต์ระบุตรงกัน"
         }
