@@ -22,6 +22,8 @@ private enum class AppScreen {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val saleRepository = (application as LottoApplication).container.saleRepository
+
         setContent {
             MaterialTheme {
                 var currentScreen by rememberSaveable { mutableStateOf(AppScreen.Home.name) }
@@ -29,12 +31,15 @@ class MainActivity : ComponentActivity() {
                     when (currentScreen) {
                         AppScreen.Sale.name -> SaleScreen(
                             onBack = { currentScreen = AppScreen.Home.name },
-                            onSave = {
+                            onSave = { draft ->
+                                val saleId = saleRepository.saveConfirmedSale(draft)
                                 Toast.makeText(
                                     this,
-                                    "หน้าขายยังอยู่ระหว่างพัฒนา ข้อมูลยังไม่ได้บันทึก",
+                                    "บันทึกการขายเรียบร้อย เลขที่รายการ $saleId",
                                     Toast.LENGTH_LONG
                                 ).show()
+                                currentScreen = AppScreen.Home.name
+                                saleId
                             }
                         )
                         else -> HomeScreen(
