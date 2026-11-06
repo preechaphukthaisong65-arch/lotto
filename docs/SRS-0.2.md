@@ -67,7 +67,7 @@ Manual local backup, encrypted export, version validation, integrity check befor
 
 Implemented phase-7 backup format:
 - The user supplies and confirms a passphrase of at least 10 characters; the app derives a 256-bit key with PBKDF2-HMAC-SHA256 (210,000 rounds) and encrypts with AES-256-GCM using a fresh random salt and nonce for every backup.
-- One archive contains the Room/SQLite database and local receipt images. The archive is written through Android's document picker; no network upload is performed.
+- One archive contains the Room/SQLite database and local receipt images. On Android 10 and newer it is created directly in the device's Downloads/Lotto folder through MediaStore; older supported Android versions use the app-specific Documents directory. No cloud document picker or network upload is used for export.
 - Restore authenticates/decrypts before extraction, rejects unsafe archive paths and oversized archives, checks SQLite integrity, foreign keys, schema version, and required Lotto tables, then replaces the local database and receipts with rollback protection.
 - The backup passphrase is not stored by the app and cannot be recovered. Losing it makes that backup unreadable.
 - Supported restore schema versions are 1 through 7, subject to the app's registered Room migrations. Restore never accepts a database newer than the app.
