@@ -487,13 +487,13 @@ class LottoDatabaseIntegrityTest {
         dao.insertPeriod(DrawPeriodEntity(
             "period-2", "prepared", null, "PREPARED", null, 2L, 100L
         ))
-        dao.setNumberBlocked("block-12", "period-2", "TWO_DIGIT", "12", true, 3L, "block-event")
+        dao.setNumberBlocked("block-123", "period-2", "THREE_TOAD", "123", true, 3L, "block-event")
         assertEquals(1, dao.getActiveNumberBlockRules("period-2").size)
         assertEquals(0, dao.getActiveNumberBlockRules("period-1").size)
 
         val sale = SaleDocumentEntity("sale-12", "period-1", null, "CASH", 100L, 4L, "Asia/Bangkok")
         dao.postSale(sale,
-            listOf(SaleLineEntity("line-12", "sale-12", "period-1", "12", "TWO_TOP", 100L, false)),
+            listOf(SaleLineEntity("line-12", "sale-12", "period-1", "123", "THREE_TOP", 100L, false)),
             AuditEventEntity("sale-event-12", "SALE_DOCUMENT", "sale-12", "POSTED", "test", 4L))
         assertEquals(1, dao.documentExists("sale-12"))
     }
