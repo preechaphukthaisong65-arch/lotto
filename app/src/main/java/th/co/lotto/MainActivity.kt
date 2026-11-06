@@ -120,8 +120,7 @@ class MainActivity : Activity() {
         addCard(currentBody, "เลขอั้นและเลขเต็ม", "กำหนดวงเงินแยกตามประเภทเลข") { showLimits() }
         addCard(currentBody, "ผลหวยและสรุปยอด", "บันทึกผลพร้อมแหล่งที่มาและข้อมูลตรวจสอบ") { showResults() }
         addCard(currentBody, "รายงาน", "รายงานยอดขาย ลูกหนี้ และยอดคงเหลือ") { showReports() }
-        addCard(currentBody, "ตั้งค่าอัตราจ่าย", "กำหนดอัตรา 2 ตัวและ 3 ตัวแยกประเภท") { showSettings() }
-        addCard(currentBody, "PIN และสิทธิ์", "การกำหนดบทบาทและสิทธิ์ยังไม่เปิดใช้") { showNotReady("PIN และสิทธิ์") }
+        addCard(currentBody, "ตั้งค่าอัตราจ่าย", "กำหนดอัตรา 3 ตัวบนและ 3 ตัวโต๊ด") { showSettings() }
         addCard(currentBody, "สำรองและกู้คืน", "ไฟล์สำรองเข้ารหัสด้วยรหัสผ่าน • ย้ายเครื่องและกู้คืนได้") { showBackup() }
     }
 
@@ -437,10 +436,7 @@ class MainActivity : Activity() {
                 }
 
                 val categories = listOf(
-                    "2 ตัวบน" to "TWO_TOP",
-                    "2 ตัวล่าง" to "TWO_BOTTOM",
                     "3 ตัวบน" to "THREE_TOP",
-                    "3 ตัวล่าง" to "THREE_BOTTOM",
                     "3 ตัวโต๊ด" to "THREE_TOAD"
                 )
                 val customerType = Spinner(this).apply {
@@ -672,10 +668,7 @@ class MainActivity : Activity() {
                 addText(currentBody, "รายการขาย", 17, navy)
                 lines.forEach { line ->
                     val category = when (line.betCategory) {
-                        "TWO_TOP" -> "2 ตัวบน"
-                        "TWO_BOTTOM" -> "2 ตัวล่าง"
                         "THREE_TOP" -> "3 ตัวบน"
-                        "THREE_BOTTOM" -> "3 ตัวล่าง"
                         "THREE_TOAD" -> "3 ตัวโต๊ด"
                         else -> line.betCategory
                     }
@@ -843,7 +836,7 @@ class MainActivity : Activity() {
                 }
             }.toMap()
             runOnUiThread {
-                addText(currentBody, "วงเงินแยกตาม 2 ตัวบน/ล่าง และ 3 ตัวบน/ล่าง/โต๊ด ไม่รวมข้ามประเภท", 12, 0xFF526171.toInt())
+                addText(currentBody, "วงเงินแยกตาม 3 ตัวบน และ 3 ตัวโต๊ด ไม่รวมยอดข้ามประเภท", 12, 0xFF526171.toInt())
                 if (periods.isEmpty()) addText(currentBody, "ไม่มีงวดเปิดหรือเตรียมไว้", 14, ink)
                 periods.forEach { period ->
                     addText(currentBody, "งวด: ${period.title} • ${if (period.status == "OPEN") "เปิดรับขาย" else "เตรียมเปิด"}", 14, navy)
@@ -870,10 +863,7 @@ class MainActivity : Activity() {
     }
 
     private fun categoryLabel(category: String): String = when (category) {
-        "TWO_TOP" -> "2 ตัวบน"
-        "TWO_BOTTOM" -> "2 ตัวล่าง"
         "THREE_TOP" -> "3 ตัวบน"
-        "THREE_BOTTOM" -> "3 ตัวล่าง"
         "THREE_TOAD" -> "3 ตัวโต๊ด"
         else -> category
     }
@@ -894,9 +884,7 @@ class MainActivity : Activity() {
                     if (rules.isEmpty()) addText(currentBody, "ยังไม่มีรายการเลขไม่รับ", 12, ink)
                     rules.forEach { rule ->
                         val typeLabel = when (rule.blockCategory) {
-                            "TWO_DIGIT" -> "2 ตัว (บน/ล่าง)"
                             "THREE_TOP" -> "3 ตัวบน"
-                            "THREE_BOTTOM" -> "3 ตัวล่าง"
                             "THREE_TOAD" -> "3 ตัวโต๊ด"
                             else -> rule.blockCategory
                         }
@@ -934,11 +922,11 @@ class MainActivity : Activity() {
 
     private fun createBlockedNumberDialog(targetPeriod: DrawPeriodEntity) {
         val number = EditText(this).apply {
-            hint = "เลข 2 หรือ 3 หลัก"
+            hint = "เลข 3 หลัก"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
-        val labels = listOf("2 ตัว (บน/ล่าง)", "3 ตัวบน", "3 ตัวล่าง", "3 ตัวโต๊ด")
-        val categories = listOf("TWO_DIGIT", "THREE_TOP", "THREE_BOTTOM", "THREE_TOAD")
+        val labels = listOf("3 ตัวบน", "3 ตัวโต๊ด")
+        val categories = listOf("THREE_TOP", "THREE_TOAD")
         val category = Spinner(this).apply {
             adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, labels)
         }
@@ -960,7 +948,7 @@ class MainActivity : Activity() {
             saveButton.setOnClickListener {
                 val value = number.text.toString().trim()
                 val blockCategory = categories[category.selectedItemPosition]
-                val requiredLength = if (blockCategory == "TWO_DIGIT") 2 else 3
+                val requiredLength = 3
                 if (value.length != requiredLength || !value.all { it in '0'..'9' }) {
                     number.error = "กรุณากรอกเลข $requiredLength หลักให้ถูกต้อง"
                     return@setOnClickListener
@@ -995,9 +983,9 @@ class MainActivity : Activity() {
     }
 
     private fun createLimitDialog(existing: NumberLimitRuleEntity? = null, targetPeriod: DrawPeriodEntity? = null) {
-        val categories = listOf("TWO_TOP", "TWO_BOTTOM", "THREE_TOP", "THREE_BOTTOM", "THREE_TOAD")
+        val categories = listOf("THREE_TOP", "THREE_TOAD")
         val number = EditText(this).apply {
-            hint = "เลข 2 หรือ 3 หลัก"
+            hint = "เลข 3 หลัก"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
             existing?.let { setText(it.numberText) }
             isEnabled = existing == null
@@ -1033,10 +1021,8 @@ class MainActivity : Activity() {
                 try {
                     val n = number.text.toString().trim()
                     val cat = category.selectedItem.toString()
-                    require(n.length in 2..3 && n.all { it in '0'..'9' }) { "กรุณากรอกเลข 2 หรือ 3 หลัก" }
-                    require((n.length == 2 && cat.startsWith("TWO_")) || (n.length == 3 && cat.startsWith("THREE_"))) {
-                        "ประเภทไม่ตรงกับจำนวนหลัก"
-                    }
+                    require(n.length == 3 && n.all { it in '0'..'9' }) { "กรุณากรอกเลข 3 หลัก" }
+                    require(cat in setOf("THREE_TOP", "THREE_TOAD")) { "เลือกได้เฉพาะ 3 ตัวบนหรือ 3 ตัวโต๊ด" }
                     val maxSatang = SaleEntryParser.parseAmountSatang(maximum.text.toString())
                     require(maxSatang > 0L) { "วงเงินต้องมากกว่า 0" }
                     val ruleId = existing?.ruleId ?: UUID.randomUUID().toString()
@@ -1195,7 +1181,7 @@ class MainActivity : Activity() {
                     }
                     val type = Spinner(this).apply {
                         adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
-                            listOf("2 ตัวบน", "2 ตัวล่าง", "3 ตัวบน", "3 ตัวล่าง"))
+                            listOf("THREE_TOP", "THREE_TOAD"))
                     }
                     val number = EditText(this).apply {
                         hint = "เลขผลรางวัล"
@@ -1215,7 +1201,7 @@ class MainActivity : Activity() {
                             val resultType = type.selectedItem.toString()
                             val winningNumber = number.text.toString().trim()
                             val sourceLabel = source.text.toString().trim()
-                            val expectedLength = if (resultType.startsWith("2")) 2 else 3
+                            val expectedLength = 3
                             if (winningNumber.length != expectedLength || !winningNumber.all { it in '0'..'9' }) {
                                 number.error = "กรุณากรอกเลข $expectedLength หลักให้ถูกต้อง"; return@setOnClickListener
                             }
@@ -1347,7 +1333,7 @@ class MainActivity : Activity() {
         base("ตั้งค่าอัตราจ่าย")
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
         addText(currentBody, "อัตราจ่ายเป็นตัวคูณต่อเงินเดิมพัน 1 บาท เก็บเป็นทศนิยม 2 ตำแหน่ง และจะใช้กับงวดใหม่เมื่อมีระบบบันทึกการชำระผล", 13, ink)
-        addText(currentBody, "2 ตัวบนและ 2 ตัวล่างใช้อัตราเดียวกัน ส่วน 3 ตัวบน 3 ตัวล่าง และ 3 ตัวโต๊ดตั้งแยกกัน", 13, navy)
+        addText(currentBody, "กำหนดอัตราจ่ายแยกเฉพาะ 3 ตัวบน และ 3 ตัวโต๊ด", 13, navy)
         io.execute {
             val current = database.lottoDao().getPayoutRateSettings()
             runOnUiThread {
@@ -1364,9 +1350,7 @@ class MainActivity : Activity() {
                     currentBody.addView(field)
                     return field
                 }
-                val two = rateInput("อัตรา 2 ตัวบน/ล่าง", current?.twoDigitRateHundredths)
                 val top = rateInput("อัตรา 3 ตัวบน", current?.threeTopRateHundredths)
-                val bottom = rateInput("อัตรา 3 ตัวล่าง", current?.threeBottomRateHundredths)
                 val toad = rateInput("อัตรา 3 ตัวโต๊ด", current?.threeToadRateHundredths)
                 if (current == null) addText(currentBody, "ยังไม่กำหนดอัตรา • กรอกทุกช่องเพื่อเริ่มตั้งค่า", 12, 0xFF9B2C2C.toInt())
                 else addText(currentBody, "เวอร์ชันการตั้งค่า: ${current.configVersion}", 12, 0xFF526171.toInt())
@@ -1381,9 +1365,10 @@ class MainActivity : Activity() {
                         val now = System.currentTimeMillis()
                         val proposed = th.co.lotto.data.PayoutRateSettingsEntity(
                             settingsId = 1,
-                            twoDigitRateHundredths = parseRate(two),
+                            // Legacy columns remain populated for schema compatibility; they are not sale categories.
+                            twoDigitRateHundredths = current?.twoDigitRateHundredths ?: 7000L,
                             threeTopRateHundredths = parseRate(top),
-                            threeBottomRateHundredths = parseRate(bottom),
+                            threeBottomRateHundredths = current?.threeBottomRateHundredths ?: 50000L,
                             threeToadRateHundredths = parseRate(toad),
                             configVersion = current?.configVersion ?: 0L,
                             updatedAtEpochMillis = now
@@ -1407,7 +1392,7 @@ class MainActivity : Activity() {
                         Toast.makeText(this, e.message ?: "กรุณากรอกอัตราจ่ายให้ถูกต้อง", Toast.LENGTH_LONG).show()
                     }
                 }
-                addText(currentBody, "หมายเหตุ: ยังไม่เปิดคำนวณยอดจ่ายรางวัลหรือยอดสุทธิ จนกว่าจะอนุมัติสูตรจ่ายครึ่งและกฎบัญชีตาม SRS 0.2", 12, 0xFF9B2C2C.toInt())
+                addText(currentBody, "การจ่ายครึ่งใช้อัตราจ่าย 50% ของอัตราปกติ โดยใช้ยอดเดิมพันเต็มจำนวน • การคำนวณยอดจ่ายจริงจะเปิดหลังผ่านการตรวจสอบระบบ", 12, 0xFF526171.toInt())
             }
         }
     }
