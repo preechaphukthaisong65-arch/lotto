@@ -23,7 +23,7 @@ class PayoutCalculatorTest {
     fun calculatesSeparateRatesAndPeriodTotals() {
         val snapshot = SettlementSnapshotEntity(
             "snapshot-1", "period-1",
-            7_000L, 50_000L, 50_000L, 10_000L, 1L, 10L
+            7_000L, 7_000L, 50_000L, 10_000L, 1L, 10L
         )
         val topFull = SaleLineEntity("top-full", "d1", "period-1", "123", "THREE_TOP", 10_000L, false)
         val topHalf = SaleLineEntity("top-half", "d2", "period-1", "123", "THREE_TOP", 10_000L, true)
