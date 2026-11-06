@@ -164,8 +164,9 @@ abstract class LottoDao {
         require(document.createdAtEpochMillis <= System.currentTimeMillis()) {
             "Sale timestamp cannot be in the future"
         }
-        val saleZone = runCatching { java.time.ZoneId.of(document.deviceTimeZone) }
-            .getOrDefault(java.time.ZoneId.systemDefault())
+        // Draw periods and sales cutoff are defined in Thailand local time,
+        // independent of the device's currently selected timezone.
+        val saleZone = java.time.ZoneId.of("Asia/Bangkok")
         val scheduledClose = period.drawDateEpochMillis?.let { drawDate ->
             java.time.Instant.ofEpochMilli(drawDate).atZone(saleZone).toLocalDate()
                 .atTime(java.time.LocalTime.of(14, 0)).atZone(saleZone).toInstant().toEpochMilli()
