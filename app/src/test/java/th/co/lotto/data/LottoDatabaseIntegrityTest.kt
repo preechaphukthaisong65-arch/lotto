@@ -299,17 +299,17 @@ class LottoDatabaseIntegrityTest {
     }
 
     @Test
-    fun linkedCorrectionCannotReferenceAnotherPeriod() {
+    fun anyLinkedCorrectionIsRejectedAtPosting() {
         dao.insertPeriod(period("period-1"))
         val original = SaleDocumentEntity("sale-original", "period-1", null, "CASH", 1_000L, 10L, "Asia/Bangkok")
-        dao.postSale(original, listOf(SaleLineEntity("line-original", "sale-original", "period-1", "12", "TWO_TOP", 1_000L, false)),
+        dao.postSale(original, listOf(SaleLineEntity("line-original", "sale-original", "period-1", "123", "THREE_TOP", 1_000L, false)),
             AuditEventEntity("event-original", "SALE_DOCUMENT", "sale-original", "POSTED", "test", 10L))
         database.openHelper.writableDatabase.execSQL("UPDATE draw_periods SET status = 'CLOSED' WHERE periodId = 'period-1'")
         dao.insertPeriod(period("period-2"))
         val correction = SaleDocumentEntity("sale-correction", "period-2", null, "CASH", 2_000L, 20L,
             "Asia/Bangkok", "sale-original")
         assertThrows(IllegalArgumentException::class.java) {
-            dao.postSale(correction, listOf(SaleLineEntity("line-correction", "sale-correction", "period-2", "21", "TWO_BOTTOM", 2_000L, true)),
+            dao.postSale(correction, listOf(SaleLineEntity("line-correction", "sale-correction", "period-2", "456", "THREE_TOP", 2_000L, false)),
                 AuditEventEntity("event-correction", "SALE_DOCUMENT", "sale-correction", "POSTED", "linked correction", 20L))
         }
         assertEquals(0, dao.documentExists("sale-correction"))
