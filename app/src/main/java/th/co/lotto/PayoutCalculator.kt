@@ -62,6 +62,9 @@ object PayoutCalculator {
                 )
             }
         }
+        require(linePayouts.map { it.line.lineId }.distinct().size == linePayouts.size) {
+            "A sale line matched more than one draw result; duplicate payout is blocked"
+        }
         val totalPayout = linePayouts.fold(0L) { total, item ->
             Math.addExact(total, item.payoutSatang)
         }
