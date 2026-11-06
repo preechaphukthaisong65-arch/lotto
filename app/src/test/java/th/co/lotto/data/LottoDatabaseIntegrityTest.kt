@@ -395,12 +395,12 @@ class LottoDatabaseIntegrityTest {
 
         dao.postSale(
             document,
-            listOf(SaleLineEntity("line-1", "sale-1", "period-1", "12", "TWO_TOP", 1_500L, false)),
+            listOf(SaleLineEntity("line-1", "sale-1", "period-1", "123", "THREE_TOP", 1_500L, false)),
             AuditEventEntity("event-1", "SALE_DOCUMENT", "sale-1", "POSTED", "test", 10L)
         )
 
         assertEquals(1, dao.documentExists("sale-1"))
-        assertEquals(1_500L, dao.getSoldAmountForNumber("period-1", "12", "TWO_TOP"))
+        assertEquals(1_500L, dao.getSoldAmountForNumber("period-1", "123", "THREE_TOP"))
     }
 
     @Test
