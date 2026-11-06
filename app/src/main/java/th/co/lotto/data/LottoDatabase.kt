@@ -197,6 +197,14 @@ abstract class LottoDatabase : RoomDatabase() {
                 END
             """.trimIndent())
             db.execSQL("""
+                CREATE TRIGGER IF NOT EXISTS prevent_sale_correction_insert
+                BEFORE INSERT ON sale_documents
+                WHEN NEW.correctionOfDocumentId IS NOT NULL
+                BEGIN
+                    SELECT RAISE(ABORT, 'Correction documents are disabled; cancel the original bill and create a new bill');
+                END
+            """.trimIndent())
+            db.execSQL("""
                 CREATE TRIGGER IF NOT EXISTS validate_sale_line_parent_insert
                 BEFORE INSERT ON sale_lines
                 WHEN NOT EXISTS (
