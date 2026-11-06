@@ -288,7 +288,10 @@ class MainActivity : Activity() {
                         val dateText = dateInput.text.toString().trim()
                         val drawDate = try {
                             SimpleDateFormat("dd/MM/yyyy", Locale("th", "TH"))
-                                .apply { isLenient = false }.parse(dateText)?.time
+                                .apply {
+                                    isLenient = false
+                                    timeZone = java.util.TimeZone.getTimeZone("Asia/Bangkok")
+                                }.parse(dateText)?.time
                         } catch (_: Exception) { null }
                         if (drawDate == null) {
                             dateInput.error = "กรุณาระบุวันที่ให้ถูกต้อง"
@@ -351,7 +354,10 @@ class MainActivity : Activity() {
                 if (title.isBlank()) { titleInput.error = "กรุณาระบุชื่องวด"; return@setOnClickListener }
                 val dateText = dateInput.text.toString().trim()
                 val drawDate = if (dateText.isBlank()) null else try {
-                    SimpleDateFormat("dd/MM/yyyy", Locale("th", "TH")).apply { isLenient = false }.parse(dateText)?.time
+                    SimpleDateFormat("dd/MM/yyyy", Locale("th", "TH")).apply {
+                        isLenient = false
+                        timeZone = java.util.TimeZone.getTimeZone("Asia/Bangkok")
+                    }.parse(dateText)?.time
                 } catch (_: Exception) { null }
                 if (drawDate == null) { dateInput.error = "กรุณาระบุวันที่หวยออกให้ถูกต้อง"; return@setOnClickListener }
                 saveButton.isEnabled = false
