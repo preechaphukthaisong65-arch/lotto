@@ -358,6 +358,7 @@ abstract class LottoDao {
     @Query("""
         SELECT * FROM number_block_rules
         WHERE periodId = :periodId AND blocked = 1
+          AND blockCategory IN ('THREE_TOP', 'THREE_TOAD')
         ORDER BY blockCategory, numberText
     """)
     abstract fun getActiveNumberBlockRules(periodId: String): List<NumberBlockRuleEntity>
@@ -365,6 +366,7 @@ abstract class LottoDao {
     @Query("""
         SELECT * FROM number_block_rules
         WHERE periodId = :periodId
+          AND blockCategory IN ('THREE_TOP', 'THREE_TOAD')
         ORDER BY blockCategory, numberText
     """)
     abstract fun getAllNumberBlockRules(periodId: String): List<NumberBlockRuleEntity>
@@ -470,7 +472,7 @@ abstract class LottoDao {
         }
     }
 
-    @Query("SELECT * FROM number_limit_rules WHERE periodId = :periodId ORDER BY numberLength, betCategory, numberText")
+    @Query("SELECT * FROM number_limit_rules WHERE periodId = :periodId AND betCategory IN ('THREE_TOP', 'THREE_TOAD') ORDER BY numberLength, betCategory, numberText")
     abstract fun getLimitRules(periodId: String): List<NumberLimitRuleEntity>
 
     @Query("SELECT * FROM payout_rate_settings WHERE settingsId = 1 LIMIT 1")
