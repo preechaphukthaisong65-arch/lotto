@@ -18,8 +18,8 @@ Lotto is being developed as an Android-only, offline-first application. The on-d
 - No in-app PIN, user accounts, staff roles, or per-module permissions. Device screen lock is the device-level protection.
 - Final physical-device and airplane-mode acceptance testing is still required.
 - Production release gate: verify commercial-use permission for GLO result data; the GLO Data Catalog currently lists a Creative Commons Non-Commercial license for the result dataset.
-- Approved half-payout rule: retain the full recorded stake and apply 50% of the configured payout rate. Final payout calculations remain disabled until their end-to-end accounting implementation is verified.
-- Confirmed sales are immutable. Cancellation is a separate auditable event with timestamp and reason; a replacement purchase is a new sale document. Cancelled bills remain visible in history but are excluded from active totals.
+- Payout summaries use the saved per-period rate snapshot. Half-payout retains the full stake and applies 50% of the configured rate; each winning line is rounded HALF_UP to the nearest satang before totals are summed. Sales-after-payout is not net profit and does not include cash refunds for cancelled cash bills.
+- Confirmed sales are immutable. Cancellation is a separate auditable event with timestamp, reason, and original amount; a replacement purchase is a new sale document. Cancelled bills remain visible in history and period summaries but are excluded from active totals.
 
 ## Build debug APK
 The workflow is `.github/workflows/android-build.yml`. Pushes to `main`, `feature/**`, and `srs-0.2-offline` trigger Android lint, unit/database tests, and a debug APK build. The `lotto-debug-apk` artifact includes `app-debug.apk`, its SHA-256 checksum, build metadata (commit/branch/run), and Room schemas.
