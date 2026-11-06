@@ -1,6 +1,7 @@
 package com.lotto.app.data.repository
 
 import com.lotto.app.data.local.dao.SaleDao
+import com.lotto.app.data.local.LottoDatabase
 import com.lotto.app.data.local.entity.CreditDocumentEntity
 import com.lotto.app.data.local.entity.CreditPaymentEntity
 
@@ -12,5 +13,10 @@ class RoomCreditAccountRepository(private val saleDao: SaleDao) : CreditAccountR
 
     override suspend fun receivePayment(creditDocumentId: Long, amount: Long) {
         saleDao.recordCreditPayment(creditDocumentId, amount, System.currentTimeMillis())
+    }
+
+    override suspend fun cleanupExpiredPaidBills(): Int {
+        val retention = LottoDatabase.PAID_DOCUMENT_RETENTION_DAYS * LottoDatabase.MILLIS_PER_DAY
+        return saleDao.deleteExpiredPaidDocuments(System.currentTimeMillis() - retention)
     }
 }
