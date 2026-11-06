@@ -41,7 +41,14 @@ object LocalBackupManager {
         destination: java.io.OutputStream
     ) {
         validatePassphrase(passphrase)
-        database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").close()
+        val checkpoint = database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)")
+        try {
+            require(checkpoint.moveToFirst() && checkpoint.getInt(0) == 0) {
+                "ฐานข้อมูลกำลังถูกใช้งาน ไม่สามารถสำรองข้อมูลอย่างปลอดภัยได้"
+            }
+        } finally {
+            checkpoint.close()
+        }
         val archiveFile = File(context.cacheDir, "lotto-backup-${System.currentTimeMillis()}.zip")
         try {
             ZipOutputStream(FileOutputStream(archiveFile)).use { zip ->
@@ -224,6 +231,16 @@ object LocalBackupManager {
                         "ฐานข้อมูลหลังการกู้คืนไม่ผ่าน quick_check"
                     }
                 }
+                reopened.lottoDao().insertAuditEvent(
+                    th.co.lotto.data.AuditEventEntity(
+                        java.util.UUID.randomUUID().toString(),
+                        "LOCAL_BACKUP",
+                        "DATABASE",
+                        "RESTORED",
+                        "Encrypted local backup restored",
+                        System.currentTimeMillis()
+                    )
+                )
             } catch (failure: Exception) {
                 runCatching { LottoDatabase.closeForRestore() }
                 if (newReceiptsInstalled) targetReceipts.deleteRecursively()
