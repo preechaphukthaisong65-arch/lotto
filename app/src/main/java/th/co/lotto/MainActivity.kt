@@ -1300,8 +1300,33 @@ class MainActivity : Activity() {
                                 now
                             )
                             dao.postDrawResult(result, audit)
+                            val snapshotMessage = try {
+                                val rates = dao.getPayoutRateSettings()
+                                if (rates == null) {
+                                    "ยังไม่ได้ตั้งค่าอัตราจ่าย จึงยังไม่สร้าง snapshot"
+                                } else {
+                                    val snapshotNow = System.currentTimeMillis()
+                                    val snapshot = th.co.lotto.data.SettlementSnapshotEntity(
+                                        UUID.randomUUID().toString(), selected.periodId,
+                                        rates.twoDigitRateHundredths, rates.threeTopRateHundredths,
+                                        rates.threeBottomRateHundredths, rates.threeToadRateHundredths,
+                                        rates.configVersion, snapshotNow
+                                    )
+                                    val snapshotAudit = AuditEventEntity(
+                                        UUID.randomUUID().toString(), "SETTLEMENT", snapshot.settlementId,
+                                        "SNAPSHOTTED", "Automatic payout-rate snapshot after GLO result import; version=${rates.configVersion}",
+                                        snapshotNow
+                                    )
+                                    dao.createSettlementSnapshot(snapshot, snapshotAudit)
+                                    "บันทึก snapshot อัตราจ่ายแล้ว"
+                                }
+                            } catch (snapshotError: Exception) {
+                                "ผล GLO บันทึกแล้ว แต่ snapshot ไม่สำเร็จ: ${snapshotError.message}"
+                            }
                             runOnUiThread {
-                                Toast.makeText(this, "นำเข้าผล GLO แล้ว • 3 ตัวบน ${official.threeTopNumber}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(this,
+                                    "นำเข้าผล GLO แล้ว • 3 ตัวบน ${official.threeTopNumber} • $snapshotMessage",
+                                    Toast.LENGTH_LONG).show()
                                 showResults()
                             }
                         } catch (e: Exception) {
