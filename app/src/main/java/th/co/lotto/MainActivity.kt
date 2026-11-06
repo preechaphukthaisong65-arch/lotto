@@ -542,34 +542,68 @@ class MainActivity : Activity() {
             val dao = database.lottoDao()
             val period = dao.getOpenPeriod()
             val rules = period?.let { dao.getLimitRules(it.periodId) } ?: emptyList()
+            val soldByRule = rules.associate { rule ->
+                rule.ruleId to dao.getSoldAmountForNumber(period!!.periodId, rule.numberText, rule.betCategory)
+            }
             runOnUiThread {
                 addText(currentBody, period?.let { "งวด: ${it.title}" } ?: "ไม่มีงวดเปิดอยู่", 14, ink)
+                addText(currentBody, "วงเงินแยกตามประเภท 2 ตัวบน/ล่าง และ 3 ตัวบน/ล่าง/โต๊ด", 12, 0xFF526171.toInt())
                 if (rules.isEmpty()) addText(currentBody, "ยังไม่มีการกำหนดเลขอั้น/เลขเต็ม", 13, ink)
                 rules.forEach { rule ->
-                    addCard(currentBody, "${rule.numberText} • ${rule.betCategory}",
-                        "วงเงิน ${formatMoney(rule.maximumAmountSatang)} • ${if (rule.enabled) "เปิดใช้" else "ปิดใช้"}") { }
+                    val sold = soldByRule[rule.ruleId] ?: 0L
+                    val remaining = (rule.maximumAmountSatang - sold).coerceAtLeast(0L)
+                    val status = when {
+                        !rule.enabled -> "ปิดใช้งาน"
+                        remaining == 0L -> "เต็มแล้ว"
+                        else -> "ยังรับได้"
+                    }
+                    addCard(currentBody, "${rule.numberText} • ${categoryLabel(rule.betCategory)}",
+                        "วงเงิน ${formatMoney(rule.maximumAmountSatang)} • ขายแล้ว ${formatMoney(sold)} • คงเหลือ ${formatMoney(remaining)} • $status") {
+                        createLimitDialog(rule)
+                    }
                 }
             }
         }
     }
 
-    private fun createLimitDialog() {
-        val number = EditText(this).apply { hint = "เลข 2 หรือ 3 หลัก"; inputType = android.text.InputType.TYPE_CLASS_NUMBER }
+    private fun categoryLabel(category: String): String = when (category) {
+        "TWO_TOP" -> "2 ตัวบน"
+        "TWO_BOTTOM" -> "2 ตัวล่าง"
+        "THREE_TOP" -> "3 ตัวบน"
+        "THREE_BOTTOM" -> "3 ตัวล่าง"
+        "THREE_TOAD" -> "3 ตัวโต๊ด"
+        else -> category
+    }
+
+    private fun createLimitDialog(existing: NumberLimitRuleEntity? = null) {
+        val categories = listOf("TWO_TOP", "TWO_BOTTOM", "THREE_TOP", "THREE_BOTTOM", "THREE_TOAD")
+        val number = EditText(this).apply {
+            hint = "เลข 2 หรือ 3 หลัก"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            existing?.let { setText(it.numberText) }
+            isEnabled = existing == null
+        }
         val category = Spinner(this).apply {
-            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
-                listOf("TWO_TOP", "TWO_BOTTOM", "THREE_TOP", "THREE_BOTTOM", "THREE_TOAD"))
+            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, categories)
+            existing?.let { setSelection(categories.indexOf(it.betCategory).coerceAtLeast(0)) }
+            isEnabled = existing == null
         }
         val maximum = EditText(this).apply {
             hint = "วงเงินสูงสุด (บาท)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            existing?.let { setText(String.format(Locale.US, "%.2f", it.maximumAmountSatang / 100.0)) }
         }
-        val enabled = CheckBox(this).apply { text = "เปิดใช้กฎวงเงิน"; isChecked = true }
+        val enabled = CheckBox(this).apply {
+            text = "เปิดใช้กฎวงเงิน"
+            isChecked = existing?.enabled ?: true
+        }
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
             addView(number); addView(category); addView(maximum); addView(enabled)
         }
-        val dialog = AlertDialog.Builder(this).setTitle("กำหนดเลขอั้น/เลขเต็ม").setView(form)
+        val title = if (existing == null) "กำหนดเลขอั้น/เลขเต็ม" else "แก้ไขวงเงิน ${existing.numberText}"
+        val dialog = AlertDialog.Builder(this).setTitle(title).setView(form)
             .setNegativeButton("กลับ", null).setPositiveButton("บันทึก", null).create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -577,23 +611,29 @@ class MainActivity : Activity() {
                     val n = number.text.toString().trim()
                     val cat = category.selectedItem.toString()
                     require(n.length in 2..3 && n.all { it in '0'..'9' }) { "กรุณากรอกเลข 2 หรือ 3 หลัก" }
-                    require((n.length == 2 && cat.startsWith("TWO_")) || (n.length == 3 && cat.startsWith("THREE_"))) { "ประเภทไม่ตรงกับจำนวนหลัก" }
-                    val maxSatang = BigDecimal(maximum.text.toString().trim()).multiply(BigDecimal(100))
-                        .setScale(0, RoundingMode.HALF_UP).longValueExact()
+                    require((n.length == 2 && cat.startsWith("TWO_")) || (n.length == 3 && cat.startsWith("THREE_"))) {
+                        "ประเภทไม่ตรงกับจำนวนหลัก"
+                    }
+                    val maxSatang = SaleEntryParser.parseAmountSatang(maximum.text.toString())
                     require(maxSatang > 0L) { "วงเงินต้องมากกว่า 0" }
+                    val periodId = existing?.periodId ?: database.lottoDao().getOpenPeriod()?.periodId
+                        ?: error("ไม่มีงวดเปิดอยู่")
+                    val rule = NumberLimitRuleEntity(
+                        existing?.ruleId ?: UUID.randomUUID().toString(),
+                        periodId, n.length, cat, n, maxSatang, enabled.isChecked
+                    )
                     io.execute {
                         try {
-                            val dao = database.lottoDao()
-                            val period = dao.getOpenPeriod() ?: error("ไม่มีงวดเปิดอยู่")
-                            val rule = NumberLimitRuleEntity(UUID.randomUUID().toString(), period.periodId,
-                                n.length, cat, n, maxSatang, enabled.isChecked)
-                            dao.insertLimitRule(rule)
-                            runOnUiThread { Toast.makeText(this, "บันทึกกฎวงเงินแล้ว", Toast.LENGTH_SHORT).show(); showLimits() }
+                            database.lottoDao().saveLimitRule(rule)
+                            runOnUiThread {
+                                Toast.makeText(this, "บันทึกกฎวงเงินแล้ว", Toast.LENGTH_SHORT).show()
+                                dialog.dismiss()
+                                showLimits()
+                            }
                         } catch (e: Exception) {
                             runOnUiThread { Toast.makeText(this, "บันทึกไม่สำเร็จ: ${e.message}", Toast.LENGTH_LONG).show() }
                         }
                     }
-                    dialog.dismiss()
                 } catch (e: Exception) {
                     Toast.makeText(this, e.message ?: "ข้อมูลไม่ถูกต้อง", Toast.LENGTH_LONG).show()
                 }
