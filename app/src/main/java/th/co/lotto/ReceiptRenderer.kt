@@ -53,10 +53,7 @@ object ReceiptRenderer {
         var y = 392f
         lines.forEach { item ->
             val category = when (item.betCategory) {
-                "TWO_TOP" -> "2 ตัวบน"
-                "TWO_BOTTOM" -> "2 ตัวล่าง"
                 "THREE_TOP" -> "3 ตัวบน"
-                "THREE_BOTTOM" -> "3 ตัวล่าง"
                 "THREE_TOAD" -> "3 ตัวโต๊ด"
                 else -> item.betCategory
             }
