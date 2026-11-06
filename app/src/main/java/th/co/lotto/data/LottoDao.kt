@@ -544,11 +544,11 @@ abstract class LottoDao {
             "Winning number must contain digits only"
         }
         val expectedLength = when (result.resultType.trim().uppercase(java.util.Locale.ROOT)) {
-            "THREE_TOP", "THREE_TOAD", "3 ตัวบน", "3 ตัวโต๊ด" -> 3
+            "THREE_TOP", "3 ตัวบน" -> 3
             else -> 0
         }
         require(expectedLength == 3 && result.winningNumber.length == expectedLength) {
-            "Result type must be 3 ตัวบน or 3 ตัวโต๊ด and number length must be exactly 3"
+            "Result type must be 3 ตัวบน derived from GLO and number length must be exactly 3"
         }
         require(result.sourceLabel.isNotBlank()) { "Result source is required" }
         val period = getPeriod(result.periodId) ?: error("Draw period not found")
