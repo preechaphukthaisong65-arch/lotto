@@ -368,7 +368,7 @@ abstract class LottoDao {
         }
         require(rule.maximumAmountSatang > 0L) { "Limit amount must be positive" }
         val period = getPeriod(rule.periodId) ?: error("Draw period not found")
-        require(period.status == "OPEN") { "Limits can only be changed for an open period" }
+        require(period.status == "OPEN" || period.status == "PREPARED") { "Limits can only be changed for an open or prepared period" }
 
         val sold = getSoldAmountForNumber(rule.periodId, rule.numberText, rule.betCategory)
         require(rule.maximumAmountSatang >= sold) {
