@@ -1,33 +1,28 @@
-# Lotto — Android Offline Foundation
+# Lotto — SRS 0.2 Offline Android App
 
-This branch contains an Android starter application and a GitHub Actions workflow that builds a debug APK.
+Lotto is being developed as an Android-only, offline-first application. The on-device SQLite database is the system of record.
 
-## Current scope
+## Architecture rules
+- No cloud database, backend server, account service, or data synchronization.
+- No customer, sale, credit, payment, or receipt data is transmitted outside the device.
+- Internet access is not required for core operation. Any future public calendar/result import must be optional and must never transmit private transaction data.
+- GitHub Actions is used only to compile and package APK test artifacts; it is not part of the running application.
 
-- Native Android application using Kotlin.
-- Offline-first foundation; no cloud database, account service, or synchronization.
-- Local-only app shell.
-- No betting, wagering, ticket-entry, or payout-calculation functionality.
+## Current implementation status
+- SRS 0.2 baseline: `docs/SRS-0.2.md`.
+- Room/SQLite local schema for periods, customers, sale documents/lines, payments, limits, results, and audit events.
+- Atomic sale-posting DAO method and database triggers protecting posted sale documents and lines from update/delete.
+- Initial home navigation, period creation/list, and customer creation/list.
+- Sales, credit/payment workflows, limit engine, receipts, settlement, PIN, and encrypted backup/restore remain to be implemented and tested before the app can be called complete.
+- Payout rules and other unresolved decisions in SRS 0.2 are intentionally not guessed or enabled.
 
-## Build an APK with GitHub Actions
+## Build debug APK
+The workflow is `.github/workflows/android-build.yml`. Pushes to `main`, `feature/**`, and `srs-0.2-offline` trigger a debug build. On a successful run, download the `lotto-debug-apk` artifact and extract `app-debug.apk`.
 
-The workflow is located at `.github/workflows/android-build.yml`.
+## Toolchain
+- JDK 17
+- Android Gradle Plugin 8.7.3
+- Gradle 8.9
+- Compile SDK 35 / Minimum SDK 26
 
-It runs automatically when code is pushed to `main` or a `feature/**` branch. It can also be started manually from the repository's **Actions** tab using **Android APK Build** → **Run workflow**.
-
-When the run completes successfully:
-
-1. Open the completed workflow run.
-2. Scroll to **Artifacts**.
-3. Download **lotto-debug-apk**.
-4. Extract the ZIP and install `app-debug.apk` on an Android device.
-
-The artifact is retained for 14 days. This is a debug build for testing, not a signed production release.
-
-## Development configuration
-
-- JDK: 17
-- Android Gradle Plugin: 8.7.3
-- Gradle: 8.9
-- Compile SDK: 35
-- Minimum SDK: 26
+This is a test build, not a signed production release.
