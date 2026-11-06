@@ -281,6 +281,76 @@ class LottoDatabaseIntegrityTest {
         assertEquals("period-next", dao.getOpenPeriod()?.periodId)
     }
 
+    @Test
+    fun blockedTwoDigitNumberRejectsBothTopAndBottomUntilUnblocked() {
+        dao.insertPeriod(period("period-1"))
+        dao.setNumberBlocked("block-00", "period-1", "TWO_DIGIT", "00", true, 10L, "block-event")
+        val top = SaleDocumentEntity("sale-top", "period-1", null, "CASH", 100L, 11L, "Asia/Bangkok")
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.postSale(top,
+                listOf(SaleLineEntity("line-top", "sale-top", "period-1", "00", "TWO_TOP", 100L, false)),
+                AuditEventEntity("sale-event-top", "SALE_DOCUMENT", "sale-top", "POSTED", "test", 11L))
+        }
+        val bottom = SaleDocumentEntity("sale-bottom", "period-1", null, "CASH", 100L, 12L, "Asia/Bangkok")
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.postSale(bottom,
+                listOf(SaleLineEntity("line-bottom", "sale-bottom", "period-1", "00", "TWO_BOTTOM", 100L, false)),
+                AuditEventEntity("sale-event-bottom", "SALE_DOCUMENT", "sale-bottom", "POSTED", "test", 12L))
+        }
+
+        dao.setNumberBlocked("block-00", "period-1", "TWO_DIGIT", "00", false, 13L, "unblock-event")
+        dao.postSale(bottom,
+            listOf(SaleLineEntity("line-bottom", "sale-bottom", "period-1", "00", "TWO_BOTTOM", 100L, false)),
+            AuditEventEntity("sale-event-bottom", "SALE_DOCUMENT", "sale-bottom", "POSTED", "test", 14L))
+
+        assertEquals(listOf("BLOCKED", "UNBLOCKED"), dao.getAuditEvents("block-00").map { it.action })
+        assertEquals(1, dao.documentExists("sale-bottom"))
+    }
+
+    @Test
+    fun straightAndToadBlockedNumberRulesAreIndependent() {
+        dao.insertPeriod(period("period-1"))
+        dao.setNumberBlocked("straight-123", "period-1", "THREE_STRAIGHT", "123", true, 10L, "straight-event")
+        val straight = SaleDocumentEntity("sale-straight", "period-1", null, "CASH", 100L, 11L, "Asia/Bangkok")
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.postSale(straight,
+                listOf(SaleLineEntity("line-straight", "sale-straight", "period-1", "123", "THREE_TOP", 100L, false)),
+                AuditEventEntity("sale-event-straight", "SALE_DOCUMENT", "sale-straight", "POSTED", "test", 11L))
+        }
+
+        val toad = SaleDocumentEntity("sale-toad", "period-1", null, "CASH", 100L, 12L, "Asia/Bangkok")
+        dao.postSale(toad,
+            listOf(SaleLineEntity("line-toad", "sale-toad", "period-1", "123", "THREE_TOAD", 100L, false)),
+            AuditEventEntity("sale-event-toad", "SALE_DOCUMENT", "sale-toad", "POSTED", "test", 12L))
+
+        dao.setNumberBlocked("toad-123", "period-1", "THREE_TOAD", "123", true, 13L, "toad-event")
+        val toadBlocked = SaleDocumentEntity("sale-toad-blocked", "period-1", null, "CASH", 100L, 14L, "Asia/Bangkok")
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.postSale(toadBlocked,
+                listOf(SaleLineEntity("line-toad-blocked", "sale-toad-blocked", "period-1", "123", "THREE_TOAD", 100L, false)),
+                AuditEventEntity("sale-event-toad-blocked", "SALE_DOCUMENT", "sale-toad-blocked", "POSTED", "test", 14L))
+        }
+        assertEquals(1, dao.documentExists("sale-toad"))
+        assertEquals(0, dao.documentExists("sale-toad-blocked"))
+    }
+
+    @Test
+    fun blockedNumbersAreIsolatedByPeriodAndCanBeConfiguredBeforeOpening() {
+        dao.insertPeriod(period("period-1"))
+        dao.insertPeriod(DrawPeriodEntity(
+            "period-2", "prepared", null, "PREPARED", null, 2L, 100L
+        ))
+        dao.setNumberBlocked("block-12", "period-2", "TWO_DIGIT", "12", true, 3L, "block-event")
+        assertEquals(1, dao.getActiveNumberBlockRules("period-2").size)
+        assertEquals(0, dao.getActiveNumberBlockRules("period-1").size)
+
+        val sale = SaleDocumentEntity("sale-12", "period-1", null, "CASH", 100L, 4L, "Asia/Bangkok")
+        dao.postSale(sale,
+            listOf(SaleLineEntity("line-12", "sale-12", "period-1", "12", "TWO_TOP", 100L, false)),
+            AuditEventEntity("sale-event-12", "SALE_DOCUMENT", "sale-12", "POSTED", "test", 4L))
+        assertEquals(1, dao.documentExists("sale-12"))
+    }
+
     private fun period(id: String) = DrawPeriodEntity(
         id, id, null, "OPEN", null, System.currentTimeMillis()
     )
