@@ -1354,7 +1354,7 @@ class MainActivity : Activity() {
         val audit = AuditEventEntity(UUID.randomUUID().toString(), "SETTLEMENT",
             snapshot.settlementId, "SNAPSHOTTED",
             "Automatic payout-rate snapshot after verified two-source/manual result confirmation; version=${rates.configVersion}", now)
-        dao.createSettlementSnapshot(snapshot, audit)
+        runCatching { dao.createSettlementSnapshot(snapshot, audit) }
     }
 
     private fun showManualResultDialog(
