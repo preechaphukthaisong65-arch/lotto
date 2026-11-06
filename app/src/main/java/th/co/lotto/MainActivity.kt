@@ -432,7 +432,9 @@ class MainActivity : Activity() {
                 }
                 val categories = listOf(
                     "3 ตัวบน" to "THREE_TOP",
-                    "3 ตัวโต๊ด" to "THREE_TOAD"
+                    "3 ตัวโต๊ด" to "THREE_TOAD",
+                    "2 ตัวบน" to "TWO_TOP",
+                    "2 ตัวล่าง" to "TWO_BOTTOM"
                 )
                 val customerType = Spinner(this).apply {
                     adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("เงินสด", "เงินเชื่อ"))
@@ -676,6 +678,8 @@ class MainActivity : Activity() {
                     val category = when (line.betCategory) {
                         "THREE_TOP" -> "3 ตัวบน"
                         "THREE_TOAD" -> "3 ตัวโต๊ด"
+                        "TWO_TOP" -> "2 ตัวบน"
+                        "TWO_BOTTOM" -> "2 ตัวล่าง"
                         else -> line.betCategory
                     }
                     addCard(currentBody, "${line.numberText} • $category",
@@ -902,7 +906,7 @@ class MainActivity : Activity() {
                 }
             }.toMap()
             runOnUiThread {
-                addText(currentBody, "วงเงินแยกตาม 3 ตัวบน และ 3 ตัวโต๊ด ไม่รวมยอดข้ามประเภท", 12, 0xFF526171.toInt())
+                addText(currentBody, "วงเงินแยกตามเลข 3 ตัวบน, 3 ตัวโต๊ด, 2 ตัวบน และ 2 ตัวล่าง ไม่รวมยอดข้ามประเภท", 12, 0xFF526171.toInt())
                 if (periods.isEmpty()) addText(currentBody, "ไม่มีงวดเปิดหรือเตรียมไว้", 14, ink)
                 periods.forEach { period ->
                     addText(currentBody, "งวด: ${period.title} • ${if (period.status == "OPEN") "เปิดรับขาย" else "เตรียมเปิด"}", 14, navy)
@@ -931,6 +935,8 @@ class MainActivity : Activity() {
     private fun categoryLabel(category: String): String = when (category) {
         "THREE_TOP" -> "3 ตัวบน"
         "THREE_TOAD" -> "3 ตัวโต๊ด"
+        "TWO_TOP" -> "2 ตัวบน"
+        "TWO_BOTTOM" -> "2 ตัวล่าง"
         else -> category
     }
 
@@ -952,6 +958,8 @@ class MainActivity : Activity() {
                         val typeLabel = when (rule.blockCategory) {
                             "THREE_TOP" -> "3 ตัวบน"
                             "THREE_TOAD" -> "3 ตัวโต๊ด"
+                            "TWO_TOP" -> "2 ตัวบน"
+                            "TWO_BOTTOM" -> "2 ตัวล่าง"
                             else -> rule.blockCategory
                         }
                         val status = if (rule.blocked) "ไม่รับ" else "ปลดบล็อกแล้ว"
@@ -988,11 +996,11 @@ class MainActivity : Activity() {
 
     private fun createBlockedNumberDialog(targetPeriod: DrawPeriodEntity) {
         val number = EditText(this).apply {
-            hint = "เลข 3 หลัก"
+            hint = "เลข 2 หรือ 3 หลัก"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
         }
-        val labels = listOf("3 ตัวบน", "3 ตัวโต๊ด")
-        val categories = listOf("THREE_TOP", "THREE_TOAD")
+        val labels = listOf("3 ตัวบน", "3 ตัวโต๊ด", "2 ตัวบน", "2 ตัวล่าง")
+        val categories = listOf("THREE_TOP", "THREE_TOAD", "TWO_TOP", "TWO_BOTTOM")
         val category = Spinner(this).apply {
             adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, labels)
         }
@@ -1014,7 +1022,7 @@ class MainActivity : Activity() {
             saveButton.setOnClickListener {
                 val value = number.text.toString().trim()
                 val blockCategory = categories[category.selectedItemPosition]
-                val requiredLength = 3
+                val requiredLength = if (blockCategory == "TWO_TOP" || blockCategory == "TWO_BOTTOM") 2 else 3
                 if (value.length != requiredLength || !value.all { it in '0'..'9' }) {
                     number.error = "กรุณากรอกเลข $requiredLength หลักให้ถูกต้อง"
                     return@setOnClickListener
@@ -1049,9 +1057,9 @@ class MainActivity : Activity() {
     }
 
     private fun createLimitDialog(existing: NumberLimitRuleEntity? = null, targetPeriod: DrawPeriodEntity? = null) {
-        val categories = listOf("THREE_TOP", "THREE_TOAD")
+        val categories = listOf("THREE_TOP", "THREE_TOAD", "TWO_TOP", "TWO_BOTTOM")
         val number = EditText(this).apply {
-            hint = "เลข 3 หลัก"
+            hint = "เลข 2 หรือ 3 หลัก"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
             existing?.let { setText(it.numberText) }
             isEnabled = existing == null
@@ -1087,8 +1095,9 @@ class MainActivity : Activity() {
                 try {
                     val n = number.text.toString().trim()
                     val cat = category.selectedItem.toString()
-                    require(n.length == 3 && n.all { it in '0'..'9' }) { "กรุณากรอกเลข 3 หลัก" }
-                    require(cat in setOf("THREE_TOP", "THREE_TOAD")) { "เลือกได้เฉพาะ 3 ตัวบนหรือ 3 ตัวโต๊ด" }
+                    val requiredLength = if (cat == "TWO_TOP" || cat == "TWO_BOTTOM") 2 else 3
+                    require(n.length == requiredLength && n.all { it in '0'..'9' }) { "กรุณากรอกเลข $requiredLength หลัก" }
+                    require(cat in setOf("THREE_TOP", "THREE_TOAD", "TWO_TOP", "TWO_BOTTOM")) { "ประเภทเลขไม่ถูกต้อง" }
                     val maxSatang = SaleEntryParser.parseAmountSatang(maximum.text.toString())
                     require(maxSatang > 0L) { "วงเงินต้องมากกว่า 0" }
                     val ruleId = existing?.ruleId ?: UUID.randomUUID().toString()
@@ -1160,8 +1169,10 @@ class MainActivity : Activity() {
                                     val snapshot = th.co.lotto.data.SettlementSnapshotEntity(
                                         UUID.randomUUID().toString(), selectedPeriod.periodId,
                                         rates.twoDigitRateHundredths, rates.threeTopRateHundredths,
-                                        rates.threeBottomRateHundredths, rates.threeToadRateHundredths,
-                                        rates.configVersion, now
+                                         rates.threeBottomRateHundredths, rates.threeToadRateHundredths,
+                                         rates.configVersion, now,
+                                         twoTopRateHundredths = rates.twoTopRateHundredths,
+                                         twoBottomRateHundredths = rates.twoBottomRateHundredths
                                     )
                                     val audit = AuditEventEntity(UUID.randomUUID().toString(),
                                         "SETTLEMENT", snapshot.settlementId, "SNAPSHOTTED",
@@ -1260,8 +1271,10 @@ class MainActivity : Activity() {
                                     val snapshot = th.co.lotto.data.SettlementSnapshotEntity(
                                         UUID.randomUUID().toString(), selected.periodId,
                                         rates.twoDigitRateHundredths, rates.threeTopRateHundredths,
-                                        rates.threeBottomRateHundredths, rates.threeToadRateHundredths,
-                                        rates.configVersion, snapshotNow
+                                         rates.threeBottomRateHundredths, rates.threeToadRateHundredths,
+                                         rates.configVersion, snapshotNow,
+                                         twoTopRateHundredths = rates.twoTopRateHundredths,
+                                         twoBottomRateHundredths = rates.twoBottomRateHundredths
                                     )
                                     val snapshotAudit = AuditEventEntity(
                                         UUID.randomUUID().toString(), "SETTLEMENT", snapshot.settlementId,
@@ -1276,7 +1289,7 @@ class MainActivity : Activity() {
                             }
                             runOnUiThread {
                                 Toast.makeText(this,
-                                    "นำเข้าผล GLO แล้ว • 3 ตัวบน ${official.threeTopNumber} • $snapshotMessage",
+                                    "นำเข้าผล GLO แล้ว • 3 ตัวบน ${official.threeTopNumber} • 2 ตัวล่าง ${official.twoBottomNumber} • $snapshotMessage",
                                     Toast.LENGTH_LONG).show()
                                 showResults(selected.periodId)
                             }
@@ -1464,7 +1477,7 @@ class MainActivity : Activity() {
         base("ตั้งค่าอัตราจ่าย")
         addButton(currentBody, "กลับหน้าหลัก") { showHome() }
         addText(currentBody, "อัตราจ่ายเป็นตัวคูณต่อเงินเดิมพัน 1 บาท เก็บเป็นทศนิยม 2 ตำแหน่ง และจะตรึงไว้เป็น snapshot ของแต่ละงวดเมื่อบันทึกผล", 13, ink)
-        addText(currentBody, "กำหนดอัตราจ่ายแยกเฉพาะ 3 ตัวบน และ 3 ตัวโต๊ด", 13, navy)
+        addText(currentBody, "กำหนดอัตราจ่ายแยกทั้ง 4 ประเภทเลข", 13, navy)
         io.execute {
             val current = database.lottoDao().getPayoutRateSettings()
             runOnUiThread {
@@ -1483,6 +1496,8 @@ class MainActivity : Activity() {
                 }
                 val top = rateInput("อัตรา 3 ตัวบน", current?.threeTopRateHundredths)
                 val toad = rateInput("อัตรา 3 ตัวโต๊ด", current?.threeToadRateHundredths)
+                val twoTop = rateInput("อัตรา 2 ตัวบน", current?.twoTopRateHundredths)
+                val twoBottom = rateInput("อัตรา 2 ตัวล่าง", current?.twoBottomRateHundredths)
                 if (current == null) addText(currentBody, "ยังไม่กำหนดอัตรา • กรอกทุกช่องเพื่อเริ่มตั้งค่า", 12, 0xFF9B2C2C.toInt())
                 else addText(currentBody, "เวอร์ชันการตั้งค่า: ${current.configVersion}", 12, 0xFF526171.toInt())
                 addButton(currentBody, "บันทึกอัตราจ่าย") {
@@ -1498,6 +1513,8 @@ class MainActivity : Activity() {
                             settingsId = 1,
                             // Legacy columns remain populated for schema compatibility; they are not sale categories.
                             twoDigitRateHundredths = current?.twoDigitRateHundredths ?: 7000L,
+                            twoTopRateHundredths = parseRate(twoTop),
+                            twoBottomRateHundredths = parseRate(twoBottom),
                             threeTopRateHundredths = parseRate(top),
                             threeBottomRateHundredths = current?.threeBottomRateHundredths ?: 50000L,
                             threeToadRateHundredths = parseRate(toad),
