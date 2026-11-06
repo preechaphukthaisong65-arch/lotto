@@ -296,6 +296,12 @@ abstract class LottoDao {
     @Query("SELECT * FROM payment_entries WHERE customerId = :customerId ORDER BY paidAtEpochMillis DESC")
     abstract fun getPaymentsForCustomer(customerId: String): List<PaymentEntryEntity>
 
+    @Query("SELECT * FROM payment_entries WHERE documentId = :documentId ORDER BY paidAtEpochMillis DESC")
+    abstract fun getPaymentsForDocument(documentId: String): List<PaymentEntryEntity>
+
+    @Query("SELECT COUNT(*) FROM payment_entries WHERE paymentId = :paymentId")
+    abstract fun paymentExists(paymentId: String): Int
+
     @Query("SELECT * FROM sale_documents WHERE customerId = :customerId AND customerType = 'CREDIT' ORDER BY createdAtEpochMillis DESC")
     abstract fun getCreditDocumentsForCustomer(customerId: String): List<SaleDocumentEntity>
 

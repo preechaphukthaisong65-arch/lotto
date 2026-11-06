@@ -51,6 +51,23 @@ class LottoDatabaseIntegrityTest {
     }
 
     @Test
+    fun paymentHistoryIsAppendOnlyAndCanBeReadPerCreditDocument() {
+        dao.insertPeriod(period("period-payment"))
+        dao.insertCustomer(CustomerEntity("credit-payment", "Credit customer", "0800000000", "verified", "CREDIT", 1L))
+        val document = SaleDocumentEntity("credit-document", "period-payment", "credit-payment", "CREDIT", 5_000L, 2L, "Asia/Bangkok")
+        dao.insertSaleDocument(document)
+        val payment = PaymentEntryEntity("payment-history-1", document.documentId, "credit-payment", 2_000L, 3L, "CASH", "first")
+        dao.postPayment(payment, AuditEventEntity("payment-audit-1", "PAYMENT", payment.paymentId, "POSTED", "test", 3L))
+        assertEquals(listOf(payment), dao.getPaymentsForDocument(document.documentId))
+        assertEquals(1, dao.paymentExists(payment.paymentId))
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.postPayment(payment.copy(paymentId = "payment-history-2", amountSatang = 4_000L),
+                AuditEventEntity("payment-audit-2", "PAYMENT", "payment-history-2", "POSTED", "test", 4L))
+        }
+        assertEquals(1, dao.getPaymentsForDocument(document.documentId).size)
+    }
+
+    @Test
     fun creditCustomerRequiresCompleteIdentityAndCreationIsAuditedAtomically() {
         val incomplete = CustomerEntity("credit-bad", "Credit customer", "123", null, "CREDIT", 1L)
         val incompleteAudit = AuditEventEntity("customer-bad-event", "CUSTOMER", "credit-bad", "CREATED", "test", 1L)

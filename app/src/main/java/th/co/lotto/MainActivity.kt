@@ -755,6 +755,17 @@ class MainActivity : Activity() {
                         if (due > 0L) createPaymentDialog(doc.documentId, customerId, customerName, due)
                         else Toast.makeText(this, "บิลนี้ชำระครบแล้ว", Toast.LENGTH_SHORT).show()
                     }
+                    val paymentHistory = dao.getPaymentsForDocument(doc.documentId)
+                    if (paymentHistory.isNotEmpty()) {
+                        addText(currentBody, "ประวัติรับชำระ", 12, navy)
+                        paymentHistory.forEach { payment ->
+                            val date = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH"))
+                                .format(Date(payment.paidAtEpochMillis))
+                            addText(currentBody,
+                                "$date • ${formatMoney(payment.amountSatang)} • ${payment.method}${payment.note?.let { " • $it" } ?: ""}",
+                                12, ink)
+                        }
+                    }
                 }
             }
         }
@@ -1089,6 +1100,33 @@ class MainActivity : Activity() {
                         }
                     }
                 }
+                addButton(currentBody, "ตรวจสอบเลขที่ถูกรางวัล") {
+                    resultList.removeAllViews()
+                    val selectedPeriod = periods[picker.selectedItemPosition]
+                    io.execute {
+                        val savedResults = dao.getDrawResults(selectedPeriod.periodId)
+                        val documents = dao.getSalesForPeriod(selectedPeriod.periodId)
+                        val lines = documents.flatMap { dao.getLinesForDocument(it.documentId) }
+                        val matches = th.co.lotto.DrawResultMatcher.findMatches(savedResults, lines)
+                        runOnUiThread {
+                            if (savedResults.isEmpty()) addText(resultList, "ยังไม่มีผลหวยสำหรับตรวจสอบ", 13, ink)
+                            else if (matches.isEmpty()) addText(resultList, "ยังไม่พบรายการขายที่ตรงกับผลที่บันทึก", 13, ink)
+                            matches.forEach { match ->
+                                addText(resultList,
+                                    "${match.resultType} • เลข ${match.winningNumber} • ${categoryLabel(match.betCategory)}",
+                                    15, navy)
+                                match.lines.forEach { line ->
+                                    addText(resultList,
+                                        "บิล ${line.documentId.take(8)} • ยอดแทง ${formatMoney(line.amountSatang)}${if (line.halfPayout) " • จ่ายครึ่งตามกฎงวด" else ""}",
+                                        13, ink)
+                                }
+                            }
+                            addText(resultList,
+                                "ผลนี้เป็นการจับคู่รายการขายเท่านั้น ยังไม่ใช่ยอดจ่ายเงินจริง เพราะสูตรจ่ายครึ่งและกฎบัญชียังไม่ครบ",
+                                12, 0xFF9B2C2C.toInt())
+                        }
+                    }
+                }
                 addButton(currentBody, "＋ บันทึกผลหวย") {
                     val selected = periods[picker.selectedItemPosition]
                     if (selected.status != "CLOSED") {
@@ -1201,6 +1239,35 @@ class MainActivity : Activity() {
                                     addText(results, "มีเอกสารแก้ไข ${report.correctionDocumentCount} ฉบับ • ยอดขายรวมข้างต้นนับรวมเอกสารแก้ไขด้วย และยังไม่หักกลบเป็นยอดสุทธิ", 13, 0xFF9B2C2C.toInt())
                                 }
                                 addText(results, "ยังไม่คำนวณยอดจ่ายรางวัล กำไร หรือยอดสุทธิ จนกว่าจะกำหนดสูตรและกฎบัญชีตาม SRS 0.2", 13, 0xFF9B2C2C.toInt())
+                                addButton(results, "ส่งออกรายงาน CSV") {
+                                    val csv = buildString {
+                                        appendLine("section,value")
+                                        appendLine("period,\"${period.title.replace("\"", "\"\"")}\"")
+                                        appendLine("documents,${report.documentCount}")
+                                        appendLine("original_documents,${report.originalDocumentCount}")
+                                        appendLine("correction_documents,${report.correctionDocumentCount}")
+                                        appendLine("gross_sales_satang,${report.grossSalesSatang}")
+                                        appendLine("cash_sales_satang,${report.cashSalesSatang}")
+                                        appendLine("credit_sales_satang,${report.creditSalesSatang}")
+                                        appendLine("payments_received_satang,${report.paymentsReceivedSatang}")
+                                        appendLine("outstanding_credit_satang,${report.outstandingCreditSatang}")
+                                        appendLine("line_count,${report.lineCount}")
+                                        appendLine("half_payout_line_count,${report.halfPayoutLineCount}")
+                                        appendLine("half_payout_amount_satang,${report.halfPayoutAmountSatang}")
+                                        report.categoryTotalsSatang.forEach { (category, amount) ->
+                                            appendLine("category_${category},${amount}")
+                                        }
+                                        report.dailyGrossSalesSatang.forEach { (date, amount) ->
+                                            appendLine("daily_${date},${amount}")
+                                        }
+                                    }
+                                    val share = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/csv"
+                                        putExtra(Intent.EXTRA_SUBJECT, "Lotto report • ${period.title}")
+                                        putExtra(Intent.EXTRA_TEXT, csv)
+                                    }
+                                    startActivity(Intent.createChooser(share, "ส่งออกรายงาน"))
+                                }
                             }
                         } catch (e: Exception) {
                             runOnUiThread { addText(results, "สร้างรายงานไม่สำเร็จ: ${e.message}", 14, 0xFF9B2C2C.toInt()) }
