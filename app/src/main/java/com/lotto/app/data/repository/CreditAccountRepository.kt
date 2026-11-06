@@ -8,4 +8,5 @@ interface CreditAccountRepository {
     suspend fun getPaidBills(): List<CreditDocumentEntity>
     suspend fun getPayments(creditDocumentId: Long): List<CreditPaymentEntity>
     suspend fun receivePayment(creditDocumentId: Long, amount: Long)
+    suspend fun cleanupExpiredPaidBills(): Int
 }
