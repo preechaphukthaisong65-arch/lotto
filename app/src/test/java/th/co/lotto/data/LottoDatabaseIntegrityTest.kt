@@ -498,6 +498,38 @@ class LottoDatabaseIntegrityTest {
         assertEquals(1, dao.documentExists("sale-12"))
     }
 
+    @Test
+    fun twoDigitTopAndBottomSalesUseIndependentLimitsAndBlocks() {
+        dao.insertPeriod(period("period-two"))
+        dao.saveLimitRule(NumberLimitRuleEntity(
+            "two-top-limit", "period-two", 2, "TWO_TOP", "56", 500L, true
+        ))
+        dao.setNumberBlocked("two-bottom-block", "period-two", "TWO_BOTTOM", "01", true, 1L, "two-bottom-audit")
+
+        val top = SaleDocumentEntity("two-top-sale", "period-two", null, "CASH", 400L, 2L, "Asia/Bangkok")
+        dao.postSale(top,
+            listOf(SaleLineEntity("two-top-line", top.documentId, "period-two", "56", "TWO_TOP", 400L, false)),
+            AuditEventEntity("two-top-event", "SALE_DOCUMENT", top.documentId, "POSTED", "test", 2L))
+
+        val blockedBottom = SaleDocumentEntity("two-bottom-sale", "period-two", null, "CASH", 100L, 3L, "Asia/Bangkok")
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.postSale(blockedBottom,
+                listOf(SaleLineEntity("two-bottom-line", blockedBottom.documentId, "period-two", "01", "TWO_BOTTOM", 100L, false)),
+                AuditEventEntity("two-bottom-event", "SALE_DOCUMENT", blockedBottom.documentId, "POSTED", "test", 3L))
+        }
+
+        val overLimit = SaleDocumentEntity("two-top-over", "period-two", null, "CASH", 200L, 4L, "Asia/Bangkok")
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.postSale(overLimit,
+                listOf(SaleLineEntity("two-top-over-line", overLimit.documentId, "period-two", "56", "TWO_TOP", 200L, false)),
+                AuditEventEntity("two-top-over-event", "SALE_DOCUMENT", overLimit.documentId, "POSTED", "test", 4L))
+        }
+        assertEquals(400L, dao.getSoldAmountForNumber("period-two", "56", "TWO_TOP"))
+        assertEquals(1, dao.documentExists("two-top-sale"))
+        assertEquals(0, dao.documentExists("two-bottom-sale"))
+        assertEquals(0, dao.documentExists("two-top-over"))
+    }
+
     private fun period(id: String) = DrawPeriodEntity(
         id, id, null, "OPEN", null, 0L
     )
