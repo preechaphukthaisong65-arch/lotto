@@ -51,6 +51,37 @@ class LottoDatabaseIntegrityTest {
     }
 
     @Test
+    fun creditCustomerRequiresCompleteIdentityAndCreationIsAuditedAtomically() {
+        val incomplete = CustomerEntity("credit-bad", "Credit customer", "123", null, "CREDIT", 1L)
+        val incompleteAudit = AuditEventEntity("customer-bad-event", "CUSTOMER", "credit-bad", "CREATED", "test", 1L)
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.postCustomer(incomplete, incompleteAudit)
+        }
+        assertEquals(null, dao.getCustomer("credit-bad"))
+        assertEquals(0, dao.getAuditEvents("credit-bad").size)
+
+        val customer = CustomerEntity("credit-good", "Credit customer", "0800000000", "verified", "CREDIT", 2L)
+        val audit = AuditEventEntity("customer-good-event", "CUSTOMER", "credit-good", "CREATED", "test", 2L)
+        dao.postCustomer(customer, audit)
+
+        assertEquals(customer, dao.getCustomer("credit-good"))
+        assertEquals(listOf("CREATED"), dao.getAuditEvents("credit-good").map { it.action })
+        assertEquals(listOf("credit-good"), dao.searchCustomers("CREDIT", "0800000000").map { it.customerId })
+        assertEquals(listOf("credit-good"), dao.searchCustomers("CREDIT", "verified").map { it.customerId })
+    }
+
+    @Test
+    fun customerAuditMismatchRollsBackCustomerCreation() {
+        val customer = CustomerEntity("cash-1", "Cash customer", null, null, "CASH", 2L)
+        val wrongAudit = AuditEventEntity("wrong-event", "CUSTOMER", "other-id", "CREATED", "test", 2L)
+        assertThrows(IllegalArgumentException::class.java) {
+            dao.postCustomer(customer, wrongAudit)
+        }
+        assertEquals(null, dao.getCustomer("cash-1"))
+        assertEquals(0, dao.getAuditEvents("cash-1").size)
+    }
+
+    @Test
     fun onlyOneOpenPeriodCanExist() {
         dao.insertPeriod(period("period-1"))
         assertThrows(SQLiteException::class.java) {
