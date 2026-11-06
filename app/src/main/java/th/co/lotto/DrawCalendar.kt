@@ -48,9 +48,6 @@ private data class CalendarSourceSnapshot(
 }
 
 object DrawCalendarService {
-    private const val LOG_FILE = "draw_calendar_checks.log"
-    private const val MAX_FUTURE_DAYS = 400L
-
     fun refresh(context: Context): DrawCalendarState {
         val today = LocalDate.now(BANGKOK)
         val lottery = runCatching { LotteryChecksCalendarClient.fetch(today) }
@@ -58,7 +55,7 @@ object DrawCalendarService {
                 "https://lotterychecks.com/draw-calendar", it.message ?: "fetch failed") }
         val huay = runCatching { HuayReviewCalendarClient.fetch(today) }
             .getOrElse { CalendarSourceSnapshot("HUAYREVIEW", emptyList(), System.currentTimeMillis(),
-                "https://huayreview.net/calendar-\${today.year + 543}/", it.message ?: "fetch failed") }
+                "https://huayreview.net/calendar-" + (today.year + 543) + "/", it.message ?: "fetch failed") }
         CalendarAuditLog.append(context, lottery)
         CalendarAuditLog.append(context, huay)
         return readState(context)
@@ -111,8 +108,7 @@ object DrawCalendarService {
 
     internal fun parseHuayReview(html: String, pageYear: Int, today: LocalDate): List<LocalDate> {
         val dates = linkedSetOf<LocalDate>()
-        val plain = htmlToText(html)
-        dates.addAll(fullDateMatches(plain))
+        dates.addAll(fullDateMatches(htmlToText(html)))
         val rowRegex = Regex("(?is)<tr\\b[^>]*>(.*?)</tr>")
         val dayRegex = Regex("""(\d{1,2})\s*(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.)""")
         for (row in rowRegex.findAll(html)) {
@@ -142,7 +138,8 @@ object DrawCalendarService {
     }
 
     private fun validateFutureDates(values: List<LocalDate>, today: LocalDate): List<LocalDate> =
-        values.distinct().filter { !it.isBefore(today) && ChronoUnit.DAYS.between(today, it) <= MAX_FUTURE_DAYS }.sorted().take(12)
+        values.distinct().filter { !it.isBefore(today) && ChronoUnit.DAYS.between(today, it) <= 400L }
+            .sorted().take(12)
 
     private fun thaiMonthNumber(raw: String): Int? = when (raw.replace(".", "").trim()) {
         "มกราคม", "มค" -> 1
@@ -168,8 +165,7 @@ object DrawCalendarService {
 private object LotteryChecksCalendarClient {
     private const val URL = "https://lotterychecks.com/draw-calendar"
     fun fetch(today: LocalDate): CalendarSourceSnapshot {
-        val html = httpGet(URL)
-        val dates = DrawCalendarService.parseLotteryChecks(html, today)
+        val dates = DrawCalendarService.parseLotteryChecks(httpGet(URL), today)
         require(dates.isNotEmpty()) { "ไม่พบรายการงวดถัดไปในปฏิทิน" }
         return CalendarSourceSnapshot("LOTTERYCHECKS", dates, System.currentTimeMillis(), URL)
     }
@@ -180,14 +176,13 @@ private object HuayReviewCalendarClient {
         val currentYear = today.year + 543
         val urls = listOf(
             "https://huayreview.net/calendar-$currentYear/",
-            "https://huayreview.net/calendar-\${currentYear + 1}/"
+            "https://huayreview.net/calendar-" + (currentYear + 1) + "/"
         )
         val dates = linkedSetOf<LocalDate>()
         val errors = mutableListOf<String>()
         urls.forEach { address ->
             runCatching {
-                val html = httpGet(address)
-                dates.addAll(DrawCalendarService.parseHuayReview(html, currentYear, today))
+                dates.addAll(DrawCalendarService.parseHuayReview(httpGet(address), currentYear, today))
             }.onFailure { errors.add(it.message ?: "fetch failed") }
         }
         val sorted = dates.sorted().take(12)
@@ -223,10 +218,10 @@ private object CalendarAuditLog {
     @Synchronized
     fun append(context: Context, snapshot: CalendarSourceSnapshot) {
         val dates = snapshot.dates.joinToString(",") { it.toString() }
-        val url = encode(snapshot.sourceUrl)
-        val reason = encode(snapshot.error.orEmpty())
+        val url = Base64.getEncoder().encodeToString(snapshot.sourceUrl.toByteArray(StandardCharsets.UTF_8))
+        val reason = Base64.getEncoder().encodeToString(snapshot.error.orEmpty().toByteArray(StandardCharsets.UTF_8))
         val line = listOf(snapshot.fetchedAt.toString(), snapshot.sourceId,
-            if (snapshot.successful) "SUCCESS" else "FAILED", dates, url, reason).joinToString("\\t") + "\\n"
+            if (snapshot.successful) "SUCCESS" else "FAILED", dates, url, reason).joinToString("\t") + "\n"
         context.openFileOutput(FILE_NAME, Context.MODE_APPEND).bufferedWriter(StandardCharsets.UTF_8).use { it.write(line) }
     }
 
@@ -234,23 +229,18 @@ private object CalendarAuditLog {
     fun latest(context: Context, sourceId: String): CalendarSourceSnapshot? {
         val file = File(context.filesDir, FILE_NAME)
         if (!file.exists()) return null
-        return file.useLines { lines ->
-            lines.mapNotNull { parseLine(it) }.lastOrNull { it.sourceId == sourceId }
-        }
+        return file.useLines { lines -> lines.mapNotNull { parseLine(it) }.lastOrNull { it.sourceId == sourceId } }
     }
 
     private fun parseLine(line: String): CalendarSourceSnapshot? {
-        val parts = line.split("\\t")
+        val parts = line.split("\t")
         if (parts.size != 6) return null
         val fetched = parts[0].toLongOrNull() ?: return null
         val dates = parts[3].split(",").mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }
-        return CalendarSourceSnapshot(parts[1], dates, fetched, decode(parts[4]), decode(parts[5]).ifBlank { null })
+        val url = runCatching { String(Base64.getDecoder().decode(parts[4]), StandardCharsets.UTF_8) }.getOrDefault("")
+        val reason = runCatching { String(Base64.getDecoder().decode(parts[5]), StandardCharsets.UTF_8) }.getOrDefault("")
+        return CalendarSourceSnapshot(parts[1], dates, fetched, url, reason.ifBlank { null })
     }
-
-    private fun encode(value: String): String = Base64.getEncoder().encodeToString(value.toByteArray(StandardCharsets.UTF_8))
-    private fun decode(value: String): String = runCatching {
-        String(Base64.getDecoder().decode(value), StandardCharsets.UTF_8)
-    }.getOrDefault("")
 }
 
 object DrawCalendarReminder {
