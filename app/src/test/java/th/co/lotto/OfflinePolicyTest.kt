@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -13,17 +14,19 @@ import org.robolectric.RuntimeEnvironment
 @RunWith(RobolectricTestRunner::class)
 class OfflinePolicyTest {
     @Test
-    fun appDoesNotRequestInternetOrAndroidSystemBackup() {
+    fun appAllowsPublicGloRetrievalButDisablesAndroidSystemBackup() {
         val context = RuntimeEnvironment.getApplication() as Context
         val applicationInfo = context.packageManager.getApplicationInfo(context.packageName, 0)
         val packageInfo = context.packageManager.getPackageInfo(
             context.packageName,
             PackageManager.GET_PERMISSIONS
         )
-        val requestsInternet = packageInfo.requestedPermissions
-            ?.contains(Manifest.permission.INTERNET) == true
+        val requested = packageInfo.requestedPermissions?.toSet().orEmpty()
 
-        assertFalse("Lotto must not request internet access", requestsInternet)
+        assertTrue(
+            "Lotto needs internet only to retrieve public GLO results",
+            Manifest.permission.INTERNET in requested
+        )
         assertFalse(
             "Android cloud/device backup must remain disabled",
             applicationInfo.flags and ApplicationInfo.FLAG_ALLOW_BACKUP != 0
