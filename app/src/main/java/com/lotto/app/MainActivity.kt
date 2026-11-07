@@ -155,6 +155,7 @@ class MainActivity : ComponentActivity() {
                         )
                         AppScreen.CurrentSales.name -> CurrentSalesReportScreen(
                             saleRepository = saleRepository,
+                            drawResultRepository = drawResultRepository,
                             drawDates = drawDates,
                             now = currentThailandTime,
                             onBack = { currentScreen = AppScreen.TotalSales.name }
