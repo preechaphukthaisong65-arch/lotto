@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.lotto.app.data.local.entity.DrawResultEntity
 import com.lotto.app.ui.components.buttons.BackButton
 import com.lotto.app.ui.components.buttons.ConfirmButton
 import kotlinx.coroutines.launch
@@ -29,15 +30,19 @@ import kotlinx.coroutines.launch
 fun DrawResultScreen(
     drawDate: String,
     onBack: () -> Unit,
-    onSave: suspend (String, String, String) -> Int
+    onSave: suspend (String, String, String, String) -> Int,
+    existingResult: DrawResultEntity? = null
 ) {
-    var threeDigit by remember(drawDate) { mutableStateOf("") }
-    var twoDigitTop by remember(drawDate) { mutableStateOf("") }
-    var twoDigitBottom by remember(drawDate) { mutableStateOf("") }
+    var threeDigit by remember(drawDate, existingResult) { mutableStateOf(existingResult?.threeDigit.orEmpty()) }
+    var twoDigitTop by remember(drawDate, existingResult) { mutableStateOf(existingResult?.twoDigitTop.orEmpty()) }
+    var twoDigitBottom by remember(drawDate, existingResult) { mutableStateOf(existingResult?.twoDigitBottom.orEmpty()) }
+    var correctionReason by remember(drawDate, existingResult) { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val valid = threeDigit.length == 3 && twoDigitTop.length == 2 && twoDigitBottom.length == 2
+    val isCorrection = existingResult != null
+    val valid = threeDigit.length == 3 && twoDigitTop.length == 2 && twoDigitBottom.length == 2 &&
+        (!isCorrection || correctionReason.isNotBlank())
 
     Scaffold(
         bottomBar = {
@@ -48,15 +53,15 @@ fun DrawResultScreen(
                 BackButton(onBack = onBack)
                 ConfirmButton(
                     label = if (saving) "กำลังบันทึก..." else "ยืนยัน / บันทึกผล",
-                    confirmationTitle = "ยืนยันผลรางวัล",
-                    confirmationMessage = "ตรวจสอบตัวเลขให้ถูกต้องก่อนบันทึก ผลที่บันทึกแล้วจะแก้ไขไม่ได้",
+                    confirmationTitle = if (isCorrection) "ยืนยันการแก้ไขผลรางวัล" else "ยืนยันผลรางวัล",
+                    confirmationMessage = if (isCorrection) "ตรวจสอบผลใหม่และเหตุผลการแก้ไขให้ถูกต้อง ระบบจะบันทึกประวัติการแก้ไข และจะไม่อนุญาตหากงวดนี้จ่ายรางวัลไปแล้ว" else "ตรวจสอบตัวเลขให้ถูกต้องก่อนบันทึกผลรางวัล",
                     enabled = valid && !saving,
                     onConfirm = {
                         scope.launch {
                             saving = true
                             error = null
                             try {
-                                onSave(threeDigit, twoDigitTop, twoDigitBottom)
+                                onSave(threeDigit, twoDigitTop, twoDigitBottom, correctionReason)
                             } catch (e: Exception) {
                                 error = e.message ?: "บันทึกผลรางวัลไม่สำเร็จ"
                             } finally {
@@ -72,7 +77,7 @@ fun DrawResultScreen(
             modifier = Modifier.fillMaxSize().padding(padding).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("บันทึกผลรางวัล", style = MaterialTheme.typography.headlineSmall)
+            Text(if (isCorrection) "แก้ไขผลรางวัล" else "บันทึกผลรางวัล", style = MaterialTheme.typography.headlineSmall)
             Text("งวดวันที่ $drawDate", style = MaterialTheme.typography.titleMedium)
             Text("กรอกผลรางวัลตามประกาศ โดยระบบจะค้นหาบิลที่ถูกรางวัลให้อัตโนมัติ")
             OutlinedTextField(
@@ -100,6 +105,16 @@ fun DrawResultScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+            if (isCorrection) {
+                OutlinedTextField(
+                    value = correctionReason,
+                    onValueChange = { correctionReason = it },
+                    label = { Text("เหตุผลที่แก้ไขผลรางวัล *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
+                )
+                Text("ระบบจะบันทึกผลเดิม ผลใหม่ และเหตุผลไว้ในประวัติการแก้ไข หากมีการจ่ายรางวัลแล้วจะไม่สามารถแก้ไขได้", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
             if (error != null) Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
         }
     }
