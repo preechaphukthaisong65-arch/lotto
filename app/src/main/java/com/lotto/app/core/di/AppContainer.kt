@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.lotto.app.data.local.LottoDatabase
 import com.lotto.app.data.repository.CreditAccountRepository
+import com.lotto.app.data.repository.DrawCalendarRepository
 import com.lotto.app.data.repository.RoomCreditAccountRepository
 import com.lotto.app.data.repository.RoomSaleRepository
 import com.lotto.app.data.repository.RoomSettingsRepository
@@ -19,7 +20,8 @@ class AppContainer(context: Context) {
         .addMigrations(
             LottoDatabase.MIGRATION_1_2,
             LottoDatabase.MIGRATION_2_3,
-            LottoDatabase.MIGRATION_3_4
+            LottoDatabase.MIGRATION_3_4,
+            LottoDatabase.MIGRATION_4_5
         )
         .build()
 
@@ -33,5 +35,9 @@ class AppContainer(context: Context) {
 
     val creditAccountRepository: CreditAccountRepository by lazy {
         RoomCreditAccountRepository(database.saleDao())
+    }
+
+    val drawCalendarRepository: DrawCalendarRepository by lazy {
+        DrawCalendarRepository(database.drawCalendarDao())
     }
 }
