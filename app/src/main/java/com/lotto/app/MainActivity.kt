@@ -70,6 +70,11 @@ class MainActivity : ComponentActivity() {
                 var currentScreen by rememberSaveable { mutableStateOf(AppScreen.Home.name) }
                 val drawDates by drawCalendarRepository.observeAllDrawDates().collectAsState(initial = emptyList())
                 val drawResults by drawResultRepository.observeAllResults().collectAsState(initial = emptyList())
+                val settingRows by settingsRepository.observeAll().collectAsState(initial = emptyList())
+                val currentFullLimits = FullNumberLimitPolicy.settingKeys.mapValues { (_, key) ->
+                    settingRows.firstOrNull { it.key == key }?.value?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+                }
+                val activeSaleDrawDate = SaleWindowPolicy.activeDrawDate(drawDates, currentThailandTime).orEmpty()
                 var selectedResultDrawDate by rememberSaveable { mutableStateOf("") }
                 var currentThailandTime by remember { mutableStateOf(DrawCalendarRepository.nowInThailand()) }
                 LaunchedEffect(Unit) {
@@ -96,6 +101,11 @@ class MainActivity : ComponentActivity() {
                     when (currentScreen) {
                         AppScreen.Sale.name -> SaleScreen(
                             onBack = { currentScreen = AppScreen.Home.name },
+                            drawDate = activeSaleDrawDate,
+                            fullLimitsByPrizeType = currentFullLimits,
+                            onGetNumberStake = { drawDate, prizeType, number ->
+                                saleRepository.getNumberStakeForDraw(drawDate, prizeType, number)
+                            },
                             onSave = { draft ->
                                 val latestStatus = SaleWindowPolicy.evaluate(
                                     drawDates,
