@@ -68,6 +68,26 @@ abstract class SaleDao {
         return saleId
     }
 
+    @Query(
+        """
+        SELECT
+            sale_items.number AS number,
+            sale_items.prizeType AS prizeType,
+            SUM(sale_items.amount) AS totalAmount
+        FROM sale_items
+        INNER JOIN sales ON sales.saleId = sale_items.saleId
+        WHERE sales.createdAt >= :startAt
+          AND sales.createdAt < :endAt
+          AND sales.status = 'CONFIRMED'
+        GROUP BY sale_items.prizeType, sale_items.number
+        ORDER BY totalAmount DESC, sale_items.number ASC
+        """
+    )
+    abstract suspend fun getNumberSalesSummary(
+        startAt: Long,
+        endAt: Long
+    ): List<com.lotto.app.data.local.model.SaleNumberSummary>
+
     @Query("SELECT * FROM sales ORDER BY createdAt DESC, saleId DESC")
     abstract suspend fun getAllSales(): List<SaleEntity>
 
