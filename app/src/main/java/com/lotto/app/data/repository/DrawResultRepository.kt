@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 
 interface DrawResultRepository {
     fun observeAllResults(): Flow<List<DrawResultEntity>>
+    fun observeCorrections(drawDate: String): Flow<List<com.lotto.app.data.local.entity.DrawResultCorrectionEntity>>
     fun observeProfitSummaries(): Flow<List<DrawProfitSummaryEntity>>
     fun observeWinners(drawDate: String): Flow<List<WinningSaleSummary>>
     fun observeWinningBills(status: String): Flow<List<WinningBillSummary>>
