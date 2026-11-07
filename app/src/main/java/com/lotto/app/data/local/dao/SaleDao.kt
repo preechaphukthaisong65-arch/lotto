@@ -52,6 +52,9 @@ abstract class SaleDao {
     @Query("UPDATE credit_documents SET status = :status, paidAt = :paidAt WHERE creditDocumentId = :creditDocumentId")
     protected abstract suspend fun updateCreditStatus(creditDocumentId: Long, status: String, paidAt: Long?)
 
+    @Query("SELECT COALESCE(SUM(totalAmount), 0) FROM sales WHERE drawDate = :drawDate AND status = 'CONFIRMED'")
+    protected abstract suspend fun getSalesTotalForDraw(drawDate: String): Long
+
     @Query("""
         SELECT COALESCE(SUM(si.amount), 0)
         FROM sale_items si
@@ -104,6 +107,8 @@ abstract class SaleDao {
         require(isDrawSaleWindowOpen(targetDrawDate, sale.createdAt) > 0) {
             "อยู่นอกเวลาเปิดรับขาย หรือมีการบันทึกผลรางวัลของงวดนี้แล้ว ไม่สามารถบันทึกบิลได้"
         }
+        // Keep draw-level totals within Long capacity so later financial summaries cannot overflow.
+        Math.addExact(getSalesTotalForDraw(targetDrawDate), sale.totalAmount)
 
         // No-accept rules are absolute and checked inside the sale transaction.
         items.forEach { item ->
