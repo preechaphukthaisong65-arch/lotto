@@ -40,4 +40,19 @@ class RoomDrawResultRepository(private val dao: DrawResultDao) : DrawResultRepos
             recordedAt = System.currentTimeMillis()
         )
     )
+
+    override suspend fun correctResult(
+        drawDate: String,
+        threeDigit: String,
+        twoDigitTop: String,
+        twoDigitBottom: String,
+        reason: String
+    ): Int = dao.correctResultAndRebuildWinners(
+        drawDate = drawDate,
+        threeDigit = threeDigit,
+        twoDigitTop = twoDigitTop,
+        twoDigitBottom = twoDigitBottom,
+        reason = reason,
+        correctedAt = System.currentTimeMillis()
+    )
 }
