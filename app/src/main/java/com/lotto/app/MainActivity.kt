@@ -8,9 +8,14 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
+import com.lotto.app.domain.rules.SaleWindowPolicy
 import androidx.compose.ui.Modifier
 import com.lotto.app.ui.HomeScreen
 import com.lotto.app.ui.credit.CreditAccountsScreen
@@ -54,11 +59,31 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 var currentScreen by rememberSaveable { mutableStateOf(AppScreen.Home.name) }
+                val drawDates by drawCalendarRepository.observeAllDrawDates().collectAsState(initial = emptyList())
+                var currentThailandTime by remember { mutableStateOf(DrawCalendarRepository.nowInThailand()) }
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        currentThailandTime = DrawCalendarRepository.nowInThailand()
+                        delay(1000L)
+                    }
+                }
+                val saleWindow = SaleWindowPolicy.evaluate(drawDates, currentThailandTime)
+                LaunchedEffect(currentScreen, saleWindow.isOpen) {
+                    if (currentScreen == AppScreen.Sale.name && !saleWindow.isOpen) {
+                        Toast.makeText(this@MainActivity, "ปิดรับขายแล้ว", Toast.LENGTH_SHORT).show()
+                        currentScreen = AppScreen.Home.name
+                    }
+                }
                 Surface(modifier = Modifier) {
                     when (currentScreen) {
                         AppScreen.Sale.name -> SaleScreen(
                             onBack = { currentScreen = AppScreen.Home.name },
                             onSave = { draft ->
+                                val latestStatus = SaleWindowPolicy.evaluate(
+                                    drawDates,
+                                    DrawCalendarRepository.nowInThailand()
+                                )
+                                check(latestStatus.isOpen) { "หมดเวลารับขายแล้ว ไม่สามารถบันทึกบิลได้" }
                                 val saleId = saleRepository.saveConfirmedSale(draft)
                                 Toast.makeText(this, "บันทึกการขายเรียบร้อย เลขที่รายการ $saleId", Toast.LENGTH_LONG).show()
                                 currentScreen = AppScreen.Home.name
@@ -110,7 +135,9 @@ class MainActivity : ComponentActivity() {
                             onOpenHistory = { currentScreen = AppScreen.History.name },
                             onOpenCreditAccounts = { currentScreen = AppScreen.CreditAccounts.name },
                             onOpenCalendar = { currentScreen = AppScreen.Calendar.name },
-                            onOpenSettings = { currentScreen = AppScreen.Settings.name }
+                            onOpenSettings = { currentScreen = AppScreen.Settings.name },
+                            saleOpen = saleWindow.isOpen,
+                            saleStatusMessage = saleWindow.message
                         )
                     }
                 }
