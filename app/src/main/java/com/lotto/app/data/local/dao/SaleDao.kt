@@ -34,6 +34,21 @@ abstract class SaleDao {
     @Query("SELECT value FROM app_settings WHERE key = :key LIMIT 1")
     protected abstract suspend fun getSettingValue(key: String): String?
 
+    @Query("""
+        SELECT COUNT(*) FROM draw_dates d
+        WHERE d.drawDate = :drawDate
+          AND NOT EXISTS (SELECT 1 FROM draw_results r WHERE r.drawDate = d.drawDate)
+          AND EXISTS (
+              SELECT 1 FROM draw_dates previous
+              WHERE previous.drawDate = (
+                  SELECT MAX(p.drawDate) FROM draw_dates p WHERE p.drawDate < d.drawDate
+              )
+                AND :createdAt >= CAST(strftime('%s', date(previous.drawDate, '+1 day') || ' 08:00:00', '-7 hours') AS INTEGER) * 1000
+                AND :createdAt < CAST(strftime('%s', d.drawDate || ' 14:30:00', '-7 hours') AS INTEGER) * 1000
+          )
+    """)
+    protected abstract suspend fun isDrawSaleWindowOpen(drawDate: String, createdAt: Long): Int
+
     @Query("UPDATE credit_documents SET status = :status, paidAt = :paidAt WHERE creditDocumentId = :creditDocumentId")
     protected abstract suspend fun updateCreditStatus(creditDocumentId: Long, status: String, paidAt: Long?)
 
@@ -58,6 +73,12 @@ abstract class SaleDao {
         items: List<SaleItemEntity>,
         fullLimitsByPrizeType: Map<String, Long> = emptyMap()
     ): Long {
+        val targetDrawDate = sale.drawDate
+            ?: throw IllegalArgumentException("ไม่พบงวดหวยสำหรับบิลนี้")
+        require(isDrawSaleWindowOpen(targetDrawDate, sale.createdAt) > 0) {
+            "อยู่นอกเวลาเปิดรับขาย หรือมีการบันทึกผลรางวัลของงวดนี้แล้ว ไม่สามารถบันทึกบิลได้"
+        }
+
         // No-accept rules are absolute and checked inside the sale transaction.
         items.forEach { item ->
             val blockedNumbers = getSettingValue("no_accept_${item.prizeType}")
@@ -87,8 +108,9 @@ abstract class SaleDao {
             val limit = fullLimitsByPrizeType[key.first] ?: 0L
             if (limit > 0L) {
                 val alreadySold = getNumberStakeForDraw(sale.drawDate.orEmpty(), key.first, key.second)
-                val requested = requestedItems.sumOf { it.amount }
-                require(alreadySold + requested <= limit) {
+                val requested = requestedItems.fold(0L) { total, item -> Math.addExact(total, item.amount) }
+                val combined = Math.addExact(alreadySold, requested)
+                require(combined <= limit) {
                     "เลข ${key.second} ในหมวด ${key.first} เต็มแล้ว (รับได้สูงสุด ${limit} บาท/งวด, สะสมเดิม ${alreadySold} บาท, รายการนี้ ${requested} บาท)"
                 }
             }
