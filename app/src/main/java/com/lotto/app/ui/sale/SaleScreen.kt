@@ -76,6 +76,7 @@ fun SaleScreen(
     var pendingQuotaAdjustments by remember { mutableStateOf<List<QuotaAdjustment>>(emptyList()) }
     var pendingAddThree by remember { mutableStateOf(false) }
     var pendingAddTwo by remember { mutableStateOf(false) }
+    var fullNumberMessage by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
     fun refreshQuotaHint(key: String, number: String, prizeType: String, digitCount: Int) {
@@ -100,6 +101,21 @@ fun SaleScreen(
                     }
                 }
         }
+    }
+
+    suspend fun findAlreadyFull(entries: List<Triple<Long, String, Map<String, Long>>>): String? {
+        for ((number, rows) in entries.filter { it.second.isNotBlank() }.groupBy { it.second }) {
+            for (prizeType in rows.flatMap { it.third.keys }.distinct()) {
+                val limit = fullLimitsByPrizeType[prizeType] ?: 0L
+                if (limit <= 0L) continue
+                val existing = onGetNumberStake(drawDate, prizeType, number)
+                val inDraft = rows.sumOf { it.third[prizeType] ?: 0L }
+                if (existing + inDraft >= limit && inDraft > 0L) {
+                    return "เลข $number ในหมวด ${FullNumberLimitPolicy.labels[prizeType] ?: prizeType} เต็มแล้ว ไม่รับเพิ่มในงวดนี้"
+                }
+            }
+        }
+        return null
     }
 
     suspend fun findAdjustments(
@@ -133,6 +149,14 @@ fun SaleScreen(
                     PrizeType.THREE_DIGIT_TOD.name to (entry.boxAmount.toLongOrNull() ?: 0L)
                 ))
             }
+            val fullMessage = runCatching { findAlreadyFull(entries) }.getOrElse {
+                saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
+                return@launch
+            }
+            if (fullMessage != null) {
+                fullNumberMessage = fullMessage
+                return@launch
+            }
             val adjustments = runCatching { findAdjustments(entries, 3) }.getOrElse {
                 saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
                 return@launch
@@ -154,6 +178,14 @@ fun SaleScreen(
                     PrizeType.TWO_DIGIT_TOP.name to (entry.topAmount.toLongOrNull() ?: 0L),
                     PrizeType.TWO_DIGIT_BOTTOM.name to (entry.bottomAmount.toLongOrNull() ?: 0L)
                 ))
+            }
+            val fullMessage = runCatching { findAlreadyFull(entries) }.getOrElse {
+                saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
+                return@launch
+            }
+            if (fullMessage != null) {
+                fullNumberMessage = fullMessage
+                return@launch
             }
             val adjustments = runCatching { findAdjustments(entries, 2) }.getOrElse {
                 saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
@@ -300,6 +332,17 @@ fun SaleScreen(
             cashAmount = cashValue,
             creditAmount = creditValue,
             items = items
+        )
+    }
+
+    fullNumberMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { fullNumberMessage = null },
+            title = { Text("หวยเต็ม") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { fullNumberMessage = null }) { Text("รับทราบ") }
+            }
         )
     }
 
