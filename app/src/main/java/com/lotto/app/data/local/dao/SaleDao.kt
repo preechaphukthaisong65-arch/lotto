@@ -29,7 +29,7 @@ abstract class SaleDao {
     protected abstract suspend fun insertCreditPayment(payment: CreditPaymentEntity): Long
 
     @Query("SELECT COALESCE(SUM(amount), 0) FROM credit_payments WHERE creditDocumentId = :creditDocumentId")
-    protected abstract suspend fun getTotalPayments(creditDocumentId: Long)
+    protected abstract suspend fun getTotalPayments(creditDocumentId: Long): Long
 
     @Query("SELECT value FROM app_settings WHERE key = :key LIMIT 1")
     protected abstract suspend fun getSettingValue(key: String): String?
