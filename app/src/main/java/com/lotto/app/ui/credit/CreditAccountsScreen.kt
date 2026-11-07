@@ -12,14 +12,16 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Button
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +43,13 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
 
+private enum class CreditSort(val label: String) {
+    OLDEST("ค้างเก่าที่สุด"),
+    HIGHEST_BALANCE("ยอดค้างรวมต่อคนมากที่สุด"),
+    MOST_BILLS("จำนวนบิลค้างต่อคนมากที่สุด"),
+    CUSTOMER_NAME("ชื่อลูกค้า ก–ฮ")
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit) {
@@ -52,6 +61,9 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
     var refreshKey by remember { mutableStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var pendingPayment by remember { mutableStateOf<Pair<Long, Long>?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedSort by remember { mutableStateOf(CreditSort.OLDEST) }
+    var sortMenuExpanded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")) }
 
@@ -63,6 +75,38 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
             bill.creditDocumentId to repository.getPayments(bill.creditDocumentId)
         }
     }
+
+    val sourceBills = if (selectedTab == 0) openBills else paidBills
+    fun remainingFor(bill: CreditDocumentEntity): Long {
+        val paid = paymentHistory[bill.creditDocumentId].orEmpty().sumOf { it.amount }
+        return (bill.creditAmount - paid).coerceAtLeast(0L)
+    }
+    fun customerKey(bill: CreditDocumentEntity): String =
+        "${bill.customerFirstName.trim()} ${bill.customerLastName.trim()}".trim()
+            .ifBlank { "ไม่ระบุชื่อลูกค้า" }.lowercase(Locale.ROOT)
+
+    val customerTotals = sourceBills.groupBy(::customerKey).mapValues { (_, customerBills) ->
+        val balance = customerBills.sumOf { remainingFor(it) }
+        val oldest = customerBills.minOfOrNull { it.createdAt } ?: Long.MAX_VALUE
+        Triple(balance, customerBills.size, oldest)
+    }
+    val filteredBills = sourceBills
+        .filter { bill ->
+            val fullName = "${bill.customerFirstName} ${bill.customerLastName}"
+            fullName.contains(searchQuery.trim(), ignoreCase = true)
+        }
+        .sortedWith { first, second ->
+            val firstStats = customerTotals[customerKey(first)] ?: Triple(0L, 0, Long.MAX_VALUE)
+            val secondStats = customerTotals[customerKey(second)] ?: Triple(0L, 0, Long.MAX_VALUE)
+            val customerComparison = when (selectedSort) {
+                CreditSort.OLDEST -> firstStats.third.compareTo(secondStats.third)
+                CreditSort.HIGHEST_BALANCE -> secondStats.first.compareTo(firstStats.first)
+                CreditSort.MOST_BILLS -> secondStats.second.compareTo(firstStats.second)
+                CreditSort.CUSTOMER_NAME -> customerKey(first).compareTo(customerKey(second))
+            }
+            if (customerComparison != 0) customerComparison
+            else first.createdAt.compareTo(second.createdAt)
+        }
 
     Scaffold(
         bottomBar = {
@@ -80,17 +124,55 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
                 Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("บิลค้างชำระ (${openBills.size})") })
                 Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("บิลจ่ายแล้ว (${paidBills.size})") })
             }
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("ค้นหาชื่อหรือนามสกุลลูกค้า") },
+                singleLine = true
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("เรียงตาม:", modifier = Modifier.padding(top = 12.dp))
+                Column {
+                    TextButton(onClick = { sortMenuExpanded = true }) {
+                        Text(selectedSort.label)
+                    }
+                    DropdownMenu(
+                        expanded = sortMenuExpanded,
+                        onDismissRequest = { sortMenuExpanded = false }
+                    ) {
+                        CreditSort.entries.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.label) },
+                                onClick = {
+                                    selectedSort = option
+                                    sortMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
             errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            val bills = if (selectedTab == 0) openBills else paidBills
-            if (bills.isEmpty()) {
-                Text(if (selectedTab == 0) "ไม่มีบิลค้างชำระ" else "ไม่มีบิลจ่ายแล้ว")
+            if (filteredBills.isEmpty()) {
+                Text(
+                    when {
+                        sourceBills.isEmpty() && selectedTab == 0 -> "ไม่มีบิลค้างชำระ"
+                        sourceBills.isEmpty() -> "ไม่มีบิลจ่ายแล้ว"
+                        else -> "ไม่พบชื่อลูกค้าที่ค้นหา"
+                    }
+                )
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(bills, key = { it.creditDocumentId }) { bill ->
+                    items(filteredBills, key = { it.creditDocumentId }) { bill ->
                         val payments = paymentHistory[bill.creditDocumentId].orEmpty()
                         val creditPaid = payments.sumOf { it.amount }
                         val paidTotal = bill.cashAmount + creditPaid
-                        val remaining = (bill.creditAmount - creditPaid).coerceAtLeast(0L)
+                        val remaining = remainingFor(bill)
+                        val stats = customerTotals[customerKey(bill)]
                         Card(modifier = Modifier.fillMaxWidth()) {
                             Column(
                                 modifier = Modifier.fillMaxWidth().padding(14.dp),
@@ -101,12 +183,16 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
+                                if (selectedTab == 0 && stats != null) {
+                                    Text("ยอดค้างรวมของลูกค้ารายนี้: ${stats.first} บาท")
+                                    Text("จำนวนบิลค้างของลูกค้ารายนี้: ${stats.second} บิล")
+                                }
                                 Text("วันที่ขาย: ${dateFormat.format(Date(bill.createdAt))}")
                                 Text("ยอดขายรวม: ${bill.saleTotalAmount} บาท")
                                 Text("เงินสด: ${bill.cashAmount} บาท")
                                 Text("ยอดเงินเชื่อ: ${bill.creditAmount} บาท")
                                 Text("รับชำระแล้วรวม: $paidTotal บาท")
-                                Text(if (bill.status == CreditDocumentEntity.STATUS_OPEN) "ยอดค้าง: $remaining บาท" else "สถานะ: จ่ายแล้ว")
+                                Text(if (bill.status == CreditDocumentEntity.STATUS_OPEN) "ยอดค้างบิลนี้: $remaining บาท" else "สถานะ: จ่ายแล้ว")
                                 if (bill.status == CreditDocumentEntity.STATUS_PAID) {
                                     Text("เริ่มนับอายุ 180 วัน: ${bill.paidAt?.let { dateFormat.format(Date(it)) } ?: "ไม่พบวันที่"}")
                                 }
