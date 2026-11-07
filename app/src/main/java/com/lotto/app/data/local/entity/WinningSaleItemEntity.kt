@@ -17,5 +17,8 @@ data class WinningSaleItemEntity(
     val number: String,
     val stakeAmount: Long,
     val payoutMultiplier: Long,
-    val prizeAmount: Long
+    val prizeAmount: Long,
+    val payoutStatus: String = "UNPAID",
+    val recipientName: String? = null,
+    val paidAt: Long? = null
 )
