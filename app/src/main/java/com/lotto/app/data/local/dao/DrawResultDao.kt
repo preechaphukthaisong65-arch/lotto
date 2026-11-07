@@ -206,6 +206,7 @@ abstract class DrawResultDao {
         require(recipientName.isNotBlank()) { "กรุณากรอกชื่อผู้รับรางวัล" }
         require(getWinningBillStatus(drawDate, saleId) == "UNPAID") { "บิลนี้จ่ายรางวัลแล้วหรือไม่พบข้อมูล" }
         require(updateWinningBillPaid(drawDate, saleId, recipientName.trim(), paidAt) > 0) { "บันทึกการจ่ายรางวัลไม่สำเร็จ" }
+        lockResultAfterPayout(drawDate)
     }
 
     @Query("DELETE FROM winning_sale_items WHERE payoutStatus = 'PAID' AND paidAt IS NOT NULL AND paidAt <= :cutoffTimestamp")
