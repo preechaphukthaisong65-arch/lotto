@@ -109,7 +109,18 @@ abstract class DrawResultDao {
                s.customerFirstName AS customerFirstName, s.customerLastName AS customerLastName,
                SUM(wi.prizeAmount) AS totalPrize, MAX(wi.payoutStatus) AS payoutStatus,
                MAX(wi.recipientName) AS recipientName, MAX(wi.paidAt) AS paidAt,
-               s.createdAt AS saleCreatedAt
+               s.createdAt AS saleCreatedAt,
+               GROUP_CONCAT(
+                   'เลข ' || wi.number || ' · ' ||
+                   CASE wi.prizeType
+                       WHEN 'THREE_DIGIT_STRAIGHT' THEN '3 ตัวตรง'
+                       WHEN 'THREE_DIGIT_TOD' THEN '3 ตัวโต๊ด'
+                       WHEN 'TWO_DIGIT_TOP' THEN '2 ตัวบน'
+                       WHEN 'TWO_DIGIT_BOTTOM' THEN '2 ตัวล่าง'
+                       ELSE wi.prizeType
+                   END || ' · แทง ' || wi.stakeAmount || ' บาท · รางวัล ' || wi.prizeAmount || ' บาท',
+                   char(10)
+               ) AS itemDetails
         FROM winning_sale_items wi INNER JOIN sales s ON s.saleId = wi.saleId
         WHERE wi.payoutStatus = :status
         GROUP BY wi.drawDate, wi.saleId, s.customerFirstName, s.customerLastName, s.createdAt
