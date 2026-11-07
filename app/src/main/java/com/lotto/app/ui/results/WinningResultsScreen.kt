@@ -25,9 +25,12 @@ import com.lotto.app.ui.components.buttons.BackButton
 fun WinningResultsScreen(
     drawDate: String,
     repository: DrawResultRepository,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onEditResult: () -> Unit
 ) {
     val winners by repository.observeWinners(drawDate).collectAsState(initial = emptyList())
+    val results by repository.observeAllResults().collectAsState(initial = emptyList())
+    val result = results.firstOrNull { it.drawDate == drawDate }
     Scaffold(
         bottomBar = {
             Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -41,7 +44,15 @@ fun WinningResultsScreen(
         ) {
             Text("ผลตรวจรางวัล", style = MaterialTheme.typography.headlineSmall)
             Text("งวดวันที่ $drawDate", style = MaterialTheme.typography.titleMedium)
+            Text("ผล 3 ตัว: ${result?.threeDigit.orEmpty()} · 2 ตัวบน: ${result?.twoDigitTop.orEmpty()} · 2 ตัวล่าง: ${result?.twoDigitBottom.orEmpty()}")
             Text("พบบิลถูกรางวัล ${winners.size} รายการ", style = MaterialTheme.typography.bodyLarge)
+            if (result?.payoutLocked == true) {
+                Text("งวดนี้มีการจ่ายรางวัลแล้ว จึงล็อกการแก้ไขผลไว้", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            } else if (result != null) {
+                androidx.compose.material3.OutlinedButton(onClick = onEditResult, modifier = Modifier.fillMaxWidth()) {
+                    Text("แก้ไขผลรางวัล (มีบันทึกประวัติ)")
+                }
+            }
             if (winners.isEmpty()) {
                 Text("ไม่พบบิลที่ถูกรางวัลในงวดนี้")
             } else {
