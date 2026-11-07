@@ -334,8 +334,37 @@ fun SaleScreen(
             ((entry.bottomAmount.toLongOrNull() ?: 0L) > 0L && n in (halfPayoutNumbersByPrizeType[PrizeType.TWO_DIGIT_BOTTOM.name] ?: emptySet()) && !isHalfAccepted(PrizeType.TWO_DIGIT_BOTTOM.name, n))
     }
 
+    fun collectUnacceptedHalfPayouts(): List<HalfPayoutPrompt> = buildList {
+        threeDigitEntries.forEach { entry ->
+            val number = entry.firstDigit + entry.secondDigit + entry.thirdDigit
+            if ((entry.straightAmount.toLongOrNull() ?: 0L) > 0L &&
+                number in (halfPayoutNumbersByPrizeType[PrizeType.THREE_DIGIT_STRAIGHT.name] ?: emptySet()) &&
+                !isHalfAccepted(PrizeType.THREE_DIGIT_STRAIGHT.name, number)) {
+                add(HalfPayoutPrompt(true, entry.id, PrizeType.THREE_DIGIT_STRAIGHT.name, number))
+            }
+            if ((entry.boxAmount.toLongOrNull() ?: 0L) > 0L &&
+                number in (halfPayoutNumbersByPrizeType[PrizeType.THREE_DIGIT_TOD.name] ?: emptySet()) &&
+                !isHalfAccepted(PrizeType.THREE_DIGIT_TOD.name, number)) {
+                add(HalfPayoutPrompt(true, entry.id, PrizeType.THREE_DIGIT_TOD.name, number))
+            }
+        }
+        twoDigitEntries.forEach { entry ->
+            val number = entry.firstDigit + entry.secondDigit
+            if ((entry.topAmount.toLongOrNull() ?: 0L) > 0L &&
+                number in (halfPayoutNumbersByPrizeType[PrizeType.TWO_DIGIT_TOP.name] ?: emptySet()) &&
+                !isHalfAccepted(PrizeType.TWO_DIGIT_TOP.name, number)) {
+                add(HalfPayoutPrompt(false, entry.id, PrizeType.TWO_DIGIT_TOP.name, number))
+            }
+            if ((entry.bottomAmount.toLongOrNull() ?: 0L) > 0L &&
+                number in (halfPayoutNumbersByPrizeType[PrizeType.TWO_DIGIT_BOTTOM.name] ?: emptySet()) &&
+                !isHalfAccepted(PrizeType.TWO_DIGIT_BOTTOM.name, number)) {
+                add(HalfPayoutPrompt(false, entry.id, PrizeType.TWO_DIGIT_BOTTOM.name, number))
+            }
+        }
+    }
+
     val canSave = total > 0L && paymentSelected && splitValid &&
-        customerValid && activeEntriesValid && !hasNoAcceptItems && !hasUnacceptedHalfPayoutItems && !isSaving
+        customerValid && activeEntriesValid && !hasNoAcceptItems && !isSaving
 
     fun createDraft(): SaleDraft {
         val items = buildList {
@@ -570,7 +599,11 @@ fun SaleScreen(
                         Spacer(Modifier.weight(1f))
                         ConfirmButton(
                         onConfirm = {
-                            if (canSave) {
+                            if (hasUnacceptedHalfPayoutItems) {
+                                pendingHalfPayouts = collectUnacceptedHalfPayouts()
+                                pendingHalfAddThree = false
+                                pendingHalfAddTwo = false
+                            } else if (canSave) {
                                 coroutineScope.launch {
                                     isSaving = true
                                     saveError = null
