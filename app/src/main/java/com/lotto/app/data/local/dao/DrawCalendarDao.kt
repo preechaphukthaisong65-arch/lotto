@@ -32,7 +32,7 @@ abstract class DrawCalendarDao {
     @Query("SELECT * FROM draw_date_changes ORDER BY changedAt DESC")
     abstract fun observeAllChanges(): Flow<List<DrawDateChangeEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insertDrawDate(entity: DrawDateEntity)
 
     @Insert
