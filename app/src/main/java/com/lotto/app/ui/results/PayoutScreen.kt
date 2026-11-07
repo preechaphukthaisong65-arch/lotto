@@ -60,20 +60,30 @@ fun PayoutScreen(repository: DrawResultRepository, onBack: () -> Unit) {
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             val bills = if (tab == 0) unpaid else paid
             if (bills.isEmpty()) Text(if (tab == 0) "ไม่มีบิลรอจ่ายรางวัล" else "ไม่มีประวัติจ่ายรางวัล")
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(bills, key = { "${it.drawDate}-${it.saleId}" }) { bill ->
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            Text("บิลขายเลขที่ ${bill.saleId}", style = MaterialTheme.typography.titleMedium)
-                            Text("ลูกค้า: ${bill.customerFirstName} ${bill.customerLastName}")
-                            Text("งวดวันที่: ${bill.drawDate}")
-                            Text("เงินรางวัลรวม: ${bill.totalPrize} บาท")
-                            if (bill.payoutStatus == "PAID") {
-                                Text("ผู้รับรางวัล: ${bill.recipientName.orEmpty()}")
-                                Text("วันที่จ่าย: ${bill.paidAt?.let { dateFormat.format(Date(it)) } ?: "-"}")
-                            } else {
-                                Button(onClick = { selected = bill; recipient = ""; error = null }, modifier = Modifier.fillMaxWidth()) {
-                                    Text("บันทึกการจ่ายรางวัล")
+            val billsByDraw = bills.groupBy { it.drawDate }.toSortedMap(compareByDescending { it })
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                billsByDraw.forEach { (drawDate, drawBills) ->
+                    item(key = "draw-$drawDate") {
+                        Text(
+                            "งวดวันที่ $drawDate",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
+                    items(drawBills, key = { "${it.drawDate}-${it.saleId}" }) { bill ->
+                        Card(Modifier.fillMaxWidth()) {
+                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text("บิลขายเลขที่ ${bill.saleId}", style = MaterialTheme.typography.titleMedium)
+                                Text("ลูกค้า: ${bill.customerFirstName} ${bill.customerLastName}")
+                                Text("เงินรางวัลรวม: ${bill.totalPrize} บาท")
+                                if (bill.payoutStatus == "PAID") {
+                                    Text("ผู้รับรางวัล: ${bill.recipientName.orEmpty()}")
+                                    Text("วันที่จ่าย: ${bill.paidAt?.let { dateFormat.format(Date(it)) } ?: "-"}")
+                                } else {
+                                    Button(onClick = { selected = bill; recipient = ""; error = null }, modifier = Modifier.fillMaxWidth()) {
+                                        Text("บันทึกการจ่ายรางวัล")
+                                    }
                                 }
                             }
                         }
