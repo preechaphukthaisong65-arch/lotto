@@ -8,7 +8,7 @@ import com.lotto.app.data.local.entity.SaleItemEntity
 import com.lotto.app.domain.model.SaleDraft
 
 class RoomSaleRepository(private val saleDao: SaleDao) : SaleRepository {
-    override suspend fun saveConfirmedSale(draft: SaleDraft, drawDate: String): Long {
+    override suspend fun saveConfirmedSale(draft: SaleDraft, drawDate: String, fullLimitsByPrizeType: Map<String, Long>): Long {
         require(draft.totalAmount > 0L) { "ยอดขายต้องมากกว่า 0 บาท" }
         require(draft.cashAmount >= 0L && draft.creditAmount >= 0L) { "ยอดชำระต้องไม่ติดลบ" }
         require(draft.cashAmount + draft.creditAmount == draft.totalAmount) {
@@ -39,7 +39,7 @@ class RoomSaleRepository(private val saleDao: SaleDao) : SaleRepository {
                 payoutMultiplier = it.payoutMultiplier
             )
         }
-        return saleDao.insertSaleWithItems(sale, items)
+        return saleDao.insertSaleWithItems(sale, items, fullLimitsByPrizeType)
     }
 
     override suspend fun getAllSales(): List<SaleEntity> = saleDao.getAllSales()
