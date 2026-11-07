@@ -18,10 +18,11 @@ class LottoApplication : Application() {
 
         // Local retention cleanup at startup. OPEN credit bills are never eligible.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            runCatching { container.saleRepository.cleanupExpiredPaidDocuments() }
-                .onFailure { Log.e("LottoRetention", "Credit document cleanup failed", it) }
+            // Remove expired paid winning rows first; then their source sale may become eligible.
             runCatching { container.drawResultRepository.cleanupExpiredPaidWinningBills() }
                 .onFailure { Log.e("LottoRetention", "Winning bill cleanup failed", it) }
+            runCatching { container.saleRepository.cleanupExpiredPaidDocuments() }
+                .onFailure { Log.e("LottoRetention", "Credit and source sale cleanup failed", it) }
         }
     }
 }
