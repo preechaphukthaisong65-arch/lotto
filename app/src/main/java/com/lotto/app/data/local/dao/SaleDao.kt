@@ -28,7 +28,10 @@ abstract class SaleDao {
     protected abstract suspend fun insertCreditPayment(payment: CreditPaymentEntity): Long
 
     @Query("SELECT COALESCE(SUM(amount), 0) FROM credit_payments WHERE creditDocumentId = :creditDocumentId")
-    protected abstract suspend fun getTotalPayments(creditDocumentId: Long): Long
+    protected abstract suspend fun getTotalPayments(creditDocumentId: Long)
+
+    @Query("SELECT value FROM app_settings WHERE key = :key LIMIT 1")
+    protected abstract suspend fun getSettingValue(key: String): String?
 
     @Query("UPDATE credit_documents SET status = :status, paidAt = :paidAt WHERE creditDocumentId = :creditDocumentId")
     protected abstract suspend fun updateCreditStatus(creditDocumentId: Long, status: String, paidAt: Long?)
@@ -54,6 +57,18 @@ abstract class SaleDao {
         items: List<SaleItemEntity>,
         fullLimitsByPrizeType: Map<String, Long> = emptyMap()
     ): Long {
+        // No-accept rules are absolute and checked inside the sale transaction.
+        items.forEach { item ->
+            val blockedNumbers = getSettingValue("no_accept_${item.prizeType}")
+                .orEmpty()
+                .split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+            require(item.number !in blockedNumbers) {
+                "เลข ${item.number} ในหมวด ${item.prizeType} ถูกตั้งค่าไม่รับ ไม่สามารถบันทึกได้"
+            }
+        }
+
         // Check each number/type pair inside the same transaction as insertion.
         // Grouping also prevents duplicate rows in one bill from bypassing the cap.
         items.groupBy { it.prizeType to it.number }.forEach { (key, requestedItems) ->
