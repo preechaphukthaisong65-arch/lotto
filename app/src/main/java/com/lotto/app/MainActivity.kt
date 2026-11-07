@@ -29,6 +29,7 @@ import com.lotto.app.ui.history.HistoryScreen
 import com.lotto.app.ui.reports.ReportDetailScreen
 import com.lotto.app.ui.reports.ReportsScreen
 import com.lotto.app.ui.reports.CurrentSalesReportScreen
+import com.lotto.app.ui.reports.PerformanceReportScreen
 import com.lotto.app.ui.sale.SaleScreen
 import com.lotto.app.ui.settings.SettingsScreen
 import com.lotto.app.ui.results.DrawResultScreen
@@ -208,8 +209,9 @@ class MainActivity : ComponentActivity() {
                             title = "ยอดขายทั้งหมด (ย้อนหลัง 24 งวด)",
                             onBack = { currentScreen = AppScreen.TotalSales.name }
                         )
-                        AppScreen.Performance.name -> ReportDetailScreen(
-                            title = "ยอดผลประกอบการ",
+                        AppScreen.Performance.name -> PerformanceReportScreen(
+                            drawResultRepository = drawResultRepository,
+                            now = currentThailandTime,
                             onBack = { currentScreen = AppScreen.Reports.name }
                         )
                         else -> HomeScreen(
