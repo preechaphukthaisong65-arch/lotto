@@ -11,12 +11,12 @@ class RoomSaleRepository(private val saleDao: SaleDao) : SaleRepository {
     override suspend fun saveConfirmedSale(draft: SaleDraft, drawDate: String, fullLimitsByPrizeType: Map<String, Long>): Long {
         require(draft.totalAmount > 0L) { "ยอดขายต้องมากกว่า 0 บาท" }
         require(draft.cashAmount >= 0L && draft.creditAmount >= 0L) { "ยอดชำระต้องไม่ติดลบ" }
-        require(draft.cashAmount + draft.creditAmount == draft.totalAmount) {
+        require(Math.addExact(draft.cashAmount, draft.creditAmount) == draft.totalAmount) {
             "ยอดเงินสดและเงินเชื่อต้องรวมกันเท่ากับยอดขาย"
         }
         require(draft.items.isNotEmpty()) { "ไม่พบรายการเลขที่ซื้อ" }
         require(draft.items.all { it.amount > 0L }) { "จำนวนเงินแต่ละรายการต้องมากกว่า 0 บาท" }
-        require(draft.items.sumOf { it.amount } == draft.totalAmount) {
+        require(draft.items.fold(0L) { total, item -> Math.addExact(total, item.amount) } == draft.totalAmount) {
             "ผลรวมรายการซื้อไม่ตรงกับยอดขาย"
         }
 
