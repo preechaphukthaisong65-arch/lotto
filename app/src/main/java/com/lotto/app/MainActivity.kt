@@ -14,13 +14,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.lotto.app.ui.HomeScreen
 import com.lotto.app.ui.credit.CreditAccountsScreen
+import com.lotto.app.ui.calendar.DrawCalendarScreen
 import com.lotto.app.ui.history.HistoryScreen
 import com.lotto.app.ui.reports.ReportDetailScreen
 import com.lotto.app.ui.reports.ReportsScreen
 import com.lotto.app.ui.sale.SaleScreen
 
 private enum class AppScreen {
-    Home, Sale, History, CreditAccounts, Reports, TotalSales, CurrentSales, SalesHistory, Performance
+    Home, Sale, History, CreditAccounts, Calendar, Reports, TotalSales, CurrentSales, SalesHistory, Performance
 }
 
 class MainActivity : ComponentActivity() {
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
         val container = (application as LottoApplication).container
         val saleRepository = container.saleRepository
         val creditAccountRepository = container.creditAccountRepository
+        val drawCalendarRepository = container.drawCalendarRepository
 
         setContent {
             MaterialTheme {
@@ -68,6 +70,10 @@ class MainActivity : ComponentActivity() {
                         )
                         AppScreen.CreditAccounts.name -> CreditAccountsScreen(
                             repository = creditAccountRepository,
+                            onBack = { currentScreen = AppScreen.Home.name }
+                        )
+                        AppScreen.Calendar.name -> DrawCalendarScreen(
+                            repository = drawCalendarRepository,
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
                         AppScreen.Reports.name -> ReportsScreen(
@@ -97,7 +103,8 @@ class MainActivity : ComponentActivity() {
                             onOpenSale = { currentScreen = AppScreen.Sale.name },
                             onOpenReports = { currentScreen = AppScreen.Reports.name },
                             onOpenHistory = { currentScreen = AppScreen.History.name },
-                            onOpenCreditAccounts = { currentScreen = AppScreen.CreditAccounts.name }
+                            onOpenCreditAccounts = { currentScreen = AppScreen.CreditAccounts.name },
+                            onOpenCalendar = { currentScreen = AppScreen.Calendar.name }
                         )
                     }
                 }
