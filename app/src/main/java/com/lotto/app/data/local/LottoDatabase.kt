@@ -32,7 +32,7 @@ import com.lotto.app.data.local.entity.SaleItemEntity
         DrawResultEntity::class,
         WinningSaleItemEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -76,6 +76,13 @@ abstract class LottoDatabase : RoomDatabase() {
                 db.execSQL("""CREATE TABLE IF NOT EXISTS draw_date_changes (changeId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, drawDate TEXT NOT NULL, previousDate TEXT, newDate TEXT NOT NULL, changedAt INTEGER NOT NULL, source TEXT NOT NULL)""")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_date_changes_changedAt ON draw_date_changes(changedAt)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_date_changes_drawDate ON draw_date_changes(drawDate)")
+            }
+        }
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE winning_sale_items ADD COLUMN payoutStatus TEXT NOT NULL DEFAULT 'UNPAID'")
+                db.execSQL("ALTER TABLE winning_sale_items ADD COLUMN recipientName TEXT")
+                db.execSQL("ALTER TABLE winning_sale_items ADD COLUMN paidAt INTEGER")
             }
         }
         val MIGRATION_5_6 = object : Migration(5, 6) {
