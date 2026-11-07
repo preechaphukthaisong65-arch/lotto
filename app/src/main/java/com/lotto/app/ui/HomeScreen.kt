@@ -33,7 +33,8 @@ fun HomeScreen(
     onOpenReports: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenCreditAccounts: () -> Unit,
-    onOpenCalendar: () -> Unit
+    onOpenCalendar: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("หน้าหลัก") }) }
@@ -60,6 +61,7 @@ fun HomeScreen(
                             HomeMenuOption.History -> onOpenHistory
                             HomeMenuOption.CreditAccounts -> onOpenCreditAccounts
                             HomeMenuOption.Calendar -> onOpenCalendar
+                            HomeMenuOption.Settings -> onOpenSettings
                             else -> ({})
                         }
                     )
