@@ -9,6 +9,8 @@ import com.lotto.app.data.local.entity.DrawResultEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
 import com.lotto.app.data.local.entity.WinningSaleItemEntity
 import com.lotto.app.data.local.entity.DrawProfitSummaryEntity
+import com.lotto.app.data.local.entity.QUALITY_COMPLETE
+import com.lotto.app.data.local.entity.QUALITY_NEEDS_REVIEW
 import com.lotto.app.data.local.model.WinningSaleSummary
 import com.lotto.app.data.local.model.WinningBillSummary
 import com.lotto.app.domain.rules.LottoRules
@@ -25,6 +27,25 @@ abstract class DrawResultDao {
 
     @Query("SELECT COALESCE(SUM(totalAmount), 0) FROM sales WHERE drawDate = :drawDate AND status = 'CONFIRMED'")
     protected abstract suspend fun getSalesTotalForDraw(drawDate: String): Long
+
+    @Query("""
+        SELECT COUNT(*) FROM sales s
+        WHERE s.drawDate IS NULL
+          AND s.status = 'CONFIRMED'
+          AND EXISTS (
+              SELECT 1 FROM draw_dates d
+              WHERE d.drawDate = :drawDate
+                AND EXISTS (
+                    SELECT 1 FROM draw_dates previous
+                    WHERE previous.drawDate = (
+                        SELECT MAX(p.drawDate) FROM draw_dates p WHERE p.drawDate < d.drawDate
+                    )
+                      AND s.createdAt >= CAST(strftime('%s', date(previous.drawDate, '+1 day') || ' 08:00:00', '-7 hours') AS INTEGER) * 1000
+                      AND s.createdAt < CAST(strftime('%s', d.drawDate || ' 14:30:00', '-7 hours') AS INTEGER) * 1000
+                )
+          )
+    """)
+    protected abstract suspend fun countUnassignedSalesInDrawWindow(drawDate: String): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     protected abstract suspend fun saveProfitSummary(summary: DrawProfitSummaryEntity)
@@ -107,13 +128,19 @@ abstract class DrawResultDao {
     private suspend fun saveDrawProfitSummary(drawDate: String, recordedAt: Long, winningItems: List<WinningSaleItemEntity>) {
         val salesTotal = getSalesTotalForDraw(drawDate)
         val prizeLiability = winningItems.fold(0L) { total, item -> Math.addExact(total, item.prizeAmount) }
+        val dataQuality = if (countUnassignedSalesInDrawWindow(drawDate) == 0) {
+            QUALITY_COMPLETE
+        } else {
+            QUALITY_NEEDS_REVIEW
+        }
         saveProfitSummary(
             DrawProfitSummaryEntity(
                 drawDate = drawDate,
                 salesTotal = salesTotal,
                 prizeLiability = prizeLiability,
                 netProfit = Math.subtractExact(salesTotal, prizeLiability),
-                recordedAt = recordedAt
+                recordedAt = recordedAt,
+                dataQuality = dataQuality
             )
         )
     }
