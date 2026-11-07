@@ -550,6 +550,19 @@ fun SaleScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
+                    if (!amountInputsValid) {
+                        Text(
+                            "จำนวนเงินไม่ถูกต้อง หรือมีค่าที่เกินขอบเขตระบบ",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else if (totalResult.isFailure) {
+                        Text(
+                            "ยอดรวมเกินขอบเขตที่ระบบคำนวณได้ กรุณาแบ่งรายการ",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     if (saveError != null) {
                         Text(
                             text = saveError.orEmpty(),
