@@ -324,9 +324,6 @@ fun SaleScreen(
         ((entry.topAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.TWO_DIGIT_TOP.name] ?: emptySet())) ||
             ((entry.bottomAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.TWO_DIGIT_BOTTOM.name] ?: emptySet()))
     }
-    val canSave = total > 0L && paymentSelected && splitValid &&
-        customerValid && activeEntriesValid && !hasNoAcceptItems && !hasUnacceptedHalfPayoutItems && !isSaving
-
     val hasUnacceptedHalfPayoutItems = threeDigitEntries.any { entry ->
         val n = entry.firstDigit + entry.secondDigit + entry.thirdDigit
         ((entry.straightAmount.toLongOrNull() ?: 0L) > 0L && n in (halfPayoutNumbersByPrizeType[PrizeType.THREE_DIGIT_STRAIGHT.name] ?: emptySet()) && !isHalfAccepted(PrizeType.THREE_DIGIT_STRAIGHT.name, n)) ||
@@ -336,6 +333,9 @@ fun SaleScreen(
         ((entry.topAmount.toLongOrNull() ?: 0L) > 0L && n in (halfPayoutNumbersByPrizeType[PrizeType.TWO_DIGIT_TOP.name] ?: emptySet()) && !isHalfAccepted(PrizeType.TWO_DIGIT_TOP.name, n)) ||
             ((entry.bottomAmount.toLongOrNull() ?: 0L) > 0L && n in (halfPayoutNumbersByPrizeType[PrizeType.TWO_DIGIT_BOTTOM.name] ?: emptySet()) && !isHalfAccepted(PrizeType.TWO_DIGIT_BOTTOM.name, n))
     }
+
+    val canSave = total > 0L && paymentSelected && splitValid &&
+        customerValid && activeEntriesValid && !hasNoAcceptItems && !hasUnacceptedHalfPayoutItems && !isSaving
 
     fun createDraft(): SaleDraft {
         val items = buildList {
