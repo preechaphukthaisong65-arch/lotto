@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
@@ -38,6 +39,7 @@ import com.lotto.app.domain.model.SaleDraftItem
 import com.lotto.app.domain.rules.LottoRules
 import com.lotto.app.domain.rules.PayoutMode
 import com.lotto.app.domain.rules.PrizeType
+import com.lotto.app.domain.rules.FullNumberLimitPolicy
 import com.lotto.app.ui.components.buttons.BackButton
 import com.lotto.app.ui.components.buttons.ConfirmButton
 import com.lotto.app.ui.sale.components.SaleNumberRow
@@ -48,6 +50,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun SaleScreen(
     onBack: () -> Unit,
+    drawDate: String,
+    fullLimitsByPrizeType: Map<String, Long>,
+    onGetNumberStake: suspend (String, String, String) -> Long,
     onSave: suspend (SaleDraft) -> Long
 ) {
     val threeDigitEntries = remember { mutableStateListOf(ThreeDigitEntry(id = 1L)) }
@@ -62,7 +67,28 @@ fun SaleScreen(
     var creditAmount by remember { mutableStateOf("") }
     var isSaving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    val quotaHints = remember { mutableStateMapOf<String, String>() }
     val coroutineScope = rememberCoroutineScope()
+
+    fun refreshQuotaHint(key: String, number: String, prizeType: String, digitCount: Int) {
+        val limit = fullLimitsByPrizeType[prizeType] ?: 0L
+        if (number.length != digitCount || limit <= 0L) {
+            quotaHints.remove(key)
+            return
+        }
+        coroutineScope.launch {
+            runCatching { onGetNumberStake(drawDate, prizeType, number) }
+                .onSuccess { used ->
+                    quotaHints[key] = when {
+                        used >= limit -> "เลข $number เต็มแล้ว · เหลือโควตา 0 บาท"
+                        used.toDouble() / limit.toDouble() >= 0.90 ->
+                            "เลข $number ใกล้เต็ม · ซื้อได้อีก ${limit - used} บาท"
+                        else -> ""
+                    }
+                    if (quotaHints[key].isNullOrEmpty()) quotaHints.remove(key)
+                }
+        }
+    }
 
     val total = threeDigitEntries.sumOf {
         (it.straightAmount.toLongOrNull() ?: 0L) + (it.boxAmount.toLongOrNull() ?: 0L)
@@ -277,17 +303,34 @@ fun SaleScreen(
                 SaleNumberRow(
                     digitCount = 3,
                     firstDigit = entry.firstDigit,
-                    onFirstDigitChange = { threeDigitEntries[index] = entry.copy(firstDigit = it) },
+                    onFirstDigitChange = {
+                        threeDigitEntries[index] = entry.copy(firstDigit = it)
+                        refreshQuotaHint("three-${entry.id}-straight", it + entry.secondDigit + entry.thirdDigit, PrizeType.THREE_DIGIT_STRAIGHT.name, 3)
+                        refreshQuotaHint("three-${entry.id}-tod", it + entry.secondDigit + entry.thirdDigit, PrizeType.THREE_DIGIT_TOD.name, 3)
+                    },
                     secondDigit = entry.secondDigit,
-                    onSecondDigitChange = { threeDigitEntries[index] = entry.copy(secondDigit = it) },
+                    onSecondDigitChange = {
+                        threeDigitEntries[index] = entry.copy(secondDigit = it)
+                        refreshQuotaHint("three-${entry.id}-straight", entry.firstDigit + it + entry.thirdDigit, PrizeType.THREE_DIGIT_STRAIGHT.name, 3)
+                        refreshQuotaHint("three-${entry.id}-tod", entry.firstDigit + it + entry.thirdDigit, PrizeType.THREE_DIGIT_TOD.name, 3)
+                    },
                     thirdDigit = entry.thirdDigit,
-                    onThirdDigitChange = { threeDigitEntries[index] = entry.copy(thirdDigit = it) },
+                    onThirdDigitChange = {
+                        threeDigitEntries[index] = entry.copy(thirdDigit = it)
+                        val number = entry.firstDigit + entry.secondDigit + it
+                        refreshQuotaHint("three-${entry.id}-straight", number, PrizeType.THREE_DIGIT_STRAIGHT.name, 3)
+                        refreshQuotaHint("three-${entry.id}-tod", number, PrizeType.THREE_DIGIT_TOD.name, 3)
+                    },
                     firstAmountLabel = "ตรง",
                     firstAmount = entry.straightAmount,
                     onFirstAmountChange = { threeDigitEntries[index] = entry.copy(straightAmount = it) },
                     secondAmountLabel = "โต๊ด",
                     secondAmount = entry.boxAmount,
-                    onSecondAmountChange = { threeDigitEntries[index] = entry.copy(boxAmount = it) }
+                    onSecondAmountChange = { threeDigitEntries[index] = entry.copy(boxAmount = it) },
+                    quotaHint = listOf(
+                        quotaHints["three-${entry.id}-straight"],
+                        quotaHints["three-${entry.id}-tod"]
+                    ).filterNotNull().distinct().joinToString(" · ").ifBlank { null }
                 )
             }
             item {
@@ -302,15 +345,28 @@ fun SaleScreen(
                 SaleNumberRow(
                     digitCount = 2,
                     firstDigit = entry.firstDigit,
-                    onFirstDigitChange = { twoDigitEntries[index] = entry.copy(firstDigit = it) },
+                    onFirstDigitChange = {
+                        twoDigitEntries[index] = entry.copy(firstDigit = it)
+                        refreshQuotaHint("two-${entry.id}-top", it + entry.secondDigit, PrizeType.TWO_DIGIT_TOP.name, 2)
+                        refreshQuotaHint("two-${entry.id}-bottom", it + entry.secondDigit, PrizeType.TWO_DIGIT_BOTTOM.name, 2)
+                    },
                     secondDigit = entry.secondDigit,
-                    onSecondDigitChange = { twoDigitEntries[index] = entry.copy(secondDigit = it) },
+                    onSecondDigitChange = {
+                        twoDigitEntries[index] = entry.copy(secondDigit = it)
+                        val number = entry.firstDigit + it
+                        refreshQuotaHint("two-${entry.id}-top", number, PrizeType.TWO_DIGIT_TOP.name, 2)
+                        refreshQuotaHint("two-${entry.id}-bottom", number, PrizeType.TWO_DIGIT_BOTTOM.name, 2)
+                    },
                     firstAmountLabel = "บน",
                     firstAmount = entry.topAmount,
                     onFirstAmountChange = { twoDigitEntries[index] = entry.copy(topAmount = it) },
                     secondAmountLabel = "ล่าง",
                     secondAmount = entry.bottomAmount,
-                    onSecondAmountChange = { twoDigitEntries[index] = entry.copy(bottomAmount = it) }
+                    onSecondAmountChange = { twoDigitEntries[index] = entry.copy(bottomAmount = it) },
+                    quotaHint = listOf(
+                        quotaHints["two-${entry.id}-top"],
+                        quotaHints["two-${entry.id}-bottom"]
+                    ).filterNotNull().distinct().joinToString(" · ").ifBlank { null }
                 )
             }
             item {
