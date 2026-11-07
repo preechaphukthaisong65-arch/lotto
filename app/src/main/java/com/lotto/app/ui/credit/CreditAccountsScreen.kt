@@ -174,6 +174,11 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
                     fontWeight = FontWeight.Bold
                 )
             }
+            Text(
+                "โปรดตรวจเลขที่บิลทุกครั้ง ชื่อและนามสกุลที่ซ้ำกันอาจเป็นคนละลูกค้า ระบบรับชำระแยกตามเลขที่บิล",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             if (filteredBills.isEmpty()) {
                 Text(
@@ -197,6 +202,7 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
                                 modifier = Modifier.fillMaxWidth().padding(14.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
+                                Text("เลขที่บิล #${bill.creditDocumentId}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                                 Text(
                                     "${bill.customerFirstName} ${bill.customerLastName}".trim().ifBlank { "ไม่ระบุชื่อลูกค้า" },
                                     style = MaterialTheme.typography.titleMedium,
