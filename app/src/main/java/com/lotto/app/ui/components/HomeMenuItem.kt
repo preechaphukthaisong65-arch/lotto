@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.alpha
 
 enum class HomeMenuOption(
     val title: String,
@@ -39,10 +40,12 @@ enum class HomeMenuOption(
 @Composable
 fun HomeMenuItem(
     option: HomeMenuOption,
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
+    enabled: Boolean = true,
+    subtitle: String? = null
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+        modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.55f).clickable(enabled = enabled, onClick = onClick)
     ) {
         Row(
             modifier = Modifier
@@ -57,11 +60,12 @@ fun HomeMenuItem(
                 modifier = Modifier.size(28.dp),
                 tint = MaterialTheme.colorScheme.primary
             )
-            Text(
-                text = option.title,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium
-            )
+            androidx.compose.foundation.layout.Column(modifier = Modifier.weight(1f)) {
+                Text(text = option.title, style = MaterialTheme.typography.titleMedium)
+                if (subtitle != null) {
+                    Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+            }
             Icon(
                 imageVector = Icons.Outlined.ChevronRight,
                 contentDescription = null
