@@ -8,14 +8,25 @@ import androidx.room.Transaction
 import com.lotto.app.data.local.entity.DrawResultEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
 import com.lotto.app.data.local.entity.WinningSaleItemEntity
+import com.lotto.app.data.local.entity.DrawProfitSummaryEntity
 import com.lotto.app.data.local.model.WinningSaleSummary
 import com.lotto.app.data.local.model.WinningBillSummary
 import com.lotto.app.domain.rules.LottoRules
 import com.lotto.app.domain.rules.PrizeType
 import kotlinx.coroutines.flow.Flow
+import androidx.room.OnConflictStrategy
 
 @Dao
 abstract class DrawResultDao {
+    @Query("SELECT * FROM draw_profit_summaries ORDER BY drawDate DESC")
+    abstract fun observeProfitSummaries(): Flow<List<DrawProfitSummaryEntity>>
+
+    @Query("SELECT COALESCE(SUM(totalAmount), 0) FROM sales WHERE drawDate = :drawDate AND status = 'CONFIRMED'")
+    protected abstract suspend fun getSalesTotalForDraw(drawDate: String): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    protected abstract suspend fun saveProfitSummary(summary: DrawProfitSummaryEntity)
+
     @Query("SELECT * FROM draw_results ORDER BY drawDate DESC")
     abstract fun observeAllResults(): Flow<List<DrawResultEntity>>
 
@@ -80,6 +91,17 @@ abstract class DrawResultDao {
         }
         insertResult(result)
         if (winningItems.isNotEmpty()) insertWinners(winningItems)
+        val salesTotal = getSalesTotalForDraw(result.drawDate)
+        val prizeLiability = winningItems.sumOf { it.prizeAmount }
+        saveProfitSummary(
+            DrawProfitSummaryEntity(
+                drawDate = result.drawDate,
+                salesTotal = salesTotal,
+                prizeLiability = prizeLiability,
+                netProfit = salesTotal - prizeLiability,
+                recordedAt = result.recordedAt
+            )
+        )
         return winningItems.size
     }
 
