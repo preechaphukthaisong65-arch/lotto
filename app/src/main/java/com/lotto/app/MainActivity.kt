@@ -153,13 +153,20 @@ class MainActivity : ComponentActivity() {
                         AppScreen.Winners.name -> WinningResultsScreen(
                             drawDate = selectedResultDrawDate,
                             repository = drawResultRepository,
-                            onBack = { currentScreen = AppScreen.Home.name }
+                            onBack = { currentScreen = AppScreen.Home.name },
+                            onEditResult = { currentScreen = AppScreen.DrawResult.name }
                         )
                         AppScreen.DrawResult.name -> DrawResultScreen(
                             drawDate = selectedResultDrawDate,
                             onBack = { currentScreen = AppScreen.Home.name },
-                            onSave = { three, top, bottom ->
-                                val count = drawResultRepository.saveResult(selectedResultDrawDate, three, top, bottom)
+                            existingResult = drawResults.firstOrNull { it.drawDate == selectedResultDrawDate },
+                            onSave = { three, top, bottom, reason ->
+                                val existing = drawResults.firstOrNull { it.drawDate == selectedResultDrawDate }
+                                val count = if (existing == null) {
+                                    drawResultRepository.saveResult(selectedResultDrawDate, three, top, bottom)
+                                } else {
+                                    drawResultRepository.correctResult(selectedResultDrawDate, three, top, bottom, reason)
+                                }
                                 currentScreen = AppScreen.Winners.name
                                 count
                             }
