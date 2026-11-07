@@ -1,6 +1,5 @@
 package com.lotto.app.ui.sale
 
-private data class QuotaAdjustment(val entryId: Long, val prizeType: String, val allowedAmount: Long)
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -49,6 +48,8 @@ import com.lotto.app.ui.sale.components.SaleNumberRow
 import com.lotto.app.ui.sale.model.ThreeDigitEntry
 import com.lotto.app.ui.sale.model.TwoDigitEntry
 import kotlinx.coroutines.launch
+
+private data class QuotaAdjustment(val entryId: Long, val prizeType: String, val allowedAmount: Long)
 
 @Composable
 fun SaleScreen(
