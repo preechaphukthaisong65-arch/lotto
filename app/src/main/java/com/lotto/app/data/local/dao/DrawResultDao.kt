@@ -9,6 +9,7 @@ import com.lotto.app.data.local.entity.DrawResultEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
 import com.lotto.app.data.local.entity.WinningSaleItemEntity
 import com.lotto.app.data.local.model.WinningSaleSummary
+import com.lotto.app.data.local.model.WinningBillSummary
 import com.lotto.app.domain.rules.LottoRules
 import com.lotto.app.domain.rules.PrizeType
 import kotlinx.coroutines.flow.Flow
@@ -81,4 +82,34 @@ abstract class DrawResultDao {
         if (winningItems.isNotEmpty()) insertWinners(winningItems)
         return winningItems.size
     }
+
+    @Query("""
+        SELECT wi.drawDate AS drawDate, wi.saleId AS saleId,
+               s.customerFirstName AS customerFirstName, s.customerLastName AS customerLastName,
+               SUM(wi.prizeAmount) AS totalPrize, MAX(wi.payoutStatus) AS payoutStatus,
+               MAX(wi.recipientName) AS recipientName, MAX(wi.paidAt) AS paidAt,
+               s.createdAt AS saleCreatedAt
+        FROM winning_sale_items wi INNER JOIN sales s ON s.saleId = wi.saleId
+        WHERE wi.payoutStatus = :status
+        GROUP BY wi.drawDate, wi.saleId, s.customerFirstName, s.customerLastName, s.createdAt
+        ORDER BY COALESCE(MAX(wi.paidAt), s.createdAt) DESC, wi.saleId DESC
+    """)
+    abstract fun observeWinningBills(status: String): Flow<List<WinningBillSummary>>
+
+    @Query("SELECT payoutStatus FROM winning_sale_items WHERE drawDate = :drawDate AND saleId = :saleId LIMIT 1")
+    protected abstract suspend fun getWinningBillStatus(drawDate: String, saleId: Long): String?
+
+    @Query("UPDATE winning_sale_items SET payoutStatus = 'PAID', recipientName = :recipientName, paidAt = :paidAt WHERE drawDate = :drawDate AND saleId = :saleId AND payoutStatus = 'UNPAID'")
+    protected abstract suspend fun updateWinningBillPaid(drawDate: String, saleId: Long, recipientName: String, paidAt: Long): Int
+
+    @Transaction
+    open suspend fun markWinningBillPaid(drawDate: String, saleId: Long, recipientName: String, paidAt: Long) {
+        require(recipientName.isNotBlank()) { "กรุณากรอกชื่อผู้รับรางวัล" }
+        require(getWinningBillStatus(drawDate, saleId) == "UNPAID") { "บิลนี้จ่ายรางวัลแล้วหรือไม่พบข้อมูล" }
+        require(updateWinningBillPaid(drawDate, saleId, recipientName.trim(), paidAt) > 0) { "บันทึกการจ่ายรางวัลไม่สำเร็จ" }
+    }
+
+    @Query("DELETE FROM winning_sale_items WHERE payoutStatus = 'PAID' AND paidAt IS NOT NULL AND paidAt <= :cutoffTimestamp")
+    abstract suspend fun deleteExpiredPaidWinningBills(cutoffTimestamp: Long): Int
+
 }
