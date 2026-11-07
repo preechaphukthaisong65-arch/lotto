@@ -247,18 +247,16 @@ fun SaleScreen(
         pendingAddTwo = false
     }
 
-    val amountInputs = buildList {
+    val stakeAmountInputs = buildList {
         threeDigitEntries.forEach { add(it.straightAmount); add(it.boxAmount) }
         twoDigitEntries.forEach { add(it.topAmount); add(it.bottomAmount) }
-        add(cashAmount)
-        add(creditAmount)
     }
-    val amountInputsValid = amountInputs.all { value ->
+    val paymentAmountInputs = if (cashSelected && creditSelected) listOf(cashAmount, creditAmount) else emptyList()
+    val amountInputsValid = (stakeAmountInputs + paymentAmountInputs).all { value ->
         value.isBlank() || (value.toLongOrNull()?.let { it >= 0L } == true)
     }
     val totalResult = runCatching {
-        amountInputs.take(amountInputs.size - 2)
-            .filter { it.isNotBlank() }
+        stakeAmountInputs.filter { it.isNotBlank() }
             .map { it.toLong() }
             .fold(0L) { sum, amount -> Math.addExact(sum, amount) }
     }
