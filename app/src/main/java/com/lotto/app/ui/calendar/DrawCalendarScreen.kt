@@ -3,6 +3,7 @@ package com.lotto.app.ui.calendar
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -50,8 +52,10 @@ fun DrawCalendarScreen(
     val start = visibleMonth.atDay(1)
     val end = visibleMonth.atEndOfMonth()
     val drawDates by repository.observeDrawDates(start, end).collectAsState(initial = emptyList())
+    val changeHistory by repository.observeAllChanges().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     var editing by remember { mutableStateOf<DrawDateEntity?>(null) }
+    var adding by remember { mutableStateOf(false) }
     var newDateText by remember { mutableStateOf("") }
     var errorText by remember { mutableStateOf<String?>(null) }
     val thaiLocale = remember { Locale("th", "TH") }
@@ -84,7 +88,7 @@ fun DrawCalendarScreen(
                 "วันที่วันนี้: ${today.format(DateTimeFormatter.ofPattern("d MMMM yyyy", thaiLocale))} (เวลาไทย)",
                 style = MaterialTheme.typography.bodySmall
             )
-            if (drawDates.isEmpty()) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {\n                Button(onClick = { adding = true; newDateText = today.toString(); errorText = null }) { Text("เพิ่มวันออกรางวัล") }\n            }\n            if (drawDates.isEmpty()) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
                         Text("ยังไม่มีข้อมูลงวดในเดือนนี้")
