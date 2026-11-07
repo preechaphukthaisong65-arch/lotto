@@ -1,5 +1,6 @@
 package com.lotto.app.domain.rules
 import com.lotto.app.data.repository.SettingsRepository
+import com.lotto.app.domain.rules.PrizeType
 object HalfPayoutNumberPolicy {
     private const val KEY_PREFIX = "half_payout_"
     val settingKeys = mapOf(
