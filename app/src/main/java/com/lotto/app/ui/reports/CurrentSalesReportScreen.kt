@@ -33,6 +33,7 @@ import com.lotto.app.data.repository.DrawResultRepository
 import com.lotto.app.data.repository.SaleRepository
 import com.lotto.app.domain.rules.PrizeType
 import com.lotto.app.ui.components.buttons.BackButton
+import java.math.BigInteger
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZonedDateTime
@@ -180,7 +181,7 @@ fun CurrentSalesReportScreen(
                                 Text("ยอดขายรวมทั้งหมด", fontWeight = FontWeight.SemiBold)
                                 Spacer(Modifier.weight(1f))
                                 Text(
-                                    text = "${summaries.orEmpty().sumOf { it.totalAmount }} บาท",
+                                    text = "${summaries.orEmpty().fold(BigInteger.ZERO) { total, item -> total.add(BigInteger.valueOf(item.totalAmount)) }} บาท",
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold
                                 )
