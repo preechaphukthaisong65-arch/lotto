@@ -27,9 +27,11 @@ import com.lotto.app.ui.reports.ReportsScreen
 import com.lotto.app.ui.reports.CurrentSalesReportScreen
 import com.lotto.app.ui.sale.SaleScreen
 import com.lotto.app.ui.settings.SettingsScreen
+import com.lotto.app.ui.results.DrawResultScreen
+import java.time.LocalDate
 
 private enum class AppScreen {
-    Home, Sale, History, CreditAccounts, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance
+    Home, Sale, History, CreditAccounts, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance, DrawResult
 }
 
 class MainActivity : ComponentActivity() {
@@ -57,11 +59,14 @@ class MainActivity : ComponentActivity() {
         val saleRepository = container.saleRepository
         val creditAccountRepository = container.creditAccountRepository
         val drawCalendarRepository = container.drawCalendarRepository
+        val drawResultRepository = container.drawResultRepository
 
         setContent {
             MaterialTheme {
                 var currentScreen by rememberSaveable { mutableStateOf(AppScreen.Home.name) }
                 val drawDates by drawCalendarRepository.observeAllDrawDates().collectAsState(initial = emptyList())
+                val drawResults by drawResultRepository.observeAllResults().collectAsState(initial = emptyList())
+                var selectedResultDrawDate by rememberSaveable { mutableStateOf("") }
                 var currentThailandTime by remember { mutableStateOf(DrawCalendarRepository.nowInThailand()) }
                 LaunchedEffect(Unit) {
                     while (true) {
@@ -70,6 +75,12 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 val saleWindow = SaleWindowPolicy.evaluate(drawDates, currentThailandTime)
+                val pendingResultDate = drawDates.mapNotNull { runCatching { LocalDate.parse(it.drawDate) }.getOrNull() }
+                    .filter { date ->
+                        !currentThailandTime.toLocalDate().isBefore(date) &&
+                            !currentThailandTime.toLocalDateTime().isBefore(date.atTime(16, 0)) &&
+                            drawResults.none { it.drawDate == date.toString() }
+                    }.maxOrNull()?.toString()
                 LaunchedEffect(currentScreen, saleWindow.isOpen) {
                     if (currentScreen == AppScreen.Sale.name && !saleWindow.isOpen) {
                         Toast.makeText(this@MainActivity, "ปิดรับขายแล้ว", Toast.LENGTH_SHORT).show()
@@ -86,10 +97,22 @@ class MainActivity : ComponentActivity() {
                                     DrawCalendarRepository.nowInThailand()
                                 )
                                 check(latestStatus.isOpen) { "หมดเวลารับขายแล้ว ไม่สามารถบันทึกบิลได้" }
-                                val saleId = saleRepository.saveConfirmedSale(draft)
+                                val targetDrawDate = SaleWindowPolicy.activeDrawDate(drawDates, DrawCalendarRepository.nowInThailand())
+                                    ?: error("ไม่พบงวดหวยที่เปิดรับขาย")
+                                val saleId = saleRepository.saveConfirmedSale(draft, targetDrawDate)
                                 Toast.makeText(this, "บันทึกการขายเรียบร้อย เลขที่รายการ $saleId", Toast.LENGTH_LONG).show()
                                 currentScreen = AppScreen.Home.name
                                 saleId
+                            }
+                        )
+                        AppScreen.DrawResult.name -> DrawResultScreen(
+                            drawDate = selectedResultDrawDate,
+                            onBack = { currentScreen = AppScreen.Home.name },
+                            onSave = { three, top, bottom ->
+                                val count = drawResultRepository.saveResult(selectedResultDrawDate, three, top, bottom)
+                                Toast.makeText(this, "บันทึกผลแล้ว พบรายการถูกรางวัล $count รายการ", Toast.LENGTH_LONG).show()
+                                currentScreen = AppScreen.Home.name
+                                count
                             }
                         )
                         AppScreen.History.name -> HistoryScreen(
@@ -141,7 +164,12 @@ class MainActivity : ComponentActivity() {
                             onOpenCalendar = { currentScreen = AppScreen.Calendar.name },
                             onOpenSettings = { currentScreen = AppScreen.Settings.name },
                             saleOpen = saleWindow.isOpen,
-                            saleStatusMessage = saleWindow.message
+                            saleStatusMessage = saleWindow.message,
+                            pendingResultDate = pendingResultDate,
+                            onOpenDrawResult = {
+                                selectedResultDrawDate = pendingResultDate.orEmpty()
+                                currentScreen = AppScreen.DrawResult.name
+                            }
                         )
                     }
                 }
