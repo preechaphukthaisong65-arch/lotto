@@ -33,8 +33,40 @@ abstract class SaleDao {
     @Query("UPDATE credit_documents SET status = :status, paidAt = :paidAt WHERE creditDocumentId = :creditDocumentId")
     protected abstract suspend fun updateCreditStatus(creditDocumentId: Long, status: String, paidAt: Long?)
 
+    @Query("""
+        SELECT COALESCE(SUM(si.amount), 0)
+        FROM sale_items si
+        INNER JOIN sales s ON s.saleId = si.saleId
+        WHERE s.drawDate = :drawDate
+          AND s.status = 'CONFIRMED'
+          AND si.prizeType = :prizeType
+          AND si.number = :number
+    """)
+    protected abstract suspend fun getNumberStakeForDraw(
+        drawDate: String,
+        prizeType: String,
+        number: String
+    ): Long
+
     @Transaction
-    open suspend fun insertSaleWithItems(sale: SaleEntity, items: List<SaleItemEntity>): Long {
+    open suspend fun insertSaleWithItems(
+        sale: SaleEntity,
+        items: List<SaleItemEntity>,
+        fullLimitsByPrizeType: Map<String, Long> = emptyMap()
+    ): Long {
+        // Check each number/type pair inside the same transaction as insertion.
+        // Grouping also prevents duplicate rows in one bill from bypassing the cap.
+        items.groupBy { it.prizeType to it.number }.forEach { (key, requestedItems) ->
+            val limit = fullLimitsByPrizeType[key.first] ?: 0L
+            if (limit > 0L) {
+                val alreadySold = getNumberStakeForDraw(sale.drawDate.orEmpty(), key.first, key.second)
+                val requested = requestedItems.sumOf { it.amount }
+                require(alreadySold + requested <= limit) {
+                    "เลข ${key.second} ในหมวด ${key.first} เต็มแล้ว (รับได้สูงสุด ${limit} บาท/งวด, สะสมเดิม ${alreadySold} บาท, รายการนี้ ${requested} บาท)"
+                }
+            }
+        }
+
         val saleId = insertSale(sale)
         insertSaleItems(items.map { it.copy(saleId = saleId) })
 
