@@ -330,7 +330,7 @@ fun SaleScreen(
                     quotaHint = listOf(
                         quotaHints["three-${entry.id}-straight"],
                         quotaHints["three-${entry.id}-tod"]
-                    ).filterNotNull().distinct().joinToString(" · ").ifBlank { null }
+                    ).filterNotNull().distinct().joinToString(" · ").takeIf { it.isNotBlank() }
                 )
             }
             item {
