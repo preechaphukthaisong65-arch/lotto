@@ -20,6 +20,9 @@ abstract class DrawResultDao {
     @Query("SELECT * FROM draw_profit_summaries ORDER BY drawDate DESC")
     abstract fun observeProfitSummaries(): Flow<List<DrawProfitSummaryEntity>>
 
+    @Query("DELETE FROM draw_profit_summaries WHERE drawDate < :cutoffDate")
+    abstract suspend fun deleteExpiredProfitSummaries(cutoffDate: String): Int
+
     @Query("SELECT COALESCE(SUM(totalAmount), 0) FROM sales WHERE drawDate = :drawDate AND status = 'CONFIRMED'")
     protected abstract suspend fun getSalesTotalForDraw(drawDate: String): Long
 
