@@ -68,9 +68,12 @@ fun SaleScreen(
     var isSaving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
     val quotaHints = remember { mutableStateMapOf<String, String>() }
+    val quotaRequestVersions = remember { mutableStateMapOf<String, Int>() }
     val coroutineScope = rememberCoroutineScope()
 
     fun refreshQuotaHint(key: String, number: String, prizeType: String, digitCount: Int) {
+        val version = (quotaRequestVersions[key] ?: 0) + 1
+        quotaRequestVersions[key] = version
         val limit = fullLimitsByPrizeType[prizeType] ?: 0L
         if (number.length != digitCount || limit <= 0L) {
             quotaHints.remove(key)
@@ -79,13 +82,15 @@ fun SaleScreen(
         coroutineScope.launch {
             runCatching { onGetNumberStake(drawDate, prizeType, number) }
                 .onSuccess { used ->
-                    quotaHints[key] = when {
-                        used >= limit -> "เลข $number เต็มแล้ว · เหลือโควตา 0 บาท"
-                        used.toDouble() / limit.toDouble() >= 0.90 ->
-                            "เลข $number ใกล้เต็ม · ซื้อได้อีก ${limit - used} บาท"
-                        else -> ""
+                    if (quotaRequestVersions[key] == version) {
+                        quotaHints[key] = when {
+                            used >= limit -> "เลข $number เต็มแล้ว · เหลือโควตา 0 บาท"
+                            used.toDouble() / limit.toDouble() >= 0.90 ->
+                                "เลข $number ใกล้เต็ม · ซื้อได้อีก ${limit - used} บาท"
+                            else -> ""
+                        }
+                        if (quotaHints[key].isNullOrEmpty()) quotaHints.remove(key)
                     }
-                    if (quotaHints[key].isNullOrEmpty()) quotaHints.remove(key)
                 }
         }
     }
