@@ -1,5 +1,7 @@
 package com.lotto.app.ui.sale
 
+private data class QuotaAdjustment(val entryId: Long, val prizeType: String, val allowedAmount: Long)
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +72,9 @@ fun SaleScreen(
     var saveError by remember { mutableStateOf<String?>(null) }
     val quotaHints = remember { mutableStateMapOf<String, String>() }
     val quotaRequestVersions = remember { mutableStateMapOf<String, Int>() }
+    var pendingQuotaAdjustments by remember { mutableStateOf<List<QuotaAdjustment>>(emptyList()) }
+    var pendingAddThree by remember { mutableStateOf(false) }
+    var pendingAddTwo by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
     fun refreshQuotaHint(key: String, number: String, prizeType: String, digitCount: Int) {
@@ -93,6 +99,100 @@ fun SaleScreen(
                     }
                 }
         }
+    }
+
+    suspend fun findAdjustments(
+        entries: List<Triple<Long, String, Map<String, Long>>>,
+        digitCount: Int
+    ): List<QuotaAdjustment> {
+        val adjustments = mutableListOf<QuotaAdjustment>()
+        for ((entryId, number, amounts) in entries) {
+            if (number.length != digitCount) continue
+            for ((prizeType, requestedAmount) in amounts) {
+                if (requestedAmount <= 0L) continue
+                val limit = fullLimitsByPrizeType[prizeType] ?: 0L
+                if (limit <= 0L) continue
+                val alreadySold = onGetNumberStake(drawDate, prizeType, number)
+                val otherDraftAmount = entries
+                    .filter { it.second == number && it.first != entryId }
+                    .sumOf { it.third[prizeType] ?: 0L }
+                val remaining = (limit - alreadySold - otherDraftAmount).coerceAtLeast(0L)
+                if (requestedAmount > remaining) adjustments += QuotaAdjustment(entryId, prizeType, remaining)
+            }
+        }
+        return adjustments
+    }
+
+    fun requestAddThree() {
+        coroutineScope.launch {
+            val entries = threeDigitEntries.map { entry ->
+                Triple(entry.id, entry.firstDigit + entry.secondDigit + entry.thirdDigit, mapOf(
+                    PrizeType.THREE_DIGIT_STRAIGHT.name to (entry.straightAmount.toLongOrNull() ?: 0L),
+                    PrizeType.THREE_DIGIT_TOD.name to (entry.boxAmount.toLongOrNull() ?: 0L)
+                ))
+            }
+            val adjustments = runCatching { findAdjustments(entries, 3) }.getOrElse {
+                saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
+                return@launch
+            }
+            if (adjustments.isEmpty()) {
+                threeDigitEntries.add(ThreeDigitEntry(id = nextThreeId))
+                nextThreeId += 1L
+            } else {
+                pendingQuotaAdjustments = adjustments
+                pendingAddThree = true
+            }
+        }
+    }
+
+    fun requestAddTwo() {
+        coroutineScope.launch {
+            val entries = twoDigitEntries.map { entry ->
+                Triple(entry.id, entry.firstDigit + entry.secondDigit, mapOf(
+                    PrizeType.TWO_DIGIT_TOP.name to (entry.topAmount.toLongOrNull() ?: 0L),
+                    PrizeType.TWO_DIGIT_BOTTOM.name to (entry.bottomAmount.toLongOrNull() ?: 0L)
+                ))
+            }
+            val adjustments = runCatching { findAdjustments(entries, 2) }.getOrElse {
+                saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
+                return@launch
+            }
+            if (adjustments.isEmpty()) {
+                twoDigitEntries.add(TwoDigitEntry(id = nextTwoId))
+                nextTwoId += 1L
+            } else {
+                pendingQuotaAdjustments = adjustments
+                pendingAddTwo = true
+            }
+        }
+    }
+
+    fun confirmQuotaAdjustments() {
+        pendingQuotaAdjustments.forEach { adjustment ->
+            when (adjustment.prizeType) {
+                PrizeType.THREE_DIGIT_STRAIGHT.name -> {
+                    val index = threeDigitEntries.indexOfFirst { it.id == adjustment.entryId }
+                    if (index >= 0) threeDigitEntries[index] = threeDigitEntries[index].copy(straightAmount = adjustment.allowedAmount.toString())
+                }
+                PrizeType.THREE_DIGIT_TOD.name -> {
+                    val index = threeDigitEntries.indexOfFirst { it.id == adjustment.entryId }
+                    if (index >= 0) threeDigitEntries[index] = threeDigitEntries[index].copy(boxAmount = adjustment.allowedAmount.toString())
+                }
+                PrizeType.TWO_DIGIT_TOP.name -> {
+                    val index = twoDigitEntries.indexOfFirst { it.id == adjustment.entryId }
+                    if (index >= 0) twoDigitEntries[index] = twoDigitEntries[index].copy(topAmount = adjustment.allowedAmount.toString())
+                }
+                PrizeType.TWO_DIGIT_BOTTOM.name -> {
+                    val index = twoDigitEntries.indexOfFirst { it.id == adjustment.entryId }
+                    if (index >= 0) twoDigitEntries[index] = twoDigitEntries[index].copy(bottomAmount = adjustment.allowedAmount.toString())
+                }
+            }
+        }
+        if (pendingAddThree) { threeDigitEntries.add(ThreeDigitEntry(id = nextThreeId)); nextThreeId += 1L }
+        if (pendingAddTwo) { twoDigitEntries.add(TwoDigitEntry(id = nextTwoId)); nextTwoId += 1L }
+        pendingQuotaAdjustments = emptyList()
+        pendingAddThree = false
+        pendingAddTwo = false
     }
 
     val total = threeDigitEntries.sumOf {
@@ -198,6 +298,45 @@ fun SaleScreen(
             cashAmount = cashValue,
             creditAmount = creditValue,
             items = items
+        )
+    }
+
+    if (pendingQuotaAdjustments.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = {
+                pendingQuotaAdjustments = emptyList()
+                pendingAddThree = false
+                pendingAddTwo = false
+            },
+            title = { Text("ปรับยอดซื้อให้ตรงกับโควตาที่เหลือ") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    pendingQuotaAdjustments.forEach { adjustment ->
+                        val label = FullNumberLimitPolicy.labels[adjustment.prizeType] ?: adjustment.prizeType
+                        val number = if (adjustment.prizeType.startsWith("THREE")) {
+                            threeDigitEntries.firstOrNull { it.id == adjustment.entryId }?.let { it.firstDigit + it.secondDigit + it.thirdDigit }.orEmpty()
+                        } else {
+                            twoDigitEntries.firstOrNull { it.id == adjustment.entryId }?.let { it.firstDigit + it.secondDigit }.orEmpty()
+                        }
+                        val entered = when (adjustment.prizeType) {
+                            PrizeType.THREE_DIGIT_STRAIGHT.name -> threeDigitEntries.firstOrNull { it.id == adjustment.entryId }?.straightAmount
+                            PrizeType.THREE_DIGIT_TOD.name -> threeDigitEntries.firstOrNull { it.id == adjustment.entryId }?.boxAmount
+                            PrizeType.TWO_DIGIT_TOP.name -> twoDigitEntries.firstOrNull { it.id == adjustment.entryId }?.topAmount
+                            else -> twoDigitEntries.firstOrNull { it.id == adjustment.entryId }?.bottomAmount
+                        }?.toLongOrNull() ?: 0L
+                        Text("เลข $number ($label): กรอก $entered บาท แต่ซื้อได้อีก ${adjustment.allowedAmount} บาท")
+                    }
+                    Text("หากยืนยัน ระบบจะปรับยอดรายการให้เท่ากับโควตาที่เหลือ แล้วเพิ่มแถวรายการใหม่")
+                }
+            },
+            confirmButton = { TextButton(onClick = { confirmQuotaAdjustments() }) { Text("ยืนยันปรับยอดและเพิ่มรายการ") } },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingQuotaAdjustments = emptyList()
+                    pendingAddThree = false
+                    pendingAddTwo = false
+                }) { Text("ยกเลิก") }
+            }
         )
     }
 
@@ -339,10 +478,7 @@ fun SaleScreen(
                 )
             }
             item {
-                TextButton(onClick = {
-                    threeDigitEntries.add(ThreeDigitEntry(id = nextThreeId))
-                    nextThreeId += 1L
-                }) { Text("+ เพิ่มรายการ 3 ตัว") }
+                TextButton(onClick = { requestAddThree() }) { Text("+ เพิ่มรายการ 3 ตัว") }
             }
             item { Divider() }
             item { Text("2 ตัว", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
@@ -375,10 +511,7 @@ fun SaleScreen(
                 )
             }
             item {
-                TextButton(onClick = {
-                    twoDigitEntries.add(TwoDigitEntry(id = nextTwoId))
-                    nextTwoId += 1L
-                }) { Text("+ เพิ่มรายการ 2 ตัว") }
+                TextButton(onClick = { requestAddTwo() }) { Text("+ เพิ่มรายการ 2 ตัว") }
             }
             item { Divider() }
             item {
