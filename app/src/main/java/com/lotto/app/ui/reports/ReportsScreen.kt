@@ -313,7 +313,7 @@ private fun YearlySalesChart(
         }.fold(BigInteger.ZERO) { total, item -> total.add(BigInteger.valueOf(item.salesTotal)) }
     }
     val maxValue = totals.maxOrNull()?.max(BigInteger.ONE) ?: BigInteger.ONE
-    val hasData = totals.any { it > 0L }
+    val hasData = totals.any { it.signum() > 0 }
 
     Column(modifier = modifier.fillMaxSize()) {
         Text("ยอดขาย (บาท) · 12 เดือนล่าสุด", color = axisColor, fontSize = 11.sp)
