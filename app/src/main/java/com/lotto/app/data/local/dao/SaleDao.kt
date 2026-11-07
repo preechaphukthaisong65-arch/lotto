@@ -222,10 +222,47 @@ abstract class SaleDao {
      * Related items and payment history cascade with the paid document.
      */
     @Query("""
+        INSERT OR IGNORE INTO expired_sale_retention (saleId, eligibleAt)
+        SELECT sourceSaleId, paidAt
+        FROM credit_documents
+        WHERE status = 'PAID'
+          AND paidAt IS NOT NULL
+          AND paidAt <= :cutoffTimestamp
+    """)
+    protected abstract suspend fun markExpiredSalesForRetention(cutoffTimestamp: Long)
+
+    @Query("""
         DELETE FROM credit_documents
         WHERE status = 'PAID'
           AND paidAt IS NOT NULL
           AND paidAt <= :cutoffTimestamp
     """)
-    abstract suspend fun deleteExpiredPaidDocuments(cutoffTimestamp: Long): Int
+    protected abstract suspend fun deleteExpiredPaidDocumentsInternal(cutoffTimestamp: Long): Int
+
+    @Query("""
+        DELETE FROM sales
+        WHERE saleId IN (
+            SELECT retention.saleId
+            FROM expired_sale_retention retention
+            WHERE NOT EXISTS (
+                SELECT 1 FROM winning_sale_items wi WHERE wi.saleId = retention.saleId
+            )
+        )
+    """)
+    protected abstract suspend fun deleteExpiredSourceSalesWithoutWinningHistory(): Int
+
+    @Query("""
+        DELETE FROM expired_sale_retention
+        WHERE saleId NOT IN (SELECT saleId FROM sales)
+    """)
+    protected abstract suspend fun deleteCompletedRetentionMarkers(): Int
+
+    @Transaction
+    open suspend fun deleteExpiredPaidDocuments(cutoffTimestamp: Long): Int {
+        markExpiredSalesForRetention(cutoffTimestamp)
+        val deletedDocuments = deleteExpiredPaidDocumentsInternal(cutoffTimestamp)
+        deleteExpiredSourceSalesWithoutWinningHistory()
+        deleteCompletedRetentionMarkers()
+        return deletedDocuments
+    }
 }
