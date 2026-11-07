@@ -103,7 +103,9 @@ abstract class LottoDatabase : RoomDatabase() {
                 )""")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_result_corrections_drawDate ON draw_result_corrections(drawDate)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_result_corrections_correctedAt ON draw_result_corrections(correctedAt)")
-                db.execSQL("UPDATE draw_results SET payoutLocked = 1 WHERE drawDate IN (SELECT DISTINCT drawDate FROM winning_sale_items WHERE payoutStatus = 'PAID')")
+                // Legacy payout rows may already have been removed by the 180-day retention rule.
+                // Lock all pre-existing results because their payout history cannot be proven complete.
+                db.execSQL("UPDATE draw_results SET payoutLocked = 1")
             }
         }
         val MIGRATION_8_9 = object : Migration(8, 9) {
