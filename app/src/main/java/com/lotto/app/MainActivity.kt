@@ -24,6 +24,7 @@ import com.lotto.app.ui.calendar.DrawCalendarScreen
 import com.lotto.app.ui.history.HistoryScreen
 import com.lotto.app.ui.reports.ReportDetailScreen
 import com.lotto.app.ui.reports.ReportsScreen
+import com.lotto.app.ui.reports.CurrentSalesReportScreen
 import com.lotto.app.ui.sale.SaleScreen
 import com.lotto.app.ui.settings.SettingsScreen
 
@@ -118,8 +119,10 @@ class MainActivity : ComponentActivity() {
                             onOpenCurrentSales = { currentScreen = AppScreen.CurrentSales.name },
                             onOpenSalesHistory = { currentScreen = AppScreen.SalesHistory.name }
                         )
-                        AppScreen.CurrentSales.name -> ReportDetailScreen(
-                            title = "ยอดขายงวดปัจจุบัน",
+                        AppScreen.CurrentSales.name -> CurrentSalesReportScreen(
+                            saleRepository = saleRepository,
+                            drawDates = drawDates,
+                            now = currentThailandTime,
                             onBack = { currentScreen = AppScreen.TotalSales.name }
                         )
                         AppScreen.SalesHistory.name -> ReportDetailScreen(
