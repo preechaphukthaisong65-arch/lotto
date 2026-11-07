@@ -205,14 +205,6 @@ fun SaleScreen(
                 }
             }
             if (halfRows.isNotEmpty()) { pendingHalfPayouts = halfRows; pendingHalfAddTwo = true; return@launch }
-            val fullMessage = runCatching { findAlreadyFull(entries) }.getOrElse {
-                saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
-                return@launch
-            }
-            if (fullMessage != null) {
-                fullNumberMessage = fullMessage
-                return@launch
-            }
             val adjustments = runCatching { findAdjustments(entries, 2) }.getOrElse {
                 saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
                 return@launch
