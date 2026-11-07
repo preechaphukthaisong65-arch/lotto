@@ -60,7 +60,7 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
     val paymentInputs = remember { mutableStateMapOf<Long, String>() }
     var refreshKey by remember { mutableStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var pendingPayment by remember { mutableStateOf<Pair<Long, Long>?>(null) }
+    var pendingPayment by remember { mutableStateOf<Triple<CreditDocumentEntity, Long, Long>?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedSort by remember { mutableStateOf(CreditSort.OLDEST) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -242,8 +242,10 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
                                             val amount = paymentInputs[bill.creditDocumentId]?.toLongOrNull()
                                             if (amount == null || amount <= 0L) {
                                                 errorMessage = "กรุณากรอกยอดรับชำระให้ถูกต้อง"
+                                            } else if (amount > remaining) {
+                                                errorMessage = "ยอดรับชำระเกินยอดค้าง $remaining บาท"
                                             } else {
-                                                pendingPayment = bill.creditDocumentId to amount
+                                                pendingPayment = Triple(bill, amount, remaining)
                                             }
                                         },
                                         modifier = Modifier.fillMaxWidth()
@@ -257,17 +259,24 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
         }
     }
 
-    pendingPayment?.let { (documentId, amount) ->
+    pendingPayment?.let { (bill, amount, outstanding) ->
         AlertDialog(
             onDismissRequest = { pendingPayment = null },
             title = { Text("ยืนยันการรับชำระ") },
-            text = { Text("ยืนยันรับเงินจำนวน $amount บาทใช่หรือไม่?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("ลูกค้า: ${bill.customerFirstName} ${bill.customerLastName}")
+                    Text("บิลเลขที่: #${bill.creditDocumentId}")
+                    Text("ยอดค้างก่อนชำระ: $outstanding บาท")
+                    Text("ยอดที่จะรับชำระ: $amount บาท", fontWeight = FontWeight.Bold)
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
                         try {
-                            repository.receivePayment(documentId, amount)
-                            paymentInputs[documentId] = ""
+                            repository.receivePayment(bill.creditDocumentId, amount)
+                            paymentInputs[bill.creditDocumentId] = ""
                             errorMessage = null
                             pendingPayment = null
                             refreshKey += 1
