@@ -121,6 +121,7 @@ private fun SettingsMenuCard(title: String, description: String, onClick: () -> 
 }
 
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun NoAcceptNumberScreen(
     repository: SettingsRepository,
@@ -177,7 +178,7 @@ private fun NoAcceptNumberScreen(
             ) {
                 OutlinedTextField(
                     value = numberInput,
-                    onValueChange = { numberInput = it.filter(Char::isDigit).take(digitCount) },
+                    onValueChange = { numberInput = it.filter { digit -> digit in '0'..'9' }.take(digitCount) },
                     modifier = Modifier.weight(1f),
                     label = { Text("$digitCount หลัก") },
                     singleLine = true,
