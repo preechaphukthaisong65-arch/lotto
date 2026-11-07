@@ -13,5 +13,6 @@ data class SaleEntity(
     val cashAmount: Long,
     val creditAmount: Long,
     val createdAt: Long,
-    val status: String = "CONFIRMED"
+    val status: String = "CONFIRMED",
+    val drawDate: String? = null
 )
