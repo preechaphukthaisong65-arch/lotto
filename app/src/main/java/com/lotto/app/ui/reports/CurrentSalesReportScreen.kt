@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.lotto.app.data.local.entity.DrawDateEntity
 import com.lotto.app.data.local.model.SaleNumberSummary
 import com.lotto.app.data.repository.DrawCalendarRepository
+import com.lotto.app.data.repository.DrawResultRepository
 import com.lotto.app.data.repository.SaleRepository
 import com.lotto.app.domain.rules.PrizeType
 import com.lotto.app.ui.components.buttons.BackButton
@@ -83,18 +84,22 @@ private fun resolveCurrentDrawPeriod(
 @Composable
 fun CurrentSalesReportScreen(
     saleRepository: SaleRepository,
+    drawResultRepository: DrawResultRepository,
     drawDates: List<DrawDateEntity>,
     now: ZonedDateTime,
     onBack: () -> Unit
 ) {
     val period = remember(drawDates, now) { resolveCurrentDrawPeriod(drawDates, now) }
     var summaries by remember { mutableStateOf<List<SaleNumberSummary>?>(null) }
+    var totalPrizeLiability by remember { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(period?.startAt, period?.endAt) {
-        summaries = if (period == null) {
-            emptyList()
+        if (period == null) {
+            summaries = emptyList()
+            totalPrizeLiability = 0L
         } else {
-            saleRepository.getNumberSalesSummary(period.startAt, period.endAt)
+            summaries = saleRepository.getNumberSalesSummary(period.startAt, period.endAt)
+            totalPrizeLiability = drawResultRepository.getTotalPrizeLiability(period.drawDate.toString())
         }
     }
 
@@ -162,22 +167,35 @@ fun CurrentSalesReportScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            } else if (summaries == null) {
+            } else if (summaries == null || totalPrizeLiability == null) {
                 item { Text("กำลังคำนวณยอดขาย...") }
             } else {
                 item {
                     Card(modifier = Modifier.fillMaxWidth()) {
-                        Row(
+                        Column(
                             modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text("ยอดซื้อรวมทั้งงวด", fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.weight(1f))
-                            Text(
-                                text = "${summaries.orEmpty().sumOf { it.totalAmount }} บาท",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("ยอดขายรวมทั้งหมด", fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.weight(1f))
+                                Text(
+                                    text = "${summaries.orEmpty().sumOf { it.totalAmount }} บาท",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Divider(color = MaterialTheme.colorScheme.outlineVariant)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("ยอดที่ต้องจ่ายรางวัลทั้งหมด", fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.weight(1f))
+                                Text(
+                                    text = "${totalPrizeLiability ?: 0L} บาท",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 }
