@@ -2,6 +2,7 @@ package com.lotto.app.data.repository
 
 import com.lotto.app.data.local.dao.DrawResultDao
 import com.lotto.app.data.local.entity.DrawResultEntity
+import com.lotto.app.data.local.entity.DrawProfitSummaryEntity
 import com.lotto.app.data.local.model.WinningSaleSummary
 import com.lotto.app.data.local.model.WinningBillSummary
 import com.lotto.app.data.local.LottoDatabase
