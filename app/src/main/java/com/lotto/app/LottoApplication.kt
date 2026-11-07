@@ -1,6 +1,7 @@
 package com.lotto.app
 
 import android.app.Application
+import android.util.Log
 import com.lotto.app.core.di.AppContainer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,8 +18,10 @@ class LottoApplication : Application() {
 
         // Local retention cleanup at startup. OPEN credit bills are never eligible.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            container.saleRepository.cleanupExpiredPaidDocuments()
-            container.drawResultRepository.cleanupExpiredPaidWinningBills()
+            runCatching { container.saleRepository.cleanupExpiredPaidDocuments() }
+                .onFailure { Log.e("LottoRetention", "Credit document cleanup failed", it) }
+            runCatching { container.drawResultRepository.cleanupExpiredPaidWinningBills() }
+                .onFailure { Log.e("LottoRetention", "Winning bill cleanup failed", it) }
         }
     }
 }
