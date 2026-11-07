@@ -57,25 +57,7 @@ fun SettingsScreen(
             repository = settingsRepository,
             onBack = { section = SettingsSection.MENU }
         )
-        SettingsSection.HALF_PAYOUT -> {
-            val title = "ตั้งค่าหวยจ่ายครึ่งราคา"
-            Scaffold(
-                topBar = { TopAppBar(title = { Text(title) }) },
-                bottomBar = {
-                    Row(Modifier.fillMaxWidth().padding(12.dp)) {
-                        BackButton(onBack = { section = SettingsSection.MENU })
-                    }
-                }
-            ) { padding ->
-                Column(
-                    Modifier.fillMaxSize().padding(padding).padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("เมนูนี้เตรียมไว้แล้ว", style = MaterialTheme.typography.titleMedium)
-                    Text("รายละเอียดกติกาของเมนูนี้ยังไม่ได้กำหนด จึงยังไม่มีการเปลี่ยนแปลงระบบขาย")
-                }
-            }
-        }
+        SettingsSection.HALF_PAYOUT -> HalfPayoutNumberScreen(repository = settingsRepository, onBack = { section = SettingsSection.MENU })
         SettingsSection.MENU -> {
             Scaffold(
                 topBar = { TopAppBar(title = { Text("ตั้งค่า") }) },
