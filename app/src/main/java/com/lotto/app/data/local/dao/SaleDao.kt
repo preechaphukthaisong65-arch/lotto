@@ -75,6 +75,32 @@ abstract class SaleDao {
     ): Long {
         val targetDrawDate = sale.drawDate
             ?: throw IllegalArgumentException("ไม่พบงวดหวยสำหรับบิลนี้")
+        require(sale.totalAmount > 0L) { "ยอดขายต้องมากกว่า 0 บาท" }
+        require(sale.cashAmount >= 0L && sale.creditAmount >= 0L) { "ยอดชำระต้องไม่ติดลบ" }
+        require(Math.addExact(sale.cashAmount, sale.creditAmount) == sale.totalAmount) {
+            "ยอดเงินสดและเงินเชื่อต้องรวมกันเท่ากับยอดขาย"
+        }
+        require(items.isNotEmpty()) { "ไม่พบรายการเลขที่ซื้อ" }
+        require(items.all { it.amount > 0L }) { "จำนวนเงินแต่ละรายการต้องมากกว่า 0 บาท" }
+        require(items.fold(0L) { total, item -> Math.addExact(total, item.amount) } == sale.totalAmount) {
+            "ผลรวมรายการซื้อไม่ตรงกับยอดขาย"
+        }
+        if (sale.creditAmount > 0L) {
+            require(sale.customerFirstName.isNotBlank() && sale.customerLastName.isNotBlank()) {
+                "การขายเงินเชื่อต้องระบุชื่อและนามสกุลลูกค้า"
+            }
+        }
+        items.forEach { item ->
+            val type = runCatching { PrizeType.valueOf(item.prizeType) }
+                .getOrElse { throw IllegalArgumentException("ไม่รู้จักประเภทหวย ${item.prizeType}") }
+            val validNumber = when (type) {
+                PrizeType.THREE_DIGIT_STRAIGHT, PrizeType.THREE_DIGIT_TOD ->
+                    com.lotto.app.domain.rules.LottoRules.isValidThreeDigitNumber(item.number)
+                PrizeType.TWO_DIGIT_TOP, PrizeType.TWO_DIGIT_BOTTOM ->
+                    com.lotto.app.domain.rules.LottoRules.isValidTwoDigitNumber(item.number)
+            }
+            require(validNumber) { "เลข ${item.number} ไม่ถูกต้องสำหรับประเภท ${item.prizeType}" }
+        }
         require(isDrawSaleWindowOpen(targetDrawDate, sale.createdAt) > 0) {
             "อยู่นอกเวลาเปิดรับขาย หรือมีการบันทึกผลรางวัลของงวดนี้แล้ว ไม่สามารถบันทึกบิลได้"
         }
@@ -105,7 +131,10 @@ abstract class SaleDao {
         // Check each number/type pair inside the same transaction as insertion.
         // Grouping also prevents duplicate rows in one bill from bypassing the cap.
         items.groupBy { it.prizeType to it.number }.forEach { (key, requestedItems) ->
-            val limit = fullLimitsByPrizeType[key.first] ?: 0L
+            // The persisted setting is authoritative; the UI-supplied map is only a fallback.
+            val limit = getSettingValue("full_limit_${key.first}")?.toLongOrNull()?.coerceAtLeast(0L)
+                ?: fullLimitsByPrizeType[key.first]?.coerceAtLeast(0L)
+                ?: 0L
             if (limit > 0L) {
                 val alreadySold = getNumberStakeForDraw(sale.drawDate.orEmpty(), key.first, key.second)
                 val requested = requestedItems.fold(0L) { total, item -> Math.addExact(total, item.amount) }
