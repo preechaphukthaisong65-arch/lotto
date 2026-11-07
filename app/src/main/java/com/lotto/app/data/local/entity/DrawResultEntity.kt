@@ -1,5 +1,6 @@
 package com.lotto.app.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -9,5 +10,7 @@ data class DrawResultEntity(
     val threeDigit: String,
     val twoDigitTop: String,
     val twoDigitBottom: String,
-    val recordedAt: Long
+    val recordedAt: Long,
+    @ColumnInfo(defaultValue = "0")
+    val payoutLocked: Boolean = false
 )
