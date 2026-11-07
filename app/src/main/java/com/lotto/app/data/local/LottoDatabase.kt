@@ -5,11 +5,14 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.lotto.app.data.local.dao.AppSettingDao
+import com.lotto.app.data.local.dao.DrawCalendarDao
 import com.lotto.app.data.local.dao.SaleDao
 import com.lotto.app.data.local.entity.AppSettingEntity
 import com.lotto.app.data.local.entity.CreditDocumentEntity
 import com.lotto.app.data.local.entity.CreditDocumentItemEntity
 import com.lotto.app.data.local.entity.CreditPaymentEntity
+import com.lotto.app.data.local.entity.DrawDateEntity
+import com.lotto.app.data.local.entity.DrawDateChangeEntity
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
 
@@ -20,14 +23,17 @@ import com.lotto.app.data.local.entity.SaleItemEntity
         SaleItemEntity::class,
         CreditDocumentEntity::class,
         CreditDocumentItemEntity::class,
-        CreditPaymentEntity::class
+        CreditPaymentEntity::class,
+        DrawDateEntity::class,
+        DrawDateChangeEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
     abstract fun appSettingDao(): AppSettingDao
     abstract fun saleDao(): SaleDao
+    abstract fun drawCalendarDao(): DrawCalendarDao
 
     companion object {
         const val DATABASE_NAME = "lotto_database"
@@ -98,6 +104,36 @@ abstract class LottoDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_credit_document_items_creditDocumentId ON credit_document_items(creditDocumentId)")
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS draw_dates (
+                        drawDate TEXT NOT NULL PRIMARY KEY,
+                        referenceDate TEXT,
+                        source TEXT NOT NULL,
+                        note TEXT,
+                        updatedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS draw_date_changes (
+                        changeId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        drawDate TEXT NOT NULL,
+                        previousDate TEXT,
+                        newDate TEXT NOT NULL,
+                        changedAt INTEGER NOT NULL,
+                        source TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_date_changes_changedAt ON draw_date_changes(changedAt)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_date_changes_drawDate ON draw_date_changes(drawDate)")
             }
         }
 
