@@ -34,6 +34,7 @@ enum class HomeMenuOption(
     Reports("รายงานยอด", Icons.Outlined.Assessment),
     History("ประวัติ", Icons.Outlined.History),
     CreditAccounts("บัญชีเชื่อ", Icons.Outlined.AccountBalanceWallet),
+    PayDebt("ชำระหนี้", Icons.Outlined.Paid),
     Payout("จ่ายรางวัล", Icons.Outlined.Paid),
     Calendar("ปฏิทินหวย", Icons.Outlined.CalendarMonth),
     Settings("ตั้งค่า", Icons.Outlined.Settings)
