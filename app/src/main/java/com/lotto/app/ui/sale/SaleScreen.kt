@@ -51,6 +51,7 @@ import kotlinx.coroutines.launch
 
 private data class QuotaAdjustment(val entryId: Long, val prizeType: String, val allowedAmount: Long)
 private data class NoAcceptClear(val isThreeDigit: Boolean, val entryId: Long)
+private data class HalfPayoutPrompt(val isThreeDigit: Boolean, val entryId: Long, val prizeType: String, val number: String)
 
 @Composable
 fun SaleScreen(
@@ -58,6 +59,7 @@ fun SaleScreen(
     drawDate: String,
     fullLimitsByPrizeType: Map<String, Long>,
     noAcceptNumbersByPrizeType: Map<String, Set<String>>,
+    halfPayoutNumbersByPrizeType: Map<String, Set<String>>,
     onGetNumberStake: suspend (String, String, String) -> Long,
     onSave: suspend (SaleDraft) -> Long
 ) {
@@ -80,7 +82,14 @@ fun SaleScreen(
     var pendingAddTwo by remember { mutableStateOf(false) }
     var fullNumberMessage by remember { mutableStateOf<String?>(null) }
     var pendingNoAcceptClear by remember { mutableStateOf<List<NoAcceptClear>>(emptyList()) }
+    val acceptedHalfPayoutKeys = remember { mutableStateMapOf<String, Boolean>() }
+    var pendingHalfPayouts by remember { mutableStateOf<List<HalfPayoutPrompt>>(emptyList()) }
+    var pendingHalfAddThree by remember { mutableStateOf(false) }
+    var pendingHalfAddTwo by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+
+    fun halfKey(prizeType: String, number: String) = "$prizeType|$number"
+    fun isHalfAccepted(prizeType: String, number: String) = acceptedHalfPayoutKeys[halfKey(prizeType, number)] == true
 
     fun refreshQuotaHint(key: String, number: String, prizeType: String, digitCount: Int) {
         val version = (quotaRequestVersions[key] ?: 0) + 1
@@ -163,6 +172,14 @@ fun SaleScreen(
                 pendingNoAcceptClear = blockedRows.map { NoAcceptClear(true, it.id) }
                 return@launch
             }
+            val halfRows = threeDigitEntries.flatMap { entry ->
+                val number = entry.firstDigit + entry.secondDigit + entry.thirdDigit
+                listOf(PrizeType.THREE_DIGIT_STRAIGHT, PrizeType.THREE_DIGIT_TOD).mapNotNull { type ->
+                    val amount = if (type == PrizeType.THREE_DIGIT_STRAIGHT) entry.straightAmount.toLongOrNull() ?: 0L else entry.boxAmount.toLongOrNull() ?: 0L
+                    if (number.length == 3 && amount > 0L && number in (halfPayoutNumbersByPrizeType[type.name] ?: emptySet()) && !isHalfAccepted(type.name, number)) HalfPayoutPrompt(true, entry.id, type.name, number) else null
+                }
+            }
+            if (halfRows.isNotEmpty()) { pendingHalfPayouts = halfRows; pendingHalfAddThree = true; return@launch }
             val fullMessage = runCatching { findAlreadyFull(entries) }.getOrElse {
                 saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
                 return@launch
@@ -204,6 +221,14 @@ fun SaleScreen(
                 pendingNoAcceptClear = blockedRows.map { NoAcceptClear(false, it.id) }
                 return@launch
             }
+            val halfRows = twoDigitEntries.flatMap { entry ->
+                val number = entry.firstDigit + entry.secondDigit
+                listOf(PrizeType.TWO_DIGIT_TOP, PrizeType.TWO_DIGIT_BOTTOM).mapNotNull { type ->
+                    val amount = if (type == PrizeType.TWO_DIGIT_TOP) entry.topAmount.toLongOrNull() ?: 0L else entry.bottomAmount.toLongOrNull() ?: 0L
+                    if (number.length == 2 && amount > 0L && number in (halfPayoutNumbersByPrizeType[type.name] ?: emptySet()) && !isHalfAccepted(type.name, number)) HalfPayoutPrompt(false, entry.id, type.name, number) else null
+                }
+            }
+            if (halfRows.isNotEmpty()) { pendingHalfPayouts = halfRows; pendingHalfAddTwo = true; return@launch }
             val fullMessage = runCatching { findAlreadyFull(entries) }.getOrElse {
                 saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
                 return@launch
@@ -300,7 +325,17 @@ fun SaleScreen(
             ((entry.bottomAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.TWO_DIGIT_BOTTOM.name] ?: emptySet()))
     }
     val canSave = total > 0L && paymentSelected && splitValid &&
-        customerValid && activeEntriesValid && !hasNoAcceptItems && !isSaving
+        customerValid && activeEntriesValid && !hasNoAcceptItems && !hasUnacceptedHalfPayoutItems && !isSaving
+
+    val hasUnacceptedHalfPayoutItems = threeDigitEntries.any { entry ->
+        val n = entry.firstDigit + entry.secondDigit + entry.thirdDigit
+        ((entry.straightAmount.toLongOrNull() ?: 0L) > 0L && n in (halfPayoutNumbersByPrizeType[PrizeType.THREE_DIGIT_STRAIGHT.name] ?: emptySet()) && !isHalfAccepted(PrizeType.THREE_DIGIT_STRAIGHT.name, n)) ||
+            ((entry.boxAmount.toLongOrNull() ?: 0L) > 0L && n in (halfPayoutNumbersByPrizeType[PrizeType.THREE_DIGIT_TOD.name] ?: emptySet()) && !isHalfAccepted(PrizeType.THREE_DIGIT_TOD.name, n))
+    } || twoDigitEntries.any { entry ->
+        val n = entry.firstDigit + entry.secondDigit
+        ((entry.topAmount.toLongOrNull() ?: 0L) > 0L && n in (halfPayoutNumbersByPrizeType[PrizeType.TWO_DIGIT_TOP.name] ?: emptySet()) && !isHalfAccepted(PrizeType.TWO_DIGIT_TOP.name, n)) ||
+            ((entry.bottomAmount.toLongOrNull() ?: 0L) > 0L && n in (halfPayoutNumbersByPrizeType[PrizeType.TWO_DIGIT_BOTTOM.name] ?: emptySet()) && !isHalfAccepted(PrizeType.TWO_DIGIT_BOTTOM.name, n))
+    }
 
     fun createDraft(): SaleDraft {
         val items = buildList {
@@ -315,7 +350,7 @@ fun SaleScreen(
                         amount = straight,
                         payoutMultiplier = LottoRules.payoutMultiplier(
                             PrizeType.THREE_DIGIT_STRAIGHT,
-                            PayoutMode.FULL
+                            if (isHalfAccepted(PrizeType.THREE_DIGIT_STRAIGHT.name, number)) PayoutMode.HALF else PayoutMode.FULL
                         )
                     )
                 )
@@ -326,7 +361,7 @@ fun SaleScreen(
                         amount = tod,
                         payoutMultiplier = LottoRules.payoutMultiplier(
                             PrizeType.THREE_DIGIT_TOD,
-                            PayoutMode.FULL
+                            if (isHalfAccepted(PrizeType.THREE_DIGIT_TOD.name, number)) PayoutMode.HALF else PayoutMode.FULL
                         )
                     )
                 )
@@ -342,7 +377,7 @@ fun SaleScreen(
                         amount = top,
                         payoutMultiplier = LottoRules.payoutMultiplier(
                             PrizeType.TWO_DIGIT_TOP,
-                            PayoutMode.FULL
+                            if (isHalfAccepted(PrizeType.TWO_DIGIT_TOP.name, number)) PayoutMode.HALF else PayoutMode.FULL
                         )
                     )
                 )
@@ -353,7 +388,7 @@ fun SaleScreen(
                         amount = bottom,
                         payoutMultiplier = LottoRules.payoutMultiplier(
                             PrizeType.TWO_DIGIT_BOTTOM,
-                            PayoutMode.FULL
+                            if (isHalfAccepted(PrizeType.TWO_DIGIT_BOTTOM.name, number)) PayoutMode.HALF else PayoutMode.FULL
                         )
                     )
                 )
@@ -397,6 +432,49 @@ fun SaleScreen(
                     }
                     pendingNoAcceptClear = emptyList()
                 }) { Text("รับทราบ") }
+            }
+        )
+    }
+
+    if (pendingHalfPayouts.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("เลขนี้จ่ายครึ่งราคา") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    pendingHalfPayouts.distinctBy { it.prizeType to it.number }.forEach { prompt ->
+                        Text("เลข ${prompt.number} (${FullNumberLimitPolicy.labels[prompt.prizeType] ?: prompt.prizeType}) ถูกกำหนดให้จ่ายรางวัลครึ่งราคา")
+                    }
+                    Text("หากยอมรับและถูกรางวัล จะได้รับเงินรางวัล 50% ของอัตราปกติ")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingHalfPayouts.forEach { acceptedHalfPayoutKeys[halfKey(it.prizeType, it.number)] = true }
+                    val addThree = pendingHalfAddThree
+                    val addTwo = pendingHalfAddTwo
+                    pendingHalfPayouts = emptyList()
+                    pendingHalfAddThree = false
+                    pendingHalfAddTwo = false
+                    if (addThree) requestAddThree()
+                    if (addTwo) requestAddTwo()
+                }) { Text("ยอมรับ") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingHalfPayouts.forEach { prompt ->
+                        if (prompt.isThreeDigit) {
+                            val i = threeDigitEntries.indexOfFirst { it.id == prompt.entryId }
+                            if (i >= 0) threeDigitEntries[i] = threeDigitEntries[i].copy(firstDigit = "", secondDigit = "", thirdDigit = "")
+                        } else {
+                            val i = twoDigitEntries.indexOfFirst { it.id == prompt.entryId }
+                            if (i >= 0) twoDigitEntries[i] = twoDigitEntries[i].copy(firstDigit = "", secondDigit = "")
+                        }
+                    }
+                    pendingHalfPayouts = emptyList()
+                    pendingHalfAddThree = false
+                    pendingHalfAddTwo = false
+                }) { Text("เปลี่ยนเลข") }
             }
         )
     }
