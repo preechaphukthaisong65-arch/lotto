@@ -82,7 +82,7 @@ fun SaleScreen(
     var pendingAddTwo by remember { mutableStateOf(false) }
     var fullNumberMessage by remember { mutableStateOf<String?>(null) }
     var pendingNoAcceptClear by remember { mutableStateOf<List<NoAcceptClear>>(emptyList()) }
-    val acceptedHalfPayoutKeys = remember { mutableStateMapOf<String, Boolean>() }
+    val acceptedHalfPayoutKeys = remember(halfPayoutNumbersByPrizeType) { mutableStateMapOf<String, Boolean>() }
     var pendingHalfPayouts by remember { mutableStateOf<List<HalfPayoutPrompt>>(emptyList()) }
     var pendingHalfAddThree by remember { mutableStateOf(false) }
     var pendingHalfAddTwo by remember { mutableStateOf(false) }
