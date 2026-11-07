@@ -118,6 +118,11 @@ private fun NoAcceptNumberScreen(
         settingRows.firstOrNull { it.key == key }?.value.orEmpty(),
         selectedType
     )
+    val halfKey = com.lotto.app.domain.rules.HalfPayoutNumberPolicy.settingKeys.getValue(selectedType.name)
+    val halfPayoutNumbers = com.lotto.app.domain.rules.HalfPayoutNumberPolicy.parse(
+        settingRows.firstOrNull { it.key == halfKey }?.value.orEmpty(), selectedType
+    )
+    val conflictingNumbers = blockedNumbers intersect halfPayoutNumbers
     val digitCount = if (selectedType == PrizeType.THREE_DIGIT_STRAIGHT ||
         selectedType == PrizeType.THREE_DIGIT_TOD) 3 else 2
 
@@ -169,7 +174,7 @@ private fun NoAcceptNumberScreen(
                     )
                 )
                 TextButton(
-                    enabled = numberInput.length == digitCount && numberInput !in blockedNumbers,
+                    enabled = numberInput.length == digitCount && numberInput !in blockedNumbers && numberInput !in halfPayoutNumbers,
                     onClick = {
                         val updated = (blockedNumbers + numberInput).sorted()
                         scope.launch {
@@ -178,6 +183,12 @@ private fun NoAcceptNumberScreen(
                         }
                     }
                 ) { Text("เพิ่ม") }
+            }
+            if (numberInput in halfPayoutNumbers && numberInput.isNotBlank()) {
+                Text("เลขนี้ถูกตั้งจ่ายครึ่งอยู่แล้ว กรุณาลบออกจากรายการจ่ายครึ่งก่อนตั้งเป็นเลขไม่รับ", color = MaterialTheme.colorScheme.error)
+            }
+            if (conflictingNumbers.isNotEmpty()) {
+                Text("พบเลขที่ซ้ำกับรายการจ่ายครึ่ง: ${conflictingNumbers.sorted().joinToString(", ")} · กรุณาแก้รายการให้ไม่ซ้ำกัน", color = MaterialTheme.colorScheme.error)
             }
             Text("รายการเลขไม่รับ (${blockedNumbers.size})", style = MaterialTheme.typography.titleMedium)
             if (blockedNumbers.isEmpty()) {
