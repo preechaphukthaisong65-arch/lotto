@@ -158,7 +158,13 @@ class MainActivity : ComponentActivity() {
                         )
                         AppScreen.DrawResult.name -> DrawResultScreen(
                             drawDate = selectedResultDrawDate,
-                            onBack = { currentScreen = AppScreen.Home.name },
+                            onBack = {
+                                currentScreen = if (drawResults.any { it.drawDate == selectedResultDrawDate }) {
+                                    AppScreen.Winners.name
+                                } else {
+                                    AppScreen.Home.name
+                                }
+                            },
                             existingResult = drawResults.firstOrNull { it.drawDate == selectedResultDrawDate },
                             onSave = { three, top, bottom, reason ->
                                 val existing = drawResults.firstOrNull { it.drawDate == selectedResultDrawDate }
