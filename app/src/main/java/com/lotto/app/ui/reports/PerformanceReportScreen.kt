@@ -66,6 +66,7 @@ fun PerformanceReportScreen(
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("ยอดผลประกอบการ", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("แสดงข้อมูลสะสมย้อนหลัง 1 ปี", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("คำนวณจากยอดขายหักเงินรางวัลที่ถูกรางวัลทั้งหมด แม้ยังไม่ได้จ่ายเงินจริง", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             TabRow(selectedTabIndex = view.ordinal) {
                 ProfitView.values().forEach { option ->
