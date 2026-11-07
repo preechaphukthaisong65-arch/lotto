@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,6 +29,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -37,6 +41,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import com.lotto.app.data.local.entity.DrawProfitSummaryEntity
+import com.lotto.app.data.repository.DrawResultRepository
+import java.text.NumberFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.time.ZonedDateTime
+import java.util.Locale
 import com.lotto.app.ui.components.buttons.BackButton
 
 private val monthLabels = listOf(
@@ -133,9 +147,12 @@ private fun ReportMenuItem(
 fun ReportDetailScreen(
     title: String,
     onBack: () -> Unit,
+    drawResultRepository: DrawResultRepository,
+    now: ZonedDateTime,
     onOpenCurrentSales: () -> Unit = {},
     onOpenSalesHistory: () -> Unit = {}
 ) {
+    val summaries by drawResultRepository.observeProfitSummaries().collectAsState(initial = emptyList())
     Scaffold(
         bottomBar = {
             Surface(shadowElevation = 8.dp) {
@@ -152,28 +169,24 @@ fun ReportDetailScreen(
             }
         }
     ) { innerPadding ->
-        if (title == "ยอดขายทั้งหมด") {
-            TotalSalesLayout(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+        when {
+            title == "ยอดขายทั้งหมด" -> TotalSalesLayout(
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
                 onOpenCurrentSales = onOpenCurrentSales,
-                onOpenSalesHistory = onOpenSalesHistory
+                onOpenSalesHistory = onOpenSalesHistory,
+                summaries = summaries,
+                now = now
             )
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            title.startsWith("ยอดขายทั้งหมด (ย้อนหลัง 24 งวด)") -> SalesHistoryLayout(
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                summaries = summaries
+            )
+            else -> Column(
+                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
+                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "หน้านี้เตรียมโครงสร้างไว้แล้ว รายละเอียดการแสดงผลจะกำหนดในขั้นตอนถัดไป",
+                    "หน้านี้ยังไม่มีรายงานที่เชื่อมกับข้อมูลจริง",
                     modifier = Modifier.padding(top = 16.dp),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -187,7 +200,9 @@ fun ReportDetailScreen(
 private fun TotalSalesLayout(
     modifier: Modifier = Modifier,
     onOpenCurrentSales: () -> Unit,
-    onOpenSalesHistory: () -> Unit
+    onOpenSalesHistory: () -> Unit,
+    summaries: List<DrawProfitSummaryEntity>,
+    now: ZonedDateTime
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         Column(
@@ -207,9 +222,9 @@ private fun TotalSalesLayout(
                 modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
             )
             YearlySalesChart(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                summaries = summaries,
+                now = now
             )
         }
         Column(
@@ -239,71 +254,93 @@ private fun TotalSalesLayout(
 }
 
 @Composable
-private fun YearlySalesChart(modifier: Modifier = Modifier) {
-    val gridColor = MaterialTheme.colorScheme.outlineVariant
-    val axisColor = MaterialTheme.colorScheme.onSurfaceVariant
-
-    Column(modifier = modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "ยอดขาย (บาท)",
-                modifier = Modifier.rotate(-90f),
-                color = axisColor,
-                fontSize = 11.sp,
-                maxLines = 1
-            )
-            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                Canvas(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    val left = 2.dp.toPx()
-                    val right = size.width - 2.dp.toPx()
-                    val top = 8.dp.toPx()
-                    val bottom = size.height - 4.dp.toPx()
-                    val rows = 5
-                    for (index in 0..rows) {
-                        val y = top + (bottom - top) * index / rows
-                        drawLine(
-                            color = gridColor,
-                            start = androidx.compose.ui.geometry.Offset(left, y),
-                            end = androidx.compose.ui.geometry.Offset(right, y),
-                            strokeWidth = 1.dp.toPx()
-                        )
-                    }
-                    drawLine(
-                        color = axisColor,
-                        start = androidx.compose.ui.geometry.Offset(left, top),
-                        end = androidx.compose.ui.geometry.Offset(left, bottom),
-                        strokeWidth = 1.5.dp.toPx()
-                    )
-                    drawLine(
-                        color = axisColor,
-                        start = androidx.compose.ui.geometry.Offset(left, bottom),
-                        end = androidx.compose.ui.geometry.Offset(right, bottom),
-                        strokeWidth = 1.5.dp.toPx()
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    monthLabels.forEach { month ->
-                        Text(
-                            text = month,
-                            fontSize = 8.sp,
-                            color = axisColor,
-                            maxLines = 1
-                        )
+private fun SalesHistoryLayout(
+    modifier: Modifier = Modifier,
+    summaries: List<DrawProfitSummaryEntity>
+) {
+    val money = NumberFormat.getNumberInstance(Locale("th", "TH"))
+    val dateFormat = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale("th", "TH"))
+    val rows = summaries.sortedByDescending { it.drawDate }.take(24)
+    Column(modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("ยอดขายทั้งหมด (ย้อนหลัง 24 งวด)", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("ยอดขายรวม 24 งวดล่าสุด", fontWeight = FontWeight.SemiBold)
+                Text("${money.format(rows.sumOf { it.salesTotal })} บาท", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("แสดงเฉพาะงวดที่บันทึกผลรางวัลและมีสรุปยอดไว้", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (rows.isEmpty()) {
+            Text("ยังไม่มีข้อมูลยอดขายย้อนหลัง", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(rows, key = { it.drawDate }) { row ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            val date = runCatching { LocalDate.parse(row.drawDate) }.getOrNull()
+                            Text("งวดวันที่ ${date?.format(dateFormat) ?: row.drawDate}", fontWeight = FontWeight.SemiBold)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("ยอดขาย")
+                                Text("${money.format(row.salesTotal)} บาท", fontWeight = FontWeight.Bold)
+                            }
+                            if (row.dataQuality != "COMPLETE") {
+                                Text("ข้อมูลเงินรางวัลย้อนหลังต้องตรวจสอบ", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
                     }
                 }
             }
         }
-        Text(
-            text = "ยังไม่มีข้อมูลยอดขายสำหรับแสดงกราฟ",
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    }
+}
+
+@Composable
+private fun YearlySalesChart(
+    modifier: Modifier = Modifier,
+    summaries: List<DrawProfitSummaryEntity>,
+    now: ZonedDateTime
+) {
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val axisColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val barColor = MaterialTheme.colorScheme.primary
+    val months = (11 downTo 0).map { offset -> now.toLocalDate().withDayOfMonth(1).minusMonths(offset.toLong()) }
+    val totals = months.map { month ->
+        summaries.filter { item ->
+            val date = runCatching { LocalDate.parse(item.drawDate) }.getOrNull()
+            date?.year == month.year && date.monthValue == month.monthValue
+        }.fold(0L) { total, item -> Math.addExact(total, item.salesTotal) }
+    }
+    val maxValue = totals.maxOrNull()?.coerceAtLeast(1L) ?: 1L
+    val hasData = totals.any { it > 0L }
+
+    Column(modifier = modifier.fillMaxSize()) {
+        Text("ยอดขาย (บาท) · 12 เดือนล่าสุด", color = axisColor, fontSize = 11.sp)
+        Canvas(modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp)) {
+            val left = 2.dp.toPx()
+            val right = size.width - 2.dp.toPx()
+            val top = 8.dp.toPx()
+            val bottom = size.height - 4.dp.toPx()
+            for (index in 0..4) {
+                val y = top + (bottom - top) * index / 4f
+                drawLine(gridColor, Offset(left, y), Offset(right, y), strokeWidth = 1.dp.toPx())
+            }
+            drawLine(axisColor, Offset(left, top), Offset(left, bottom), strokeWidth = 1.5.dp.toPx())
+            drawLine(axisColor, Offset(left, bottom), Offset(right, bottom), strokeWidth = 1.5.dp.toPx())
+            val gap = 5.dp.toPx()
+            val barWidth = ((right - left) - gap * (totals.size - 1)) / totals.size
+            totals.forEachIndexed { index, value ->
+                val barHeight = (value.toDouble() / maxValue.toDouble() * (bottom - top)).toFloat()
+                val x = left + index * (barWidth + gap)
+                drawRect(barColor, Offset(x, bottom - barHeight), Size(barWidth, barHeight))
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            months.forEach { month ->
+                Text(month.month.getDisplayName(TextStyle.SHORT, Locale("th", "TH")), fontSize = 8.sp, color = axisColor, maxLines = 1)
+            }
+        }
+        if (!hasData) {
+            Text("ยังไม่มีข้อมูลยอดขายสำหรับแสดงกราฟ", modifier = Modifier.fillMaxWidth().padding(top = 4.dp), style = MaterialTheme.typography.bodySmall, color = axisColor)
+        }
     }
 }
