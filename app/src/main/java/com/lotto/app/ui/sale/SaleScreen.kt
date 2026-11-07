@@ -8,9 +8,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AlertDialog
@@ -75,6 +78,7 @@ fun SaleScreen(
     var creditAmount by remember { mutableStateOf("") }
     var isSaving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
+    var savedReceipt by remember { mutableStateOf<Pair<Long, SaleDraft>?>(null) }
     val quotaHints = remember { mutableStateMapOf<String, String>() }
     val quotaRequestVersions = remember { mutableStateMapOf<String, Int>() }
     var pendingQuotaAdjustments by remember { mutableStateOf<List<QuotaAdjustment>>(emptyList()) }
@@ -341,7 +345,7 @@ fun SaleScreen(
     }
 
     val canSave = total > 0L && totalResult.isSuccess && amountInputsValid && paymentSelected && splitValid &&
-        customerValid && activeEntriesValid && !hasNoAcceptItems && !isSaving
+        customerValid && activeEntriesValid && !hasNoAcceptItems && !isSaving && savedReceipt == null
 
     fun createDraft(): SaleDraft {
         val items = buildList {
@@ -587,7 +591,9 @@ fun SaleScreen(
                                     isSaving = true
                                     saveError = null
                                     try {
-                                        onSave(createDraft())
+                                        val draft = createDraft()
+                                        val saleId = onSave(draft)
+                                        savedReceipt = saleId to draft
                                     } catch (error: Exception) {
                                         saveError = error.message ?: "บันทึกข้อมูลไม่สำเร็จ"
                                     } finally {
@@ -767,5 +773,74 @@ fun SaleScreen(
                 }
             }
         }
+    }
+
+    savedReceipt?.let { (saleId, draft) ->
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("บันทึกบิลสำเร็จ") },
+            text = {
+                Column(
+                    modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("ใบเสร็จเลขที่ #$saleId", fontWeight = FontWeight.Bold)
+                    Text("งวดวันที่ $drawDate")
+                    Text("ลูกค้า: ${(draft.customerFirstName + " " + draft.customerLastName).trim().ifBlank { "ลูกค้าทั่วไป" }}")
+                    Text("ยอดรวม: ${draft.totalAmount} บาท", fontWeight = FontWeight.Bold)
+                    Divider()
+                    draft.items.forEach { item ->
+                        val prizeType = runCatching { PrizeType.valueOf(item.prizeType) }.getOrNull()
+                        val typeLabel = when (prizeType) {
+                            PrizeType.THREE_DIGIT_STRAIGHT -> "3 ตัวตรง"
+                            PrizeType.THREE_DIGIT_TOD -> "3 ตัวโต๊ด"
+                            PrizeType.TWO_DIGIT_TOP -> "2 ตัวบน"
+                            PrizeType.TWO_DIGIT_BOTTOM -> "2 ตัวล่าง"
+                            null -> item.prizeType
+                        }
+                        val isHalf = prizeType != null &&
+                            item.payoutMultiplier < LottoRules.payoutMultiplier(prizeType)
+                        Text(
+                            "${item.number} · $typeLabel · ${item.amount} บาท${if (isHalf) " · จ่ายครึ่ง" else ""}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Divider()
+                    val paymentLabel = when {
+                        draft.cashAmount > 0L && draft.creditAmount > 0L ->
+                            "เงินสด ${draft.cashAmount} บาท / เงินเชื่อ ${draft.creditAmount} บาท"
+                        draft.cashAmount > 0L -> "เงินสด ${draft.cashAmount} บาท"
+                        else -> "เงินเชื่อ ${draft.creditAmount} บาท"
+                    }
+                    Text("การชำระ: $paymentLabel")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    threeDigitEntries.clear()
+                    threeDigitEntries.add(ThreeDigitEntry(id = 1L))
+                    twoDigitEntries.clear()
+                    twoDigitEntries.add(TwoDigitEntry(id = 1L))
+                    nextThreeId = 2L
+                    nextTwoId = 2L
+                    firstName = ""
+                    lastName = ""
+                    cashSelected = true
+                    creditSelected = false
+                    cashAmount = ""
+                    creditAmount = ""
+                    acceptedHalfPayoutKeys.clear()
+                    quotaHints.clear()
+                    saveError = null
+                    savedReceipt = null
+                }) { Text("เริ่มขายรายการใหม่") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    savedReceipt = null
+                    onBack()
+                }) { Text("กลับหน้าหลัก") }
+            }
+        )
     }
 }
