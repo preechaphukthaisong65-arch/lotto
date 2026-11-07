@@ -247,11 +247,22 @@ fun SaleScreen(
         pendingAddTwo = false
     }
 
-    val total = threeDigitEntries.sumOf {
-        (it.straightAmount.toLongOrNull() ?: 0L) + (it.boxAmount.toLongOrNull() ?: 0L)
-    } + twoDigitEntries.sumOf {
-        (it.topAmount.toLongOrNull() ?: 0L) + (it.bottomAmount.toLongOrNull() ?: 0L)
+    val amountInputs = buildList {
+        threeDigitEntries.forEach { add(it.straightAmount); add(it.boxAmount) }
+        twoDigitEntries.forEach { add(it.topAmount); add(it.bottomAmount) }
+        add(cashAmount)
+        add(creditAmount)
     }
+    val amountInputsValid = amountInputs.all { value ->
+        value.isBlank() || (value.toLongOrNull()?.let { it >= 0L } == true)
+    }
+    val totalResult = runCatching {
+        amountInputs.take(amountInputs.size - 2)
+            .filter { it.isNotBlank() }
+            .map { it.toLong() }
+            .fold(0L) { sum, amount -> Math.addExact(sum, amount) }
+    }
+    val total = totalResult.getOrDefault(0L)
 
     val cashValue = when {
         cashSelected && creditSelected -> cashAmount.toLongOrNull() ?: 0L
@@ -265,7 +276,7 @@ fun SaleScreen(
     }
 
     val paymentSelected = cashSelected || creditSelected
-    val splitValid = cashValue + creditValue == total
+    val splitValid = runCatching { Math.addExact(cashValue, creditValue) == total }.getOrDefault(false)
     val customerValid = !creditSelected || (firstName.isNotBlank() && lastName.isNotBlank())
 
     val activeEntriesValid = threeDigitEntries.all { entry ->
@@ -331,7 +342,7 @@ fun SaleScreen(
         }
     }
 
-    val canSave = total > 0L && paymentSelected && splitValid &&
+    val canSave = total > 0L && totalResult.isSuccess && amountInputsValid && paymentSelected && splitValid &&
         customerValid && activeEntriesValid && !hasNoAcceptItems && !isSaving
 
     fun createDraft(): SaleDraft {
