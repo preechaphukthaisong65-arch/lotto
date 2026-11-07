@@ -59,7 +59,7 @@ fun WinningResultsScreen(
                 }
             }
             if (result?.payoutLocked == true) {
-                Text("งวดนี้มีการจ่ายรางวัลแล้ว จึงล็อกการแก้ไขผลไว้", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text("งวดนี้ล็อกการแก้ไขผลไว้ เนื่องจากมีการจ่ายรางวัลแล้วหรือประวัติการจ่ายย้อนหลังไม่สามารถยืนยันได้", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             } else if (result != null) {
                 androidx.compose.material3.OutlinedButton(onClick = onEditResult, modifier = Modifier.fillMaxWidth()) {
                     Text("แก้ไขผลรางวัล (มีบันทึกประวัติ)")
