@@ -42,6 +42,9 @@ class RoomSaleRepository(private val saleDao: SaleDao) : SaleRepository {
         return saleDao.insertSaleWithItems(sale, items, fullLimitsByPrizeType)
     }
 
+    override suspend fun getNumberStakeForDraw(drawDate: String, prizeType: String, number: String): Long =
+        saleDao.getNumberStakeForDraw(drawDate, prizeType, number)
+
     override suspend fun getAllSales(): List<SaleEntity> = saleDao.getAllSales()
     override suspend fun getNumberSalesSummary(startAt: Long, endAt: Long): List<SaleNumberSummary> =
         saleDao.getNumberSalesSummary(startAt, endAt)
