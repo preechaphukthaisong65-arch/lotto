@@ -76,7 +76,10 @@ fun PayoutScreen(repository: DrawResultRepository, onBack: () -> Unit) {
                             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                 Text("บิลขายเลขที่ ${bill.saleId}", style = MaterialTheme.typography.titleMedium)
                                 Text("ลูกค้า: ${bill.customerFirstName} ${bill.customerLastName}")
-                                Text("เงินรางวัลรวม: ${bill.totalPrize} บาท")
+                                Text("เงินรางวัลรวม: ${bill.totalPrize} บาท", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                                bill.itemDetails.lines().forEach { detail ->
+                                    Text(detail, style = MaterialTheme.typography.bodySmall)
+                                }
                                 if (bill.payoutStatus == "PAID") {
                                     Text("ผู้รับรางวัล: ${bill.recipientName.orEmpty()}")
                                     Text("วันที่จ่าย: ${bill.paidAt?.let { dateFormat.format(Date(it)) } ?: "-"}")
@@ -99,7 +102,11 @@ fun PayoutScreen(repository: DrawResultRepository, onBack: () -> Unit) {
             title = { Text("ยืนยันจ่ายรางวัล") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("จ่ายเงินรางวัล ${bill.totalPrize} บาท")
+                    Text("งวดวันที่ ${bill.drawDate}")
+                    Text("บิลขายเลขที่ ${bill.saleId}")
+                    Text("ลูกค้า: ${bill.customerFirstName} ${bill.customerLastName}")
+                    bill.itemDetails.lines().forEach { detail -> Text(detail, style = MaterialTheme.typography.bodySmall) }
+                    Text("ยอดจ่ายรวม ${bill.totalPrize} บาท", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                     OutlinedTextField(
                         value = recipient, onValueChange = { recipient = it },
                         label = { Text("ชื่อผู้รับรางวัล *") }, singleLine = true,
