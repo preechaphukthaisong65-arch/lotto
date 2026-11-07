@@ -76,10 +76,19 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
         }
     }
 
-    val sourceBills = if (selectedTab == 0) openBills else paidBills
+    val now = remember(refreshKey) { System.currentTimeMillis() }
+    val thirtyDaysMillis = 30L * 24L * 60L * 60L * 1000L
     fun remainingFor(bill: CreditDocumentEntity): Long {
         val paid = paymentHistory[bill.creditDocumentId].orEmpty().sumOf { it.amount }
         return (bill.creditAmount - paid).coerceAtLeast(0L)
+    }
+    val trackingBills = openBills.filter { bill ->
+        now - bill.createdAt >= thirtyDaysMillis && remainingFor(bill) > 0L
+    }.sortedWith(compareBy<CreditDocumentEntity> { it.createdAt }.thenBy { it.creditDocumentId })
+    val sourceBills = when (selectedTab) {
+        0 -> openBills
+        1 -> paidBills
+        else -> trackingBills
     }
     fun customerKey(bill: CreditDocumentEntity): String =
         "${bill.customerFirstName.trim()} ${bill.customerLastName.trim()}".trim()
@@ -123,6 +132,7 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("บิลค้างชำระ (${openBills.size})") })
                 Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("บิลจ่ายแล้ว (${paidBills.size})") })
+                Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("ติดตามสินเชื่อ (${trackingBills.size})") })
             }
             OutlinedTextField(
                 value = searchQuery,
@@ -156,12 +166,20 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
                     }
                 }
             }
+            if (selectedTab == 2) {
+                Text(
+                    "แจ้งเตือน: มีบิลที่ยังมียอดค้างและเปิดบิลมาแล้วตั้งแต่ 30 วันขึ้นไป",
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             if (filteredBills.isEmpty()) {
                 Text(
                     when {
                         sourceBills.isEmpty() && selectedTab == 0 -> "ไม่มีบิลค้างชำระ"
-                        sourceBills.isEmpty() -> "ไม่มีบิลจ่ายแล้ว"
+                        sourceBills.isEmpty() && selectedTab == 1 -> "ไม่มีบิลจ่ายแล้ว"
+                        sourceBills.isEmpty() -> "ยังไม่มีบิลค้างชำระที่ครบ 30 วัน"
                         else -> "ไม่พบชื่อลูกค้าที่ค้นหา"
                     }
                 )
@@ -188,6 +206,14 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
                                     Text("จำนวนบิลค้างของลูกค้ารายนี้: ${stats.second} บิล")
                                 }
                                 Text("วันที่ขาย: ${dateFormat.format(Date(bill.createdAt))}")
+                                if (selectedTab == 2) {
+                                    val ageDays = ((now - bill.createdAt).coerceAtLeast(0L) / (24L * 60L * 60L * 1000L))
+                                    Text(
+                                        "ค้างมาแล้ว $ageDays วัน · ควรติดตามทวงถาม",
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                                 Text("ยอดขายรวม: ${bill.saleTotalAmount} บาท")
                                 Text("เงินสด: ${bill.cashAmount} บาท")
                                 Text("ยอดเงินเชื่อ: ${bill.creditAmount} บาท")
@@ -202,7 +228,7 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
                                         style = MaterialTheme.typography.bodySmall
                                     )
                                 }
-                                if (selectedTab == 0) {
+                                if (selectedTab != 1) {
                                     OutlinedTextField(
                                         value = paymentInputs[bill.creditDocumentId].orEmpty(),
                                         onValueChange = { paymentInputs[bill.creditDocumentId] = it.filter(Char::isDigit) },
