@@ -203,6 +203,8 @@ class MainActivity : ComponentActivity() {
                         AppScreen.TotalSales.name -> ReportDetailScreen(
                             title = "ยอดขายทั้งหมด",
                             onBack = { currentScreen = AppScreen.Reports.name },
+                            drawResultRepository = drawResultRepository,
+                            now = currentThailandTime,
                             onOpenCurrentSales = { currentScreen = AppScreen.CurrentSales.name },
                             onOpenSalesHistory = { currentScreen = AppScreen.SalesHistory.name }
                         )
@@ -215,7 +217,9 @@ class MainActivity : ComponentActivity() {
                         )
                         AppScreen.SalesHistory.name -> ReportDetailScreen(
                             title = "ยอดขายทั้งหมด (ย้อนหลัง 24 งวด)",
-                            onBack = { currentScreen = AppScreen.TotalSales.name }
+                            onBack = { currentScreen = AppScreen.TotalSales.name },
+                            drawResultRepository = drawResultRepository,
+                            now = currentThailandTime
                         )
                         AppScreen.Performance.name -> PerformanceReportScreen(
                             drawResultRepository = drawResultRepository,
