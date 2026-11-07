@@ -29,10 +29,11 @@ import com.lotto.app.ui.sale.SaleScreen
 import com.lotto.app.ui.settings.SettingsScreen
 import com.lotto.app.ui.results.DrawResultScreen
 import com.lotto.app.ui.results.WinningResultsScreen
+import com.lotto.app.ui.results.PayoutScreen
 import java.time.LocalDate
 
 private enum class AppScreen {
-    Home, Sale, History, CreditAccounts, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance, DrawResult, Winners
+    Home, Sale, History, CreditAccounts, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance, DrawResult, Winners, Payout
 }
 
 class MainActivity : ComponentActivity() {
@@ -107,6 +108,10 @@ class MainActivity : ComponentActivity() {
                                 saleId
                             }
                         )
+                        AppScreen.Payout.name -> PayoutScreen(
+                            repository = drawResultRepository,
+                            onBack = { currentScreen = AppScreen.Home.name }
+                        )
                         AppScreen.Winners.name -> WinningResultsScreen(
                             drawDate = selectedResultDrawDate,
                             repository = drawResultRepository,
@@ -167,6 +172,7 @@ class MainActivity : ComponentActivity() {
                             onOpenReports = { currentScreen = AppScreen.Reports.name },
                             onOpenHistory = { currentScreen = AppScreen.History.name },
                             onOpenCreditAccounts = { currentScreen = AppScreen.CreditAccounts.name },
+                            onOpenPayout = { currentScreen = AppScreen.Payout.name },
                             onOpenCalendar = { currentScreen = AppScreen.Calendar.name },
                             onOpenSettings = { currentScreen = AppScreen.Settings.name },
                             saleOpen = saleWindow.isOpen,
