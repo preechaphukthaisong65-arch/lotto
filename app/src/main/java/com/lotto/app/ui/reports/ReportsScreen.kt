@@ -273,7 +273,7 @@ private fun SalesHistoryLayout(
         if (rows.isEmpty()) {
             Text("ยังไม่มีข้อมูลยอดขายย้อนหลัง", color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(rows, key = { it.drawDate }) { row ->
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -307,7 +307,7 @@ private fun YearlySalesChart(
     val totals = months.map { month ->
         summaries.filter { item ->
             val date = runCatching { LocalDate.parse(item.drawDate) }.getOrNull()
-            date?.year == month.year && date.monthValue == month.monthValue
+            date != null && date.year == month.year && date.monthValue == month.monthValue
         }.fold(0L) { total, item -> Math.addExact(total, item.salesTotal) }
     }
     val maxValue = totals.maxOrNull()?.coerceAtLeast(1L) ?: 1L
