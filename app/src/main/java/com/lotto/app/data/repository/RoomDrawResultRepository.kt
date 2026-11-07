@@ -7,6 +7,8 @@ import com.lotto.app.data.local.model.WinningSaleSummary
 import com.lotto.app.data.local.model.WinningBillSummary
 import com.lotto.app.data.local.LottoDatabase
 import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
+import java.time.ZoneId
 
 class RoomDrawResultRepository(private val dao: DrawResultDao) : DrawResultRepository {
     override fun observeAllResults(): Flow<List<DrawResultEntity>> = dao.observeAllResults()
@@ -25,6 +27,11 @@ class RoomDrawResultRepository(private val dao: DrawResultDao) : DrawResultRepos
     override suspend fun cleanupExpiredPaidWinningBills(): Int {
         val retention = LottoDatabase.PAID_DOCUMENT_RETENTION_DAYS * LottoDatabase.MILLIS_PER_DAY
         return dao.deleteExpiredPaidWinningBills(System.currentTimeMillis() - retention)
+    }
+
+    override suspend fun cleanupExpiredProfitSummaries(): Int {
+        val cutoffDate = LocalDate.now(ZoneId.of("Asia/Bangkok")).minusYears(1).toString()
+        return dao.deleteExpiredProfitSummaries(cutoffDate)
     }
 
     override suspend fun saveResult(
