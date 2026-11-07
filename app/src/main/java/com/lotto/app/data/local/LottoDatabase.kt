@@ -16,6 +16,7 @@ import com.lotto.app.data.local.entity.DrawDateEntity
 import com.lotto.app.data.local.entity.DrawDateChangeEntity
 import com.lotto.app.data.local.entity.DrawResultEntity
 import com.lotto.app.data.local.entity.WinningSaleItemEntity
+import com.lotto.app.data.local.entity.DrawProfitSummaryEntity
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
 
@@ -30,9 +31,10 @@ import com.lotto.app.data.local.entity.SaleItemEntity
         DrawDateEntity::class,
         DrawDateChangeEntity::class,
         DrawResultEntity::class,
-        WinningSaleItemEntity::class
+        WinningSaleItemEntity::class,
+        DrawProfitSummaryEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -76,6 +78,19 @@ abstract class LottoDatabase : RoomDatabase() {
                 db.execSQL("""CREATE TABLE IF NOT EXISTS draw_date_changes (changeId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, drawDate TEXT NOT NULL, previousDate TEXT, newDate TEXT NOT NULL, changedAt INTEGER NOT NULL, source TEXT NOT NULL)""")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_date_changes_changedAt ON draw_date_changes(changedAt)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_date_changes_drawDate ON draw_date_changes(drawDate)")
+            }
+        }
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""CREATE TABLE IF NOT EXISTS draw_profit_summaries (drawDate TEXT NOT NULL PRIMARY KEY, salesTotal INTEGER NOT NULL, prizeLiability INTEGER NOT NULL, netProfit INTEGER NOT NULL, recordedAt INTEGER NOT NULL)""")
+                db.execSQL("""INSERT OR REPLACE INTO draw_profit_summaries (drawDate, salesTotal, prizeLiability, netProfit, recordedAt)
+                    SELECT dr.drawDate,
+                           COALESCE((SELECT SUM(s.totalAmount) FROM sales s WHERE s.drawDate = dr.drawDate AND s.status = 'CONFIRMED'), 0),
+                           COALESCE((SELECT SUM(w.prizeAmount) FROM winning_sale_items w WHERE w.drawDate = dr.drawDate), 0),
+                           COALESCE((SELECT SUM(s.totalAmount) FROM sales s WHERE s.drawDate = dr.drawDate AND s.status = 'CONFIRMED'), 0) -
+                           COALESCE((SELECT SUM(w.prizeAmount) FROM winning_sale_items w WHERE w.drawDate = dr.drawDate), 0),
+                           dr.recordedAt
+                    FROM draw_results dr""")
             }
         }
         val MIGRATION_6_7 = object : Migration(6, 7) {
