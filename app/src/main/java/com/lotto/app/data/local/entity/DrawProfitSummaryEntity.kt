@@ -1,5 +1,6 @@
 package com.lotto.app.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -10,6 +11,7 @@ data class DrawProfitSummaryEntity(
     val prizeLiability: Long,
     val netProfit: Long,
     val recordedAt: Long,
+    @ColumnInfo(defaultValue = "'NEEDS_REVIEW'")
     val dataQuality: String = QUALITY_COMPLETE
 )
 
