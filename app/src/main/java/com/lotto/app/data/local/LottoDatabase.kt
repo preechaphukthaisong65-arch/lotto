@@ -32,9 +32,10 @@ import com.lotto.app.data.local.entity.SaleItemEntity
         DrawDateChangeEntity::class,
         DrawResultEntity::class,
         WinningSaleItemEntity::class,
-        DrawProfitSummaryEntity::class
+        DrawProfitSummaryEntity::class,
+        com.lotto.app.data.local.entity.DrawResultCorrectionEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -83,6 +84,26 @@ abstract class LottoDatabase : RoomDatabase() {
                 db.execSQL("""CREATE TABLE IF NOT EXISTS draw_date_changes (changeId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, drawDate TEXT NOT NULL, previousDate TEXT, newDate TEXT NOT NULL, changedAt INTEGER NOT NULL, source TEXT NOT NULL)""")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_date_changes_changedAt ON draw_date_changes(changedAt)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_date_changes_drawDate ON draw_date_changes(drawDate)")
+            }
+        }
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE draw_results ADD COLUMN payoutLocked INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("""CREATE TABLE IF NOT EXISTS draw_result_corrections (
+                    correctionId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    drawDate TEXT NOT NULL,
+                    previousThreeDigit TEXT NOT NULL,
+                    previousTwoDigitTop TEXT NOT NULL,
+                    previousTwoDigitBottom TEXT NOT NULL,
+                    newThreeDigit TEXT NOT NULL,
+                    newTwoDigitTop TEXT NOT NULL,
+                    newTwoDigitBottom TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    correctedAt INTEGER NOT NULL
+                )""")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_result_corrections_drawDate ON draw_result_corrections(drawDate)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_result_corrections_correctedAt ON draw_result_corrections(correctedAt)")
+                db.execSQL("UPDATE draw_results SET payoutLocked = 1 WHERE drawDate IN (SELECT DISTINCT drawDate FROM winning_sale_items WHERE payoutStatus = 'PAID')")
             }
         }
         val MIGRATION_8_9 = object : Migration(8, 9) {
