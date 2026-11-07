@@ -22,6 +22,7 @@ private val homeMenuOptions = listOf(
     HomeMenuOption.Reports,
     HomeMenuOption.History,
     HomeMenuOption.CreditAccounts,
+    HomeMenuOption.Calendar,
     HomeMenuOption.Settings
 )
 
@@ -31,7 +32,8 @@ fun HomeScreen(
     onOpenSale: () -> Unit,
     onOpenReports: () -> Unit,
     onOpenHistory: () -> Unit,
-    onOpenCreditAccounts: () -> Unit
+    onOpenCreditAccounts: () -> Unit,
+    onOpenCalendar: () -> Unit
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("หน้าหลัก") }) }
@@ -57,6 +59,7 @@ fun HomeScreen(
                             HomeMenuOption.Reports -> onOpenReports
                             HomeMenuOption.History -> onOpenHistory
                             HomeMenuOption.CreditAccounts -> onOpenCreditAccounts
+                            HomeMenuOption.Calendar -> onOpenCalendar
                             else -> ({})
                         }
                     )
