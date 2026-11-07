@@ -33,9 +33,10 @@ import com.lotto.app.data.local.entity.SaleItemEntity
         DrawResultEntity::class,
         WinningSaleItemEntity::class,
         DrawProfitSummaryEntity::class,
-        com.lotto.app.data.local.entity.DrawResultCorrectionEntity::class
+        com.lotto.app.data.local.entity.DrawResultCorrectionEntity::class,
+        com.lotto.app.data.local.entity.ExpiredSaleRetentionEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -84,6 +85,12 @@ abstract class LottoDatabase : RoomDatabase() {
                 db.execSQL("""CREATE TABLE IF NOT EXISTS draw_date_changes (changeId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, drawDate TEXT NOT NULL, previousDate TEXT, newDate TEXT NOT NULL, changedAt INTEGER NOT NULL, source TEXT NOT NULL)""")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_date_changes_changedAt ON draw_date_changes(changedAt)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_date_changes_drawDate ON draw_date_changes(drawDate)")
+            }
+        }
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS expired_sale_retention (saleId INTEGER NOT NULL PRIMARY KEY, eligibleAt INTEGER NOT NULL)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_expired_sale_retention_eligibleAt ON expired_sale_retention(eligibleAt)")
             }
         }
         val MIGRATION_9_10 = object : Migration(9, 10) {
