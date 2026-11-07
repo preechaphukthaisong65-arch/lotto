@@ -34,7 +34,9 @@ fun HomeScreen(
     onOpenHistory: () -> Unit,
     onOpenCreditAccounts: () -> Unit,
     onOpenCalendar: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    saleOpen: Boolean,
+    saleStatusMessage: String
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("หน้าหลัก") }) }
@@ -48,6 +50,11 @@ fun HomeScreen(
                 text = "LOTTO",
                 style = androidx.compose.material3.MaterialTheme.typography.headlineMedium
             )
+            Text(
+                text = saleStatusMessage,
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                color = if (saleOpen) androidx.compose.material3.MaterialTheme.colorScheme.primary else androidx.compose.material3.MaterialTheme.colorScheme.error
+            )
             LazyColumn(
                 contentPadding = PaddingValues(bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -55,6 +62,8 @@ fun HomeScreen(
                 items(homeMenuOptions) { option ->
                     HomeMenuItem(
                         option = option,
+                        enabled = option != HomeMenuOption.Sell || saleOpen,
+                        subtitle = if (option == HomeMenuOption.Sell && !saleOpen) saleStatusMessage else null,
                         onClick = when (option) {
                             HomeMenuOption.Sell -> onOpenSale
                             HomeMenuOption.Reports -> onOpenReports
