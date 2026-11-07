@@ -86,6 +86,7 @@ fun HomeScreen(
                             HomeMenuOption.History -> onOpenHistory
                             HomeMenuOption.CreditAccounts -> onOpenCreditAccounts
                             HomeMenuOption.PayDebt -> onOpenPayDebt
+                            HomeMenuOption.Payout -> onOpenPayout
                             HomeMenuOption.Calendar -> onOpenCalendar
                             HomeMenuOption.Settings -> onOpenSettings
                             else -> ({})
