@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import com.lotto.app.domain.rules.SaleWindowPolicy
 import com.lotto.app.domain.rules.FullNumberLimitPolicy
+import com.lotto.app.domain.rules.NoAcceptNumberPolicy
 import com.lotto.app.data.repository.DrawCalendarRepository
 import androidx.compose.ui.Modifier
 import com.lotto.app.ui.HomeScreen
@@ -75,6 +76,12 @@ class MainActivity : ComponentActivity() {
                 val currentFullLimits = FullNumberLimitPolicy.settingKeys.mapValues { (_, key) ->
                     settingRows.firstOrNull { it.key == key }?.value?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
                 }
+                val currentNoAcceptNumbers = NoAcceptNumberPolicy.settingKeys.mapValues { (_, key) ->
+                    NoAcceptNumberPolicy.parse(
+                        settingRows.firstOrNull { it.key == key }?.value.orEmpty(),
+                        NoAcceptNumberPolicy.typeForKey(key)
+                    )
+                }
                 val activeSaleDrawDate = SaleWindowPolicy.activeDrawDate(drawDates, currentThailandTime).orEmpty()
                 var selectedResultDrawDate by rememberSaveable { mutableStateOf("") }
                 LaunchedEffect(Unit) {
@@ -103,6 +110,7 @@ class MainActivity : ComponentActivity() {
                             onBack = { currentScreen = AppScreen.Home.name },
                             drawDate = activeSaleDrawDate,
                             fullLimitsByPrizeType = currentFullLimits,
+                            noAcceptNumbersByPrizeType = currentNoAcceptNumbers,
                             onGetNumberStake = { drawDate, prizeType, number ->
                                 saleRepository.getNumberStakeForDraw(drawDate, prizeType, number)
                             },
@@ -115,6 +123,10 @@ class MainActivity : ComponentActivity() {
                                 val targetDrawDate = SaleWindowPolicy.activeDrawDate(drawDates, DrawCalendarRepository.nowInThailand())
                                     ?: error("ไม่พบงวดหวยที่เปิดรับขาย")
                                 val fullLimits = FullNumberLimitPolicy.load(settingsRepository)
+                                val noAcceptNumbers = NoAcceptNumberPolicy.load(settingsRepository)
+                                check(draft.items.none { item ->
+                                    item.number in (noAcceptNumbers[item.prizeType] ?: emptySet())
+                                }) { "มีเลขที่ตั้งค่าไม่รับ ไม่สามารถบันทึกบิลได้" }
                                 val saleId = saleRepository.saveConfirmedSale(draft, targetDrawDate, fullLimits)
                                 Toast.makeText(this, "บันทึกการขายเรียบร้อย เลขที่รายการ $saleId", Toast.LENGTH_LONG).show()
                                 currentScreen = AppScreen.Home.name
