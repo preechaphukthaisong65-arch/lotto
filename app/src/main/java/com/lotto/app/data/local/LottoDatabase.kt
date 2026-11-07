@@ -68,6 +68,11 @@ abstract class LottoDatabase : RoomDatabase() {
                 db.execSQL("""CREATE TABLE IF NOT EXISTS credit_payments (paymentId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, creditDocumentId INTEGER NOT NULL, amount INTEGER NOT NULL, paidAt INTEGER NOT NULL, FOREIGN KEY(creditDocumentId) REFERENCES credit_documents(creditDocumentId) ON UPDATE NO ACTION ON DELETE CASCADE)""")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_credit_payments_creditDocumentId ON credit_payments(creditDocumentId)")
                 db.execSQL("UPDATE credit_documents SET paidAt = createdAt WHERE creditAmount = 0 OR status = 'PAID'")
+                db.execSQL("""INSERT INTO credit_payments (creditDocumentId, amount, paidAt)
+                    SELECT d.creditDocumentId, d.creditAmount, COALESCE(d.paidAt, d.createdAt)
+                    FROM credit_documents d
+                    WHERE d.status = 'PAID' AND d.creditAmount > 0
+                      AND NOT EXISTS (SELECT 1 FROM credit_payments p WHERE p.creditDocumentId = d.creditDocumentId)""")
                 db.execSQL("""INSERT INTO credit_documents (sourceSaleId, customerFirstName, customerLastName, saleTotalAmount, cashAmount, creditAmount, createdAt, status, paidAt) SELECT s.saleId, s.customerFirstName, s.customerLastName, s.totalAmount, s.cashAmount, s.creditAmount, s.createdAt, 'PAID', s.createdAt FROM sales s WHERE s.creditAmount = 0 AND NOT EXISTS (SELECT 1 FROM credit_documents d WHERE d.sourceSaleId = s.saleId)""")
                 db.execSQL("""INSERT INTO credit_document_items (creditDocumentId, number, prizeType, amount, payoutMultiplier) SELECT d.creditDocumentId, si.number, si.prizeType, si.amount, si.payoutMultiplier FROM credit_documents d INNER JOIN sale_items si ON si.saleId = d.sourceSaleId WHERE d.status = 'PAID' AND d.creditAmount = 0 AND NOT EXISTS (SELECT 1 FROM credit_document_items ci WHERE ci.creditDocumentId = d.creditDocumentId)""")
             }
