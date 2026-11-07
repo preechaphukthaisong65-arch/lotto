@@ -20,8 +20,8 @@ abstract class DrawCalendarDao {
     @Query("SELECT * FROM draw_dates WHERE drawDate = :date LIMIT 1")
     abstract suspend fun getByDate(date: String): DrawDateEntity?
 
-    @Query("SELECT * FROM draw_date_changes WHERE drawDate = :date ORDER BY changedAt DESC")
-    abstract fun observeChanges(date: String): Flow<List<DrawDateChangeEntity>>
+    @Query("SELECT * FROM draw_date_changes ORDER BY changedAt DESC")
+    abstract fun observeAllChanges(): Flow<List<DrawDateChangeEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertDrawDate(entity: DrawDateEntity)
