@@ -18,6 +18,7 @@ import kotlinx.coroutines.delay
 import com.lotto.app.domain.rules.SaleWindowPolicy
 import com.lotto.app.domain.rules.FullNumberLimitPolicy
 import com.lotto.app.domain.rules.NoAcceptNumberPolicy
+import com.lotto.app.domain.rules.HalfPayoutNumberPolicy
 import com.lotto.app.data.repository.DrawCalendarRepository
 import androidx.compose.ui.Modifier
 import com.lotto.app.ui.HomeScreen
@@ -82,6 +83,9 @@ class MainActivity : ComponentActivity() {
                         NoAcceptNumberPolicy.typeForKey(key)
                     )
                 }
+                val currentHalfPayoutNumbers = HalfPayoutNumberPolicy.settingKeys.mapValues { (type, key) ->
+                    HalfPayoutNumberPolicy.parse(settingRows.firstOrNull { it.key == key }?.value.orEmpty(), com.lotto.app.domain.rules.PrizeType.valueOf(type))
+                }
                 val activeSaleDrawDate = SaleWindowPolicy.activeDrawDate(drawDates, currentThailandTime).orEmpty()
                 var selectedResultDrawDate by rememberSaveable { mutableStateOf("") }
                 LaunchedEffect(Unit) {
@@ -111,6 +115,7 @@ class MainActivity : ComponentActivity() {
                             drawDate = activeSaleDrawDate,
                             fullLimitsByPrizeType = currentFullLimits,
                             noAcceptNumbersByPrizeType = currentNoAcceptNumbers,
+                            halfPayoutNumbersByPrizeType = currentHalfPayoutNumbers,
                             onGetNumberStake = { drawDate, prizeType, number ->
                                 saleRepository.getNumberStakeForDraw(drawDate, prizeType, number)
                             },
@@ -124,9 +129,14 @@ class MainActivity : ComponentActivity() {
                                     ?: error("ไม่พบงวดหวยที่เปิดรับขาย")
                                 val fullLimits = FullNumberLimitPolicy.load(settingsRepository)
                                 val noAcceptNumbers = NoAcceptNumberPolicy.load(settingsRepository)
-                                check(draft.items.none { item ->
-                                    item.number in (noAcceptNumbers[item.prizeType] ?: emptySet())
-                                }) { "มีเลขที่ตั้งค่าไม่รับ ไม่สามารถบันทึกบิลได้" }
+                                check(draft.items.none { item -> item.number in (noAcceptNumbers[item.prizeType] ?: emptySet()) }) { "มีเลขที่ตั้งค่าไม่รับ ไม่สามารถบันทึกบิลได้" }
+                                val halfNumbers = HalfPayoutNumberPolicy.load(settingsRepository)
+                                check(draft.items.all { item ->
+                                    val type = com.lotto.app.domain.rules.PrizeType.valueOf(item.prizeType)
+                                    val isHalf = item.number in (halfNumbers[item.prizeType] ?: emptySet())
+                                    val expected = if (isHalf) type.fullPayoutMultiplier / 2L else type.fullPayoutMultiplier
+                                    item.payoutMultiplier == expected
+                                }) { "สถานะจ่ายครึ่งราคาเปลี่ยนแปลง กรุณาตรวจสอบรายการอีกครั้ง" }
                                 val saleId = saleRepository.saveConfirmedSale(draft, targetDrawDate, fullLimits)
                                 Toast.makeText(this, "บันทึกการขายเรียบร้อย เลขที่รายการ $saleId", Toast.LENGTH_LONG).show()
                                 currentScreen = AppScreen.Home.name
