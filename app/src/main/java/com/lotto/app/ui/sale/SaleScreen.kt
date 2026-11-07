@@ -163,17 +163,6 @@ fun SaleScreen(
                 pendingNoAcceptClear = blockedRows.map { NoAcceptClear(true, it.id) }
                 return@launch
             }
-            val blockedRows = twoDigitEntries.filter { entry ->
-                val number = entry.firstDigit + entry.secondDigit
-                number.length == 2 && (
-                    ((entry.topAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.TWO_DIGIT_TOP.name] ?: emptySet())) ||
-                    ((entry.bottomAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.TWO_DIGIT_BOTTOM.name] ?: emptySet()))
-                )
-            }
-            if (blockedRows.isNotEmpty()) {
-                pendingNoAcceptClear = blockedRows.map { NoAcceptClear(false, it.id) }
-                return@launch
-            }
             val fullMessage = runCatching { findAlreadyFull(entries) }.getOrElse {
                 saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
                 return@launch
@@ -203,6 +192,17 @@ fun SaleScreen(
                     PrizeType.TWO_DIGIT_TOP.name to (entry.topAmount.toLongOrNull() ?: 0L),
                     PrizeType.TWO_DIGIT_BOTTOM.name to (entry.bottomAmount.toLongOrNull() ?: 0L)
                 ))
+            }
+            val blockedRows = twoDigitEntries.filter { entry ->
+                val number = entry.firstDigit + entry.secondDigit
+                number.length == 2 && (
+                    ((entry.topAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.TWO_DIGIT_TOP.name] ?: emptySet())) ||
+                    ((entry.bottomAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.TWO_DIGIT_BOTTOM.name] ?: emptySet()))
+                )
+            }
+            if (blockedRows.isNotEmpty()) {
+                pendingNoAcceptClear = blockedRows.map { NoAcceptClear(false, it.id) }
+                return@launch
             }
             val fullMessage = runCatching { findAlreadyFull(entries) }.getOrElse {
                 saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
