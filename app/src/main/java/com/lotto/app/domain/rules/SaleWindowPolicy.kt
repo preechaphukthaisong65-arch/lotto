@@ -16,6 +16,17 @@ object SaleWindowPolicy {
     private val openTime = LocalTime.of(8, 0)
     private val closeTime = LocalTime.of(14, 30)
 
+    fun activeDrawDate(drawDates: List<DrawDateEntity>, now: ZonedDateTime): String? {
+        val dates = drawDates.mapNotNull { runCatching { LocalDate.parse(it.drawDate) }.getOrNull() }
+            .distinct().sorted()
+        val zone = now.zone
+        return dates.zipWithNext { previous, draw ->
+            val opens = previous.plusDays(1).atTime(openTime).atZone(zone)
+            val closes = draw.atTime(closeTime).atZone(zone)
+            if (!now.isBefore(opens) && now.isBefore(closes)) draw.toString() else null
+        }.firstOrNull { it != null }
+    }
+
     fun evaluate(
         drawDates: List<DrawDateEntity>,
         now: ZonedDateTime
