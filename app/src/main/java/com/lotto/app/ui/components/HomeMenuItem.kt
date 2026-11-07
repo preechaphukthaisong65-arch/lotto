@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Settings
@@ -31,6 +32,7 @@ enum class HomeMenuOption(
     Reports("รายงานยอด", Icons.Outlined.Assessment),
     History("ประวัติ", Icons.Outlined.History),
     CreditAccounts("บัญชีเชื่อ", Icons.Outlined.AccountBalanceWallet),
+    Calendar("ปฏิทินหวย", Icons.Outlined.CalendarMonth),
     Settings("ตั้งค่า", Icons.Outlined.Settings)
 }
 
