@@ -107,18 +107,19 @@ fun SaleScreen(
         digitCount: Int
     ): List<QuotaAdjustment> {
         val adjustments = mutableListOf<QuotaAdjustment>()
-        for ((entryId, number, amounts) in entries) {
-            if (number.length != digitCount) continue
-            for ((prizeType, requestedAmount) in amounts) {
-                if (requestedAmount <= 0L) continue
+        val prizeTypes = entries.flatMap { it.third.keys }.distinct()
+        for (number in entries.map { it.second }.filter { it.length == digitCount }.distinct()) {
+            for (prizeType in prizeTypes) {
                 val limit = fullLimitsByPrizeType[prizeType] ?: 0L
                 if (limit <= 0L) continue
-                val alreadySold = onGetNumberStake(drawDate, prizeType, number)
-                val otherDraftAmount = entries
-                    .filter { it.second == number && it.first != entryId }
-                    .sumOf { it.third[prizeType] ?: 0L }
-                val remaining = (limit - alreadySold - otherDraftAmount).coerceAtLeast(0L)
-                if (requestedAmount > remaining) adjustments += QuotaAdjustment(entryId, prizeType, remaining)
+                var remaining = (limit - onGetNumberStake(drawDate, prizeType, number)).coerceAtLeast(0L)
+                entries.filter { it.second == number }.forEach { entry ->
+                    val requestedAmount = entry.third[prizeType] ?: 0L
+                    if (requestedAmount > remaining) {
+                        adjustments += QuotaAdjustment(entry.first, prizeType, remaining)
+                    }
+                    remaining = (remaining - requestedAmount.coerceAtMost(remaining)).coerceAtLeast(0L)
+                }
             }
         }
         return adjustments
