@@ -9,5 +9,6 @@ data class WinningBillSummary(
     val payoutStatus: String,
     val recipientName: String?,
     val paidAt: Long?,
-    val saleCreatedAt: Long
+    val saleCreatedAt: Long,
+    val itemDetails: String
 )
