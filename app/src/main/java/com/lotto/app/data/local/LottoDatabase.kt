@@ -115,6 +115,34 @@ abstract class LottoDatabase : RoomDatabase() {
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE sales ADD COLUMN drawDate TEXT")
+                // Assign legacy sales only when exactly one calendar sale window matches.
+                // Ambiguous or unmatched records remain NULL rather than being guessed.
+                db.execSQL("""UPDATE sales
+                    SET drawDate = (
+                        SELECT d.drawDate
+                        FROM draw_dates d
+                        WHERE EXISTS (
+                            SELECT 1 FROM draw_dates previous
+                            WHERE previous.drawDate = (
+                                SELECT MAX(p.drawDate) FROM draw_dates p WHERE p.drawDate < d.drawDate
+                            )
+                              AND sales.createdAt >= CAST(strftime('%s', date(previous.drawDate, '+1 day') || ' 08:00:00', '-7 hours') AS INTEGER) * 1000
+                              AND sales.createdAt < CAST(strftime('%s', d.drawDate || ' 14:30:00', '-7 hours') AS INTEGER) * 1000
+                        )
+                    )
+                    WHERE drawDate IS NULL
+                      AND (
+                        SELECT COUNT(*)
+                        FROM draw_dates d
+                        WHERE EXISTS (
+                            SELECT 1 FROM draw_dates previous
+                            WHERE previous.drawDate = (
+                                SELECT MAX(p.drawDate) FROM draw_dates p WHERE p.drawDate < d.drawDate
+                            )
+                              AND sales.createdAt >= CAST(strftime('%s', date(previous.drawDate, '+1 day') || ' 08:00:00', '-7 hours') AS INTEGER) * 1000
+                              AND sales.createdAt < CAST(strftime('%s', d.drawDate || ' 14:30:00', '-7 hours') AS INTEGER) * 1000
+                        )
+                      ) = 1""")
                 db.execSQL("""CREATE TABLE IF NOT EXISTS draw_results (drawDate TEXT NOT NULL PRIMARY KEY, threeDigit TEXT NOT NULL, twoDigitTop TEXT NOT NULL, twoDigitBottom TEXT NOT NULL, recordedAt INTEGER NOT NULL)""")
                 db.execSQL("""CREATE TABLE IF NOT EXISTS winning_sale_items (winId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, drawDate TEXT NOT NULL, saleId INTEGER NOT NULL, saleItemId INTEGER NOT NULL, prizeType TEXT NOT NULL, number TEXT NOT NULL, stakeAmount INTEGER NOT NULL, payoutMultiplier INTEGER NOT NULL, prizeAmount INTEGER NOT NULL)""")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_winning_sale_items_drawDate_saleItemId ON winning_sale_items(drawDate, saleItemId)")
