@@ -97,13 +97,14 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 val saleWindow = SaleWindowPolicy.evaluate(drawDates, currentThailandTime)
-                val latestDrawDate = drawDates.mapNotNull { runCatching { LocalDate.parse(it.drawDate) }.getOrNull() }
-                    .filter { !it.isAfter(currentThailandTime.toLocalDate()) }
-                    .maxOrNull()
-                val pendingResultDate = latestDrawDate?.takeIf { date ->
-                    !currentThailandTime.toLocalDateTime().isBefore(date.atTime(16, 0)) &&
-                        drawResults.none { it.drawDate == date.toString() }
-                }?.toString()
+                val pendingResultDate = drawDates.mapNotNull { runCatching { LocalDate.parse(it.drawDate) }.getOrNull() }
+                    .filter { date ->
+                        !date.isAfter(currentThailandTime.toLocalDate()) &&
+                            !currentThailandTime.toLocalDateTime().isBefore(date.atTime(16, 0)) &&
+                            drawResults.none { it.drawDate == date.toString() }
+                    }
+                    .minOrNull()
+                    ?.toString()
                 LaunchedEffect(currentScreen, saleWindow.isOpen) {
                     if (currentScreen == AppScreen.Sale.name && !saleWindow.isOpen) {
                         Toast.makeText(this@MainActivity, "ปิดรับขายแล้ว", Toast.LENGTH_SHORT).show()
