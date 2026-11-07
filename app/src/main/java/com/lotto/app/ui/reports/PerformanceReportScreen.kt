@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.lotto.app.data.repository.DrawResultRepository
 import com.lotto.app.ui.components.buttons.BackButton
 import java.text.NumberFormat
+import java.math.BigInteger
 import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -20,7 +21,7 @@ import java.util.Locale
 
 private enum class ProfitView(val label: String) { DRAW("รายงวด"), MONTH("รายเดือน"), YEAR("รายปี") }
 private data class ProfitRow(val drawDate: LocalDate, val sales: Long, val prizes: Long, val needsReview: Boolean) {
-    val net: Long get() = sales - prizes
+    val net: BigInteger get() = BigInteger.valueOf(sales).subtract(BigInteger.valueOf(prizes))
 }
 
 @Composable
@@ -50,9 +51,9 @@ fun PerformanceReportScreen(
         ProfitView.MONTH -> rows.filter { it.drawDate.year == selectedYear && it.drawDate.monthValue == selectedMonth }
         ProfitView.YEAR -> rows.filter { it.drawDate.year == selectedYear }
     }
-    val totalSales = filtered.sumOf { it.sales }
-    val totalPrizes = filtered.sumOf { it.prizes }
-    val totalNet = totalSales - totalPrizes
+    val totalSales = filtered.fold(BigInteger.ZERO) { total, row -> total.add(BigInteger.valueOf(row.sales)) }
+    val totalPrizes = filtered.fold(BigInteger.ZERO) { total, row -> total.add(BigInteger.valueOf(row.prizes)) }
+    val totalNet = totalSales.subtract(totalPrizes)
     val money = remember { NumberFormat.getNumberInstance(Locale("th", "TH")) }
     val dateFormat = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale("th", "TH")) }
 
@@ -111,7 +112,7 @@ fun PerformanceReportScreen(
                     SummaryLine("เงินรางวัลที่ต้องจ่าย", totalPrizes, money)
                     HorizontalDivider()
                     Text("กำไร / ขาดทุนสุทธิ", fontWeight = FontWeight.SemiBold)
-                    Text((if (totalNet < 0) "ขาดทุน " else "กำไร ") + money.format(kotlin.math.abs(totalNet)) + " บาท", style = MaterialTheme.typography.titleLarge, color = if (totalNet < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text((if (totalNet.signum() < 0) "ขาดทุน " else "กำไร ") + money.format(totalNet.abs()) + " บาท", style = MaterialTheme.typography.titleLarge, color = if (totalNet.signum() < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     Text("จำนวนงวด: " + filtered.size, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -127,7 +128,7 @@ fun PerformanceReportScreen(
                                 if (row.needsReview) Text("ข้อมูลย้อนหลัง · ต้องตรวจสอบ", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                                 SummaryLine("ยอดขาย", row.sales, money)
                                 SummaryLine("เงินรางวัล", row.prizes, money)
-                                Text((if (row.net < 0) "ขาดทุน " else "กำไร ") + money.format(kotlin.math.abs(row.net)) + " บาท", color = if (row.net < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                Text((if (row.net.signum() < 0) "ขาดทุน " else "กำไร ") + money.format(row.net.abs()) + " บาท", color = if (row.net.signum() < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -138,7 +139,7 @@ fun PerformanceReportScreen(
 }
 
 @Composable
-private fun SummaryLine(label: String, amount: Long, money: NumberFormat) {
+private fun SummaryLine(label: String, amount: BigInteger, money: NumberFormat) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(money.format(amount) + " บาท", fontWeight = FontWeight.Medium)
