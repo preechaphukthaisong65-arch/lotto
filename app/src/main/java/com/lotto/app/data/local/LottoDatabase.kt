@@ -34,7 +34,7 @@ import com.lotto.app.data.local.entity.SaleItemEntity
         WinningSaleItemEntity::class,
         DrawProfitSummaryEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -83,6 +83,13 @@ abstract class LottoDatabase : RoomDatabase() {
                 db.execSQL("""CREATE TABLE IF NOT EXISTS draw_date_changes (changeId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, drawDate TEXT NOT NULL, previousDate TEXT, newDate TEXT NOT NULL, changedAt INTEGER NOT NULL, source TEXT NOT NULL)""")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_date_changes_changedAt ON draw_date_changes(changedAt)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_draw_date_changes_drawDate ON draw_date_changes(drawDate)")
+            }
+        }
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Older summaries may have been backfilled after expired winning bills were deleted.
+                // Keep their values, but mark them for review instead of presenting them as verified.
+                db.execSQL("ALTER TABLE draw_profit_summaries ADD COLUMN dataQuality TEXT NOT NULL DEFAULT 'NEEDS_REVIEW'")
             }
         }
         val MIGRATION_7_8 = object : Migration(7, 8) {
