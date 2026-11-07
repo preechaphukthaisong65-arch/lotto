@@ -9,6 +9,7 @@ interface DrawResultRepository {
     fun observeAllResults(): Flow<List<DrawResultEntity>>
     fun observeWinners(drawDate: String): Flow<List<WinningSaleSummary>>
     fun observeWinningBills(status: String): Flow<List<WinningBillSummary>>
+    suspend fun getTotalPrizeLiability(drawDate: String): Long
     suspend fun markWinningBillPaid(drawDate: String, saleId: Long, recipientName: String)
     suspend fun cleanupExpiredPaidWinningBills(): Int
     suspend fun saveResult(drawDate: String, threeDigit: String, twoDigitTop: String, twoDigitBottom: String): Int
