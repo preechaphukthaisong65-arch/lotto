@@ -18,6 +18,7 @@ class DrawCalendarRepository(
         dao.observeAllChanges()
 
     suspend fun addDrawDate(date: LocalDate, note: String? = null) {
+        require(dao.getByDate(date.toString()) == null) { "มีงวดออกรางวัลในวันที่เลือกแล้ว" }
         val now = System.currentTimeMillis()
         dao.insertDrawDate(
             DrawDateEntity(
