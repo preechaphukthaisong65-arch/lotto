@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 
 class RoomDrawResultRepository(private val dao: DrawResultDao) : DrawResultRepository {
     override fun observeAllResults(): Flow<List<DrawResultEntity>> = dao.observeAllResults()
+    override fun observeCorrections(drawDate: String) = dao.observeCorrections(drawDate)
     override fun observeProfitSummaries(): Flow<List<DrawProfitSummaryEntity>> = dao.observeProfitSummaries()
     override fun observeWinners(drawDate: String): Flow<List<WinningSaleSummary>> = dao.observeWinners(drawDate)
 
