@@ -59,14 +59,20 @@ abstract class DrawResultDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     protected abstract suspend fun insertWinners(items: List<WinningSaleItemEntity>)
 
-    @Transaction
-    open suspend fun saveResultAndFindWinners(result: DrawResultEntity): Int {
-        require(LottoRules.isValidThreeDigitNumber(result.threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
-        require(LottoRules.isValidTwoDigitNumber(result.twoDigitTop)) { "กรุณากรอกผล 2 ตัวบนให้ครบ 2 หลัก" }
-        require(LottoRules.isValidTwoDigitNumber(result.twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
-        require(getResult(result.drawDate) == null) { "งวดนี้บันทึกผลรางวัลแล้ว" }
+    @Insert
+    protected abstract suspend fun insertCorrection(correction: com.lotto.app.data.local.entity.DrawResultCorrectionEntity)
 
-        val winningItems = getItemsForDraw(result.drawDate).mapNotNull { item ->
+    @Query("UPDATE draw_results SET threeDigit = :threeDigit, twoDigitTop = :twoDigitTop, twoDigitBottom = :twoDigitBottom, recordedAt = :recordedAt WHERE drawDate = :drawDate")
+    protected abstract suspend fun updateResult(drawDate: String, threeDigit: String, twoDigitTop: String, twoDigitBottom: String, recordedAt: Long)
+
+    @Query("DELETE FROM winning_sale_items WHERE drawDate = :drawDate")
+    protected abstract suspend fun deleteWinnersForDraw(drawDate: String): Int
+
+    @Query("UPDATE draw_results SET payoutLocked = 1 WHERE drawDate = :drawDate")
+    protected abstract suspend fun lockResultAfterPayout(drawDate: String)
+
+    private suspend fun calculateWinningItems(result: DrawResultEntity): List<WinningSaleItemEntity> =
+        getItemsForDraw(result.drawDate).mapNotNull { item ->
             val type = runCatching { PrizeType.valueOf(item.prizeType) }.getOrNull()
                 ?: return@mapNotNull null
             val matched = when (type) {
@@ -88,19 +94,77 @@ abstract class DrawResultDao {
                 prizeAmount = prize
             )
         }
-        insertResult(result)
-        if (winningItems.isNotEmpty()) insertWinners(winningItems)
-        val salesTotal = getSalesTotalForDraw(result.drawDate)
-        val prizeLiability = winningItems.sumOf { it.prizeAmount }
+
+    private suspend fun saveDrawProfitSummary(drawDate: String, recordedAt: Long, winningItems: List<WinningSaleItemEntity>) {
+        val salesTotal = getSalesTotalForDraw(drawDate)
+        val prizeLiability = winningItems.fold(0L) { total, item -> Math.addExact(total, item.prizeAmount) }
         saveProfitSummary(
             DrawProfitSummaryEntity(
-                drawDate = result.drawDate,
+                drawDate = drawDate,
                 salesTotal = salesTotal,
                 prizeLiability = prizeLiability,
-                netProfit = salesTotal - prizeLiability,
-                recordedAt = result.recordedAt
+                netProfit = Math.subtractExact(salesTotal, prizeLiability),
+                recordedAt = recordedAt
             )
         )
+    }
+
+    @Transaction
+    open suspend fun saveResultAndFindWinners(result: DrawResultEntity): Int {
+        require(LottoRules.isValidThreeDigitNumber(result.threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
+        require(LottoRules.isValidTwoDigitNumber(result.twoDigitTop)) { "กรุณากรอกผล 2 ตัวบนให้ครบ 2 หลัก" }
+        require(LottoRules.isValidTwoDigitNumber(result.twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
+        require(getResult(result.drawDate) == null) { "งวดนี้บันทึกผลรางวัลแล้ว" }
+
+        val winningItems = calculateWinningItems(result)
+        insertResult(result)
+        if (winningItems.isNotEmpty()) insertWinners(winningItems)
+        saveDrawProfitSummary(result.drawDate, result.recordedAt, winningItems)
+        return winningItems.size
+    }
+
+    @Transaction
+    open suspend fun correctResultAndRebuildWinners(
+        drawDate: String,
+        threeDigit: String,
+        twoDigitTop: String,
+        twoDigitBottom: String,
+        reason: String,
+        correctedAt: Long
+    ): Int {
+        require(LottoRules.isValidThreeDigitNumber(threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
+        require(LottoRules.isValidTwoDigitNumber(twoDigitTop)) { "กรุณากรอกผล 2 ตัวบนให้ครบ 2 หลัก" }
+        require(LottoRules.isValidTwoDigitNumber(twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
+        require(reason.isNotBlank()) { "กรุณาระบุเหตุผลที่แก้ไขผลรางวัล" }
+        val previous = getResult(drawDate) ?: throw IllegalArgumentException("ไม่พบผลรางวัลของงวดนี้")
+        require(!previous.payoutLocked) {
+            "งวดนี้มีการจ่ายรางวัลแล้ว ไม่อนุญาตให้แก้ผลเพื่อป้องกันยอดจ่ายเดิมคลาดเคลื่อน"
+        }
+
+        insertCorrection(
+            com.lotto.app.data.local.entity.DrawResultCorrectionEntity(
+                drawDate = drawDate,
+                previousThreeDigit = previous.threeDigit,
+                previousTwoDigitTop = previous.twoDigitTop,
+                previousTwoDigitBottom = previous.twoDigitBottom,
+                newThreeDigit = threeDigit,
+                newTwoDigitTop = twoDigitTop,
+                newTwoDigitBottom = twoDigitBottom,
+                reason = reason.trim(),
+                correctedAt = correctedAt
+            )
+        )
+        deleteWinnersForDraw(drawDate)
+        updateResult(drawDate, threeDigit, twoDigitTop, twoDigitBottom, correctedAt)
+        val corrected = previous.copy(
+            threeDigit = threeDigit,
+            twoDigitTop = twoDigitTop,
+            twoDigitBottom = twoDigitBottom,
+            recordedAt = correctedAt
+        )
+        val winningItems = calculateWinningItems(corrected)
+        if (winningItems.isNotEmpty()) insertWinners(winningItems)
+        saveDrawProfitSummary(drawDate, correctedAt, winningItems)
         return winningItems.size
     }
 
