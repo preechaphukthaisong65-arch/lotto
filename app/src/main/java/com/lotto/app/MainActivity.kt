@@ -19,9 +19,10 @@ import com.lotto.app.ui.history.HistoryScreen
 import com.lotto.app.ui.reports.ReportDetailScreen
 import com.lotto.app.ui.reports.ReportsScreen
 import com.lotto.app.ui.sale.SaleScreen
+import com.lotto.app.ui.settings.SettingsScreen
 
 private enum class AppScreen {
-    Home, Sale, History, CreditAccounts, Calendar, Reports, TotalSales, CurrentSales, SalesHistory, Performance
+    Home, Sale, History, CreditAccounts, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance
 }
 
 class MainActivity : ComponentActivity() {
@@ -76,6 +77,10 @@ class MainActivity : ComponentActivity() {
                             repository = drawCalendarRepository,
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
+                        AppScreen.Settings.name -> SettingsScreen(
+                            repository = drawCalendarRepository,
+                            onBack = { currentScreen = AppScreen.Home.name }
+                        )
                         AppScreen.Reports.name -> ReportsScreen(
                             onBack = { currentScreen = AppScreen.Home.name },
                             onOpenTotalSales = { currentScreen = AppScreen.TotalSales.name },
@@ -104,7 +109,8 @@ class MainActivity : ComponentActivity() {
                             onOpenReports = { currentScreen = AppScreen.Reports.name },
                             onOpenHistory = { currentScreen = AppScreen.History.name },
                             onOpenCreditAccounts = { currentScreen = AppScreen.CreditAccounts.name },
-                            onOpenCalendar = { currentScreen = AppScreen.Calendar.name }
+                            onOpenCalendar = { currentScreen = AppScreen.Calendar.name },
+                            onOpenSettings = { currentScreen = AppScreen.Settings.name }
                         )
                     }
                 }
