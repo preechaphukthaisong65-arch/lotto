@@ -96,6 +96,9 @@ abstract class DrawResultDao {
     """)
     abstract fun observeWinningBills(status: String): Flow<List<WinningBillSummary>>
 
+    @Query("SELECT COALESCE(SUM(prizeAmount), 0) FROM winning_sale_items WHERE drawDate = :drawDate")
+    abstract suspend fun getTotalPrizeLiability(drawDate: String): Long
+
     @Query("SELECT payoutStatus FROM winning_sale_items WHERE drawDate = :drawDate AND saleId = :saleId LIMIT 1")
     protected abstract suspend fun getWinningBillStatus(drawDate: String, saleId: Long): String?
 
