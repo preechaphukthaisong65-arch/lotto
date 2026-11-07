@@ -9,5 +9,9 @@ data class DrawProfitSummaryEntity(
     val salesTotal: Long,
     val prizeLiability: Long,
     val netProfit: Long,
-    val recordedAt: Long
+    val recordedAt: Long,
+    val dataQuality: String = QUALITY_COMPLETE
 )
+
+const val QUALITY_COMPLETE = "COMPLETE"
+const val QUALITY_NEEDS_REVIEW = "NEEDS_REVIEW"
