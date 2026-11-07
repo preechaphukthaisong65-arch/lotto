@@ -142,7 +142,6 @@ class MainActivity : ComponentActivity() {
                                 }) { "สถานะจ่ายครึ่งราคาเปลี่ยนแปลง กรุณาตรวจสอบรายการอีกครั้ง" }
                                 val saleId = saleRepository.saveConfirmedSale(draft, targetDrawDate, fullLimits)
                                 Toast.makeText(this, "บันทึกการขายเรียบร้อย เลขที่รายการ $saleId", Toast.LENGTH_LONG).show()
-                                currentScreen = AppScreen.Home.name
                                 saleId
                             }
                         )
