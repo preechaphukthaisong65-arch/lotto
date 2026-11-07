@@ -19,7 +19,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private enum class ProfitView(val label: String) { DRAW("รายงวด"), MONTH("รายเดือน"), YEAR("รายปี") }
-private data class ProfitRow(val drawDate: LocalDate, val sales: Long, val prizes: Long) {
+private data class ProfitRow(val drawDate: LocalDate, val sales: Long, val prizes: Long, val needsReview: Boolean) {
     val net: Long get() = sales - prizes
 }
 
@@ -41,7 +41,7 @@ fun PerformanceReportScreen(
         summaries.mapNotNull { item ->
             val date = runCatching { LocalDate.parse(item.drawDate) }.getOrNull() ?: return@mapNotNull null
             if (date.isBefore(oneYearAgo) || date.isAfter(now.toLocalDate())) return@mapNotNull null
-            ProfitRow(date, item.salesTotal, item.prizeLiability)
+            ProfitRow(date, item.salesTotal, item.prizeLiability, item.dataQuality != "COMPLETE")
         }.sortedByDescending { it.drawDate }
     }
     val availableYears = (rows.map { it.drawDate.year } + now.year).distinct().sortedDescending()
@@ -96,6 +96,13 @@ fun PerformanceReportScreen(
                     }
                 }
             }
+            if (filtered.any { it.needsReview }) {
+                Text(
+                    "มีข้อมูลงวดเก่าที่ต้องตรวจสอบ ยอดรางวัลบางงวดอาจไม่ครบจากการลบประวัติบิลที่หมดอายุแล้ว",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("สรุป" + view.label, fontWeight = FontWeight.SemiBold)
@@ -116,6 +123,7 @@ fun PerformanceReportScreen(
                         Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text("งวดวันที่ " + row.drawDate.format(dateFormat), fontWeight = FontWeight.SemiBold)
+                                if (row.needsReview) Text("ข้อมูลย้อนหลัง · ต้องตรวจสอบ", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                                 SummaryLine("ยอดขาย", row.sales, money)
                                 SummaryLine("เงินรางวัล", row.prizes, money)
                                 Text((if (row.net < 0) "ขาดทุน " else "กำไร ") + money.format(kotlin.math.abs(row.net)) + " บาท", color = if (row.net < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
