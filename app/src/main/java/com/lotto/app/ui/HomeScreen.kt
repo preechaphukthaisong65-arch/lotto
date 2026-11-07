@@ -24,6 +24,7 @@ private val homeMenuOptions = listOf(
     HomeMenuOption.Reports,
     HomeMenuOption.History,
     HomeMenuOption.CreditAccounts,
+    HomeMenuOption.PayDebt,
     HomeMenuOption.Payout,
     HomeMenuOption.Calendar,
     HomeMenuOption.Settings
@@ -36,6 +37,7 @@ fun HomeScreen(
     onOpenReports: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenCreditAccounts: () -> Unit,
+    onOpenPayDebt: () -> Unit,
     onOpenPayout: () -> Unit,
     onOpenCalendar: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -83,6 +85,7 @@ fun HomeScreen(
                             HomeMenuOption.Reports -> onOpenReports
                             HomeMenuOption.History -> onOpenHistory
                             HomeMenuOption.CreditAccounts -> onOpenCreditAccounts
+                            HomeMenuOption.PayDebt -> onOpenPayDebt
                             HomeMenuOption.Calendar -> onOpenCalendar
                             HomeMenuOption.Settings -> onOpenSettings
                             else -> ({})
