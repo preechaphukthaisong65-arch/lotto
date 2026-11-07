@@ -14,8 +14,8 @@ class DrawCalendarRepository(
 
     fun observeAllDrawDates(): Flow<List<DrawDateEntity>> = dao.observeAllDrawDates()
 
-    fun observeChanges(date: LocalDate): Flow<List<com.lotto.app.data.local.entity.DrawDateChangeEntity>> =
-        dao.observeChanges(date.toString())
+    fun observeAllChanges(): Flow<List<com.lotto.app.data.local.entity.DrawDateChangeEntity>> =
+        dao.observeAllChanges()
 
     suspend fun addDrawDate(date: LocalDate, note: String? = null) {
         val now = System.currentTimeMillis()
