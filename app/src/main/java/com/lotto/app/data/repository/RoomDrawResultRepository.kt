@@ -13,6 +13,8 @@ class RoomDrawResultRepository(private val dao: DrawResultDao) : DrawResultRepos
 
     override fun observeWinningBills(status: String): Flow<List<WinningBillSummary>> = dao.observeWinningBills(status)
 
+    override suspend fun getTotalPrizeLiability(drawDate: String): Long = dao.getTotalPrizeLiability(drawDate)
+
     override suspend fun markWinningBillPaid(drawDate: String, saleId: Long, recipientName: String) {
         dao.markWinningBillPaid(drawDate, saleId, recipientName, System.currentTimeMillis())
     }
