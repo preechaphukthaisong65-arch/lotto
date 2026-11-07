@@ -46,7 +46,10 @@ fun WinningResultsScreen(
             Text("ผลตรวจรางวัล", style = MaterialTheme.typography.headlineSmall)
             Text("งวดวันที่ $drawDate", style = MaterialTheme.typography.titleMedium)
             Text("ผล 3 ตัว: ${result?.threeDigit.orEmpty()} · 2 ตัวบน: ${result?.twoDigitTop.orEmpty()} · 2 ตัวล่าง: ${result?.twoDigitBottom.orEmpty()}")
-            Text("พบบิลถูกรางวัล ${winners.size} รายการ", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "พบบิลถูกรางวัล ${winners.map { it.saleId }.distinct().size} บิล · รวม ${winners.size} รายการ",
+                style = MaterialTheme.typography.bodyLarge
+            )
             if (corrections.isNotEmpty()) {
                 Text("ประวัติการแก้ไขผลรางวัล", style = MaterialTheme.typography.titleSmall)
                 corrections.forEach { correction ->
