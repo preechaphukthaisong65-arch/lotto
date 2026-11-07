@@ -50,12 +50,14 @@ import com.lotto.app.ui.sale.model.TwoDigitEntry
 import kotlinx.coroutines.launch
 
 private data class QuotaAdjustment(val entryId: Long, val prizeType: String, val allowedAmount: Long)
+private data class NoAcceptClear(val isThreeDigit: Boolean, val entryId: Long)
 
 @Composable
 fun SaleScreen(
     onBack: () -> Unit,
     drawDate: String,
     fullLimitsByPrizeType: Map<String, Long>,
+    noAcceptNumbersByPrizeType: Map<String, Set<String>>,
     onGetNumberStake: suspend (String, String, String) -> Long,
     onSave: suspend (SaleDraft) -> Long
 ) {
@@ -77,6 +79,7 @@ fun SaleScreen(
     var pendingAddThree by remember { mutableStateOf(false) }
     var pendingAddTwo by remember { mutableStateOf(false) }
     var fullNumberMessage by remember { mutableStateOf<String?>(null) }
+    var pendingNoAcceptClear by remember { mutableStateOf<List<NoAcceptClear>>(emptyList()) }
     val coroutineScope = rememberCoroutineScope()
 
     fun refreshQuotaHint(key: String, number: String, prizeType: String, digitCount: Int) {
@@ -148,6 +151,28 @@ fun SaleScreen(
                     PrizeType.THREE_DIGIT_STRAIGHT.name to (entry.straightAmount.toLongOrNull() ?: 0L),
                     PrizeType.THREE_DIGIT_TOD.name to (entry.boxAmount.toLongOrNull() ?: 0L)
                 ))
+            }
+            val blockedRows = threeDigitEntries.filter { entry ->
+                val number = entry.firstDigit + entry.secondDigit + entry.thirdDigit
+                number.length == 3 && (
+                    ((entry.straightAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.THREE_DIGIT_STRAIGHT.name] ?: emptySet())) ||
+                    ((entry.boxAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.THREE_DIGIT_TOD.name] ?: emptySet()))
+                )
+            }
+            if (blockedRows.isNotEmpty()) {
+                pendingNoAcceptClear = blockedRows.map { NoAcceptClear(true, it.id) }
+                return@launch
+            }
+            val blockedRows = twoDigitEntries.filter { entry ->
+                val number = entry.firstDigit + entry.secondDigit
+                number.length == 2 && (
+                    ((entry.topAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.TWO_DIGIT_TOP.name] ?: emptySet())) ||
+                    ((entry.bottomAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.TWO_DIGIT_BOTTOM.name] ?: emptySet()))
+                )
+            }
+            if (blockedRows.isNotEmpty()) {
+                pendingNoAcceptClear = blockedRows.map { NoAcceptClear(false, it.id) }
+                return@launch
             }
             val fullMessage = runCatching { findAlreadyFull(entries) }.getOrElse {
                 saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
@@ -265,8 +290,17 @@ fun SaleScreen(
                 topAmount >= 0L && bottomAmount >= 0L)
     }
 
+    val hasNoAcceptItems = threeDigitEntries.any { entry ->
+        val number = entry.firstDigit + entry.secondDigit + entry.thirdDigit
+        ((entry.straightAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.THREE_DIGIT_STRAIGHT.name] ?: emptySet())) ||
+            ((entry.boxAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.THREE_DIGIT_TOD.name] ?: emptySet()))
+    } || twoDigitEntries.any { entry ->
+        val number = entry.firstDigit + entry.secondDigit
+        ((entry.topAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.TWO_DIGIT_TOP.name] ?: emptySet())) ||
+            ((entry.bottomAmount.toLongOrNull() ?: 0L) > 0L && number in (noAcceptNumbersByPrizeType[PrizeType.TWO_DIGIT_BOTTOM.name] ?: emptySet()))
+    }
     val canSave = total > 0L && paymentSelected && splitValid &&
-        customerValid && activeEntriesValid && !isSaving
+        customerValid && activeEntriesValid && !hasNoAcceptItems && !isSaving
 
     fun createDraft(): SaleDraft {
         val items = buildList {
@@ -332,6 +366,38 @@ fun SaleScreen(
             cashAmount = cashValue,
             creditAmount = creditValue,
             items = items
+        )
+    }
+
+    if (pendingNoAcceptClear.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("เลขนี้ไม่รับ") },
+            text = {
+                Text("เลขที่กรอกถูกตั้งค่าเป็นหวยไม่รับ ระบบจะล้างเลขนี้ให้กรอกเลขใหม่ โดยคงยอดเงินที่กรอกไว้")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingNoAcceptClear.forEach { target ->
+                        if (target.isThreeDigit) {
+                            val index = threeDigitEntries.indexOfFirst { it.id == target.entryId }
+                            if (index >= 0) {
+                                threeDigitEntries[index] = threeDigitEntries[index].copy(
+                                    firstDigit = "", secondDigit = "", thirdDigit = ""
+                                )
+                            }
+                        } else {
+                            val index = twoDigitEntries.indexOfFirst { it.id == target.entryId }
+                            if (index >= 0) {
+                                twoDigitEntries[index] = twoDigitEntries[index].copy(
+                                    firstDigit = "", secondDigit = ""
+                                )
+                            }
+                        }
+                    }
+                    pendingNoAcceptClear = emptyList()
+                }) { Text("รับทราบ") }
+            }
         )
     }
 
@@ -593,6 +659,13 @@ fun SaleScreen(
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
+                    }
+                    if (hasNoAcceptItems) {
+                        Text(
+                            "มีเลขที่ตั้งค่าไม่รับอยู่ในรายการ กรุณาเปลี่ยนเลขก่อนบันทึก",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                     if (!activeEntriesValid) {
                         Text(
