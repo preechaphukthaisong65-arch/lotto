@@ -38,6 +38,9 @@ abstract class DrawResultDao {
     @Query("SELECT * FROM draw_results WHERE drawDate = :drawDate LIMIT 1")
     abstract suspend fun getResult(drawDate: String): DrawResultEntity?
 
+    @Query("SELECT COUNT(*) FROM draw_dates WHERE drawDate = :drawDate")
+    protected abstract suspend fun countScheduledDrawDate(drawDate: String): Int
+
     @Query("""
         SELECT wi.drawDate AS drawDate, wi.saleId AS saleId,
                s.customerFirstName AS customerFirstName,
@@ -117,6 +120,7 @@ abstract class DrawResultDao {
 
     @Transaction
     open suspend fun saveResultAndFindWinners(result: DrawResultEntity): Int {
+        require(countScheduledDrawDate(result.drawDate) == 1) { "ไม่พบวันที่ออกรางวัลนี้ในปฏิทินหวย กรุณาตรวจสอบงวดก่อนบันทึกผล" }
         require(LottoRules.isValidThreeDigitNumber(result.threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(result.twoDigitTop)) { "กรุณากรอกผล 2 ตัวบนให้ครบ 2 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(result.twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
