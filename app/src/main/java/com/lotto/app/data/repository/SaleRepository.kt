@@ -5,7 +5,7 @@ import com.lotto.app.data.local.model.SaleNumberSummary
 import com.lotto.app.domain.model.SaleDraft
 
 interface SaleRepository {
-    suspend fun saveConfirmedSale(draft: SaleDraft, drawDate: String): Long
+    suspend fun saveConfirmedSale(draft: SaleDraft, drawDate: String, fullLimitsByPrizeType: Map<String, Long> = emptyMap()): Long
     suspend fun getAllSales(): List<SaleEntity>
     suspend fun getNumberSalesSummary(startAt: Long, endAt: Long): List<SaleNumberSummary>
     suspend fun cleanupExpiredPaidDocuments(now: Long = System.currentTimeMillis()): Int
