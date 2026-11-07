@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import com.lotto.app.domain.rules.SaleWindowPolicy
+import com.lotto.app.domain.rules.FullNumberLimitPolicy
 import com.lotto.app.data.repository.DrawCalendarRepository
 import androidx.compose.ui.Modifier
 import com.lotto.app.ui.HomeScreen
@@ -62,6 +63,7 @@ class MainActivity : ComponentActivity() {
         val creditAccountRepository = container.creditAccountRepository
         val drawCalendarRepository = container.drawCalendarRepository
         val drawResultRepository = container.drawResultRepository
+        val settingsRepository = container.settingsRepository
 
         setContent {
             MaterialTheme {
@@ -102,7 +104,8 @@ class MainActivity : ComponentActivity() {
                                 check(latestStatus.isOpen) { "หมดเวลารับขายแล้ว ไม่สามารถบันทึกบิลได้" }
                                 val targetDrawDate = SaleWindowPolicy.activeDrawDate(drawDates, DrawCalendarRepository.nowInThailand())
                                     ?: error("ไม่พบงวดหวยที่เปิดรับขาย")
-                                val saleId = saleRepository.saveConfirmedSale(draft, targetDrawDate)
+                                val fullLimits = FullNumberLimitPolicy.load(settingsRepository)
+                                val saleId = saleRepository.saveConfirmedSale(draft, targetDrawDate, fullLimits)
                                 Toast.makeText(this, "บันทึกการขายเรียบร้อย เลขที่รายการ $saleId", Toast.LENGTH_LONG).show()
                                 currentScreen = AppScreen.Home.name
                                 saleId
@@ -139,6 +142,7 @@ class MainActivity : ComponentActivity() {
                         )
                         AppScreen.Calendar.name -> DrawCalendarScreen(
                             repository = drawCalendarRepository,
+                            settingsRepository = settingsRepository,
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
                         AppScreen.Settings.name -> SettingsScreen(
