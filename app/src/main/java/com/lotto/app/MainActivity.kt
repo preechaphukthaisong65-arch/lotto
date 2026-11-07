@@ -28,10 +28,11 @@ import com.lotto.app.ui.reports.CurrentSalesReportScreen
 import com.lotto.app.ui.sale.SaleScreen
 import com.lotto.app.ui.settings.SettingsScreen
 import com.lotto.app.ui.results.DrawResultScreen
+import com.lotto.app.ui.results.WinningResultsScreen
 import java.time.LocalDate
 
 private enum class AppScreen {
-    Home, Sale, History, CreditAccounts, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance, DrawResult
+    Home, Sale, History, CreditAccounts, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance, DrawResult, Winners
 }
 
 class MainActivity : ComponentActivity() {
@@ -105,13 +106,17 @@ class MainActivity : ComponentActivity() {
                                 saleId
                             }
                         )
+                        AppScreen.Winners.name -> WinningResultsScreen(
+                            drawDate = selectedResultDrawDate,
+                            repository = drawResultRepository,
+                            onBack = { currentScreen = AppScreen.Home.name }
+                        )
                         AppScreen.DrawResult.name -> DrawResultScreen(
                             drawDate = selectedResultDrawDate,
                             onBack = { currentScreen = AppScreen.Home.name },
                             onSave = { three, top, bottom ->
                                 val count = drawResultRepository.saveResult(selectedResultDrawDate, three, top, bottom)
-                                Toast.makeText(this, "บันทึกผลแล้ว พบรายการถูกรางวัล $count รายการ", Toast.LENGTH_LONG).show()
-                                currentScreen = AppScreen.Home.name
+                                currentScreen = AppScreen.Winners.name
                                 count
                             }
                         )
