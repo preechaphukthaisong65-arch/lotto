@@ -142,11 +142,11 @@ class MainActivity : ComponentActivity() {
                         )
                         AppScreen.Calendar.name -> DrawCalendarScreen(
                             repository = drawCalendarRepository,
-                            settingsRepository = settingsRepository,
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
                         AppScreen.Settings.name -> SettingsScreen(
                             repository = drawCalendarRepository,
+                            settingsRepository = settingsRepository,
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
                         AppScreen.Reports.name -> ReportsScreen(
