@@ -9,6 +9,7 @@ import com.lotto.app.data.local.entity.CreditDocumentItemEntity
 import com.lotto.app.data.local.entity.CreditPaymentEntity
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
+import com.lotto.app.domain.rules.PrizeType
 
 @Dao
 abstract class SaleDao {
@@ -66,6 +67,17 @@ abstract class SaleDao {
                 .filter { it.isNotEmpty() }
             require(item.number !in blockedNumbers) {
                 "เลข ${item.number} ในหมวด ${item.prizeType} ถูกตั้งค่าไม่รับ ไม่สามารถบันทึกได้"
+            }
+        }
+
+        // Persisted payout multipliers must match the current shared half-payout setting.
+        items.forEach { item ->
+            val type = PrizeType.valueOf(item.prizeType)
+            val halfNumbers = getSettingValue("half_payout_${item.prizeType}").orEmpty()
+                .split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+            val expectedMultiplier = if (item.number in halfNumbers) type.fullPayoutMultiplier / 2L else type.fullPayoutMultiplier
+            require(item.payoutMultiplier == expectedMultiplier) {
+                "อัตราจ่ายของเลข ${item.number} เปลี่ยนแปลง กรุณาตรวจสอบรายการก่อนบันทึก"
             }
         }
 
