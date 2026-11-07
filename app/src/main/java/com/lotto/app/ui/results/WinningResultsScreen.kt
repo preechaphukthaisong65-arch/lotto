@@ -30,6 +30,7 @@ fun WinningResultsScreen(
 ) {
     val winners by repository.observeWinners(drawDate).collectAsState(initial = emptyList())
     val results by repository.observeAllResults().collectAsState(initial = emptyList())
+    val corrections by repository.observeCorrections(drawDate).collectAsState(initial = emptyList())
     val result = results.firstOrNull { it.drawDate == drawDate }
     Scaffold(
         bottomBar = {
@@ -46,6 +47,17 @@ fun WinningResultsScreen(
             Text("งวดวันที่ $drawDate", style = MaterialTheme.typography.titleMedium)
             Text("ผล 3 ตัว: ${result?.threeDigit.orEmpty()} · 2 ตัวบน: ${result?.twoDigitTop.orEmpty()} · 2 ตัวล่าง: ${result?.twoDigitBottom.orEmpty()}")
             Text("พบบิลถูกรางวัล ${winners.size} รายการ", style = MaterialTheme.typography.bodyLarge)
+            if (corrections.isNotEmpty()) {
+                Text("ประวัติการแก้ไขผลรางวัล", style = MaterialTheme.typography.titleSmall)
+                corrections.forEach { correction ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("${correction.previousThreeDigit}-${correction.previousTwoDigitTop}-${correction.previousTwoDigitBottom} → ${correction.newThreeDigit}-${correction.newTwoDigitTop}-${correction.newTwoDigitBottom}")
+                            Text("เหตุผล: ${correction.reason}", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
             if (result?.payoutLocked == true) {
                 Text("งวดนี้มีการจ่ายรางวัลแล้ว จึงล็อกการแก้ไขผลไว้", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             } else if (result != null) {
