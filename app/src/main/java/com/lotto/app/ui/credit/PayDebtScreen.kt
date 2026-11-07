@@ -48,6 +48,7 @@ fun PayDebtScreen(repository: CreditAccountRepository, onBack: () -> Unit) {
     var refreshKey by remember { mutableStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var pendingPayment by remember { mutableStateOf<Triple<CreditDocumentEntity, Long, Long>?>(null) }
+    var isProcessingPayment by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")) }
 
@@ -163,7 +164,7 @@ fun PayDebtScreen(repository: CreditAccountRepository, onBack: () -> Unit) {
 
     pendingPayment?.let { (bill, amount, outstanding) ->
         AlertDialog(
-            onDismissRequest = { pendingPayment = null },
+            onDismissRequest = { if (!isProcessingPayment) pendingPayment = null },
             title = { Text("ยืนยันการชำระหนี้") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -174,23 +175,28 @@ fun PayDebtScreen(repository: CreditAccountRepository, onBack: () -> Unit) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    scope.launch {
-                        try {
-                            repository.receivePayment(bill.creditDocumentId, amount)
-                            paymentInputs[bill.creditDocumentId] = ""
-                            errorMessage = null
-                            pendingPayment = null
-                            refreshKey += 1
-                        } catch (error: Exception) {
-                            errorMessage = error.message ?: "บันทึกรับชำระไม่สำเร็จ"
-                            pendingPayment = null
+                TextButton(enabled = !isProcessingPayment, onClick = {
+                    if (!isProcessingPayment) {
+                        isProcessingPayment = true
+                        scope.launch {
+                            try {
+                                repository.receivePayment(bill.creditDocumentId, amount)
+                                paymentInputs[bill.creditDocumentId] = ""
+                                errorMessage = null
+                                pendingPayment = null
+                                refreshKey += 1
+                            } catch (error: Exception) {
+                                errorMessage = error.message ?: "บันทึกรับชำระไม่สำเร็จ"
+                                pendingPayment = null
+                            } finally {
+                                isProcessingPayment = false
+                            }
                         }
                     }
-                }) { Text("ยืนยัน") }
+                }) { Text(if (isProcessingPayment) "กำลังบันทึก..." else "ยืนยัน") }
             },
             dismissButton = {
-                TextButton(onClick = { pendingPayment = null }) { Text("กลับไปตรวจสอบ") }
+                TextButton(enabled = !isProcessingPayment, onClick = { pendingPayment = null }) { Text("กลับไปตรวจสอบ") }
             }
         )
     }
