@@ -46,6 +46,7 @@ import androidx.compose.ui.geometry.Size
 import com.lotto.app.data.local.entity.DrawProfitSummaryEntity
 import com.lotto.app.data.repository.DrawResultRepository
 import java.text.NumberFormat
+import java.math.BigInteger
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -266,7 +267,8 @@ private fun SalesHistoryLayout(
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("ยอดขายรวม 24 งวดล่าสุด", fontWeight = FontWeight.SemiBold)
-                Text("${money.format(rows.sumOf { it.salesTotal })} บาท", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                val totalSales = rows.fold(BigInteger.ZERO) { total, row -> total.add(BigInteger.valueOf(row.salesTotal)) }
+                Text("${money.format(totalSales)} บาท", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text("แสดงเฉพาะงวดที่บันทึกผลรางวัลและมีสรุปยอดไว้", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -308,9 +310,9 @@ private fun YearlySalesChart(
         summaries.filter { item ->
             val date = runCatching { LocalDate.parse(item.drawDate) }.getOrNull()
             date != null && date.year == month.year && date.monthValue == month.monthValue
-        }.fold(0L) { total, item -> Math.addExact(total, item.salesTotal) }
+        }.fold(BigInteger.ZERO) { total, item -> total.add(BigInteger.valueOf(item.salesTotal)) }
     }
-    val maxValue = totals.maxOrNull()?.coerceAtLeast(1L) ?: 1L
+    val maxValue = totals.maxOrNull()?.max(BigInteger.ONE) ?: BigInteger.ONE
     val hasData = totals.any { it > 0L }
 
     Column(modifier = modifier.fillMaxSize()) {
