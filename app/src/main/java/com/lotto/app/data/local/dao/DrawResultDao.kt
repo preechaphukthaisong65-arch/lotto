@@ -14,7 +14,6 @@ import com.lotto.app.data.local.model.WinningBillSummary
 import com.lotto.app.domain.rules.LottoRules
 import com.lotto.app.domain.rules.PrizeType
 import kotlinx.coroutines.flow.Flow
-import androidx.room.OnConflictStrategy
 
 @Dao
 abstract class DrawResultDao {
