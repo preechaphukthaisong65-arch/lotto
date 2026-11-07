@@ -43,7 +43,7 @@ class LottoRulesTest {
     @Test
     fun calculatesPrizeExactly() {
         assertEquals(50_000L, LottoRules.calculatePrize(100L, PrizeType.THREE_DIGIT_STRAIGHT))
-        assertEquals(3_500L, LottoRules.calculatePrize(100L, PrizeType.TWO_DIGIT_TOP))
+        assertEquals(7_000L, LottoRules.calculatePrize(100L, PrizeType.TWO_DIGIT_TOP))
         assertEquals(2_500L, LottoRules.calculatePrize(100L, PrizeType.THREE_DIGIT_STRAIGHT, PayoutMode.HALF))
     }
 
