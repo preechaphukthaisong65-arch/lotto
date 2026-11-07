@@ -23,6 +23,8 @@ class LottoApplication : Application() {
                 .onFailure { Log.e("LottoRetention", "Winning bill cleanup failed", it) }
             runCatching { container.saleRepository.cleanupExpiredPaidDocuments() }
                 .onFailure { Log.e("LottoRetention", "Credit and source sale cleanup failed", it) }
+            runCatching { container.drawResultRepository.cleanupExpiredProfitSummaries() }
+                .onFailure { Log.e("LottoRetention", "Profit summary cleanup failed", it) }
         }
     }
 }
