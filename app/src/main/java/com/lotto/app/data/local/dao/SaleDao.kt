@@ -42,6 +42,21 @@ abstract class SaleDao {
           AND si.prizeType = :prizeType
           AND si.number = :number
     """)
+    abstract suspend fun getNumberStakeForDraw(
+        drawDate: String,
+        prizeType: String,
+        number: String
+    ): Long
+
+    @Query("""
+        SELECT COALESCE(SUM(si.amount), 0)
+        FROM sale_items si
+        INNER JOIN sales s ON s.saleId = si.saleId
+        WHERE s.drawDate = :drawDate
+          AND s.status = 'CONFIRMED'
+          AND si.prizeType = :prizeType
+          AND si.number = :number
+    """)
     protected abstract suspend fun getNumberStakeForDraw(
         drawDate: String,
         prizeType: String,
