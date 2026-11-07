@@ -29,6 +29,9 @@ abstract class DrawResultDao {
     @Query("SELECT * FROM draw_results ORDER BY drawDate DESC")
     abstract fun observeAllResults(): Flow<List<DrawResultEntity>>
 
+    @Query("SELECT * FROM draw_result_corrections WHERE drawDate = :drawDate ORDER BY correctedAt DESC")
+    abstract fun observeCorrections(drawDate: String): Flow<List<com.lotto.app.data.local.entity.DrawResultCorrectionEntity>>
+
     @Query("SELECT * FROM draw_results WHERE drawDate = :drawDate LIMIT 1")
     abstract suspend fun getResult(drawDate: String): DrawResultEntity?
 
