@@ -23,6 +23,7 @@ import com.lotto.app.data.repository.DrawCalendarRepository
 import androidx.compose.ui.Modifier
 import com.lotto.app.ui.HomeScreen
 import com.lotto.app.ui.credit.CreditAccountsScreen
+import com.lotto.app.ui.credit.PayDebtScreen
 import com.lotto.app.ui.calendar.DrawCalendarScreen
 import com.lotto.app.ui.history.HistoryScreen
 import com.lotto.app.ui.reports.ReportDetailScreen
@@ -36,7 +37,7 @@ import com.lotto.app.ui.results.PayoutScreen
 import java.time.LocalDate
 
 private enum class AppScreen {
-    Home, Sale, History, CreditAccounts, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance, DrawResult, Winners, Payout
+    Home, Sale, History, CreditAccounts, PayDebt, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance, DrawResult, Winners, Payout
 }
 
 class MainActivity : ComponentActivity() {
@@ -172,6 +173,10 @@ class MainActivity : ComponentActivity() {
                             repository = creditAccountRepository,
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
+                        AppScreen.PayDebt.name -> PayDebtScreen(
+                            repository = creditAccountRepository,
+                            onBack = { currentScreen = AppScreen.Home.name }
+                        )
                         AppScreen.Calendar.name -> DrawCalendarScreen(
                             repository = drawCalendarRepository,
                             onBack = { currentScreen = AppScreen.Home.name }
@@ -212,6 +217,7 @@ class MainActivity : ComponentActivity() {
                             onOpenReports = { currentScreen = AppScreen.Reports.name },
                             onOpenHistory = { currentScreen = AppScreen.History.name },
                             onOpenCreditAccounts = { currentScreen = AppScreen.CreditAccounts.name },
+                            onOpenPayDebt = { currentScreen = AppScreen.PayDebt.name },
                             onOpenPayout = { currentScreen = AppScreen.Payout.name },
                             onOpenCalendar = { currentScreen = AppScreen.Calendar.name },
                             onOpenSettings = { currentScreen = AppScreen.Settings.name },
