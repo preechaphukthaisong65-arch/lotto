@@ -80,7 +80,6 @@ fun SaleScreen(
     var pendingQuotaAdjustments by remember { mutableStateOf<List<QuotaAdjustment>>(emptyList()) }
     var pendingAddThree by remember { mutableStateOf(false) }
     var pendingAddTwo by remember { mutableStateOf(false) }
-    var fullNumberMessage by remember { mutableStateOf<String?>(null) }
     var pendingNoAcceptClear by remember { mutableStateOf<List<NoAcceptClear>>(emptyList()) }
     val acceptedHalfPayoutKeys = remember(halfPayoutNumbersByPrizeType) { mutableStateMapOf<String, Boolean>() }
     var pendingHalfPayouts by remember { mutableStateOf<List<HalfPayoutPrompt>>(emptyList()) }
@@ -113,21 +112,6 @@ fun SaleScreen(
                     }
                 }
         }
-    }
-
-    suspend fun findAlreadyFull(entries: List<Triple<Long, String, Map<String, Long>>>): String? {
-        for ((number, rows) in entries.filter { it.second.isNotBlank() }.groupBy { it.second }) {
-            for (prizeType in rows.flatMap { it.third.keys }.distinct()) {
-                val limit = fullLimitsByPrizeType[prizeType] ?: 0L
-                if (limit <= 0L) continue
-                val existing = onGetNumberStake(drawDate, prizeType, number)
-                val inDraft = rows.sumOf { it.third[prizeType] ?: 0L }
-                if (existing + inDraft >= limit && inDraft > 0L) {
-                    return "เลข $number ในหมวด ${FullNumberLimitPolicy.labels[prizeType] ?: prizeType} เต็มแล้ว ไม่รับเพิ่มในงวดนี้"
-                }
-            }
-        }
-        return null
     }
 
     suspend fun findAdjustments(
@@ -180,14 +164,6 @@ fun SaleScreen(
                 }
             }
             if (halfRows.isNotEmpty()) { pendingHalfPayouts = halfRows; pendingHalfAddThree = true; return@launch }
-            val fullMessage = runCatching { findAlreadyFull(entries) }.getOrElse {
-                saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
-                return@launch
-            }
-            if (fullMessage != null) {
-                fullNumberMessage = fullMessage
-                return@launch
-            }
             val adjustments = runCatching { findAdjustments(entries, 3) }.getOrElse {
                 saveError = it.message ?: "ตรวจสอบโควตาไม่สำเร็จ"
                 return@launch
@@ -504,17 +480,6 @@ fun SaleScreen(
                     pendingHalfAddThree = false
                     pendingHalfAddTwo = false
                 }) { Text("เปลี่ยนเลข") }
-            }
-        )
-    }
-
-    fullNumberMessage?.let { message ->
-        AlertDialog(
-            onDismissRequest = { fullNumberMessage = null },
-            title = { Text("หวยเต็ม") },
-            text = { Text(message) },
-            confirmButton = {
-                TextButton(onClick = { fullNumberMessage = null }) { Text("รับทราบ") }
             }
         )
     }
