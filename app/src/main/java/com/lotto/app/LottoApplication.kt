@@ -18,6 +18,7 @@ class LottoApplication : Application() {
         // Local retention cleanup at startup. OPEN credit bills are never eligible.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             container.saleRepository.cleanupExpiredPaidDocuments()
+            container.drawResultRepository.cleanupExpiredPaidWinningBills()
         }
     }
 }
