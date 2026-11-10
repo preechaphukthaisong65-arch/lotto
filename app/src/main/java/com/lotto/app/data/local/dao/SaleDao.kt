@@ -228,6 +228,13 @@ abstract class SaleDao {
         }
 
         if (sale.creditAmount > 0L) {
+            val legacyOutstanding = getOutstandingCreditByLegacyName(
+                sale.customerFirstName,
+                sale.customerLastName
+            )
+            require(legacyOutstanding == 0L || sale.legacyDebtReviewed) {
+                "พบยอดเชื่อค้างจากข้อมูลเดิมที่ยังไม่มีรหัสลูกค้า $legacyOutstanding บาท กรุณาตรวจสอบว่าเป็นบุคคลเดียวกันหรือไม่และยืนยันการตรวจสอบก่อนขายเชื่อ"
+            }
             val creditCapRaw = getSettingValue("risk_max_credit_per_customer")
                 ?: throw IllegalStateException("ยังไม่ได้กำหนดเพดานเครดิตต่อลูกค้า กรุณาตั้งค่าก่อนขายเงินเชื่อ")
             val creditCap = creditCapRaw.toLongOrNull()
