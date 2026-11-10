@@ -161,7 +161,8 @@ class SaleDaoFinancialSafetyTest {
                     creditAmount = 20,
                     createdAt = saleTime + 2_000,
                     drawDate = drawDate,
-                    legacyDebtReviewed = true
+                    legacyDebtReviewed = true,
+                    newCustomerIdentityConfirmed = true
                 ),
                 listOf(item(amount = 20))
             )
@@ -185,7 +186,8 @@ class SaleDaoFinancialSafetyTest {
             lastName = "ใจดี",
             total = 60,
             cash = 0,
-            credit = 60
+            credit = 60,
+            newCustomerIdentityConfirmed = true
         )
         val firstCustomerId = kotlinx.coroutines.runBlocking { saleDao.getSaleById(firstSaleId) }?.customerId
         val secondCustomerId = kotlinx.coroutines.runBlocking { saleDao.getSaleById(secondSaleId) }?.customerId
@@ -229,7 +231,8 @@ class SaleDaoFinancialSafetyTest {
         lastName: String,
         total: Long,
         cash: Long,
-        credit: Long
+        credit: Long,
+        newCustomerIdentityConfirmed: Boolean = false
     ): Long = kotlinx.coroutines.runBlocking {
         saleDao.insertSaleWithItems(
             SaleEntity(
@@ -238,6 +241,7 @@ class SaleDaoFinancialSafetyTest {
                 totalAmount = total,
                 cashAmount = cash,
                 creditAmount = credit,
+                newCustomerIdentityConfirmed = newCustomerIdentityConfirmed,
                 createdAt = at,
                 drawDate = drawDate
             ),
