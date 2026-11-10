@@ -25,6 +25,8 @@ class RoomSaleRepository(private val saleDao: SaleDao) : SaleRepository {
         val sale = SaleEntity(
             customerFirstName = draft.customerFirstName.trim(),
             customerLastName = draft.customerLastName.trim(),
+            customerId = draft.customerId,
+            customerPhone = draft.customerPhone?.trim()?.takeIf { it.isNotBlank() },
             totalAmount = draft.totalAmount,
             cashAmount = draft.cashAmount,
             creditAmount = draft.creditAmount,
