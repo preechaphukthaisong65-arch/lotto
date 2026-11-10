@@ -14,5 +14,7 @@ data class SaleEntity(
     val creditAmount: Long,
     val createdAt: Long,
     val status: String = "CONFIRMED",
-    val drawDate: String? = null
+    val drawDate: String? = null,
+    val customerId: Long? = null,
+    val customerPhone: String? = null
 )
