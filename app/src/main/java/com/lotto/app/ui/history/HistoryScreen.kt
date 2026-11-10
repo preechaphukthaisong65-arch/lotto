@@ -126,7 +126,7 @@ fun HistoryScreen(
                     category = "ขายหวย",
                     timestamp = sale.createdAt,
                     title = "บิลขายเลขที่ ${sale.saleId}",
-                    detail = "${sale.customerFirstName} ${sale.customerLastName} · รหัสลูกค้า ${sale.customerId ?: "ข้อมูลเดิม"} · $paymentType · ยอด ${sale.totalAmount} บาท · งวด ${sale.drawDate ?: "-"} · สถานะ ${if (sale.status == "VOIDED") "ยกเลิกแล้ว" else "ยืนยันแล้ว"}",
+                    detail = "${sale.customerFirstName} ${sale.customerLastName} · รหัสลูกค้า ${sale.customerId ?: "ข้อมูลเดิม"} · $paymentType · ยอด ${sale.totalAmount} บาท · งวด ${sale.drawDate ?: "-"} · ตรวจหนี้เดิม ${if (sale.legacyDebtReviewed) "แล้ว" else "ไม่ต้องตรวจ/ไม่พบ"} · สถานะ ${if (sale.status == "VOIDED") "ยกเลิกแล้ว" else "ยืนยันแล้ว"}",
                     searchText = "${sale.saleId} ${sale.customerId ?: ""} ${sale.customerPhone.orEmpty()} ${sale.customerFirstName} ${sale.customerLastName} $paymentType ${sale.drawDate} ${sale.totalAmount} ${sale.status}",
                     sale = sale
                 ))
