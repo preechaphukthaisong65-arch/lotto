@@ -43,7 +43,7 @@ import com.lotto.app.data.local.entity.CustomerEntity
         SaleVoidEventEntity::class,
         CustomerEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -55,7 +55,7 @@ abstract class LottoDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "lotto_database"
-        const val DATABASE_VERSION = 15
+        const val DATABASE_VERSION = 16
         const val PAID_DOCUMENT_RETENTION_DAYS = 180L
         const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 
@@ -251,6 +251,12 @@ abstract class LottoDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sales ADD COLUMN newCustomerIdentityConfirmed INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         val ALL_MIGRATIONS = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -265,7 +271,8 @@ abstract class LottoDatabase : RoomDatabase() {
             MIGRATION_11_12,
             MIGRATION_12_13,
             MIGRATION_13_14,
-            MIGRATION_14_15
+            MIGRATION_14_15,
+            MIGRATION_15_16
         )
     }
 }
