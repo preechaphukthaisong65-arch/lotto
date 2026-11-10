@@ -29,8 +29,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.lotto.app.data.backup.EncryptedBackupManager
 import com.lotto.app.ui.components.buttons.BackButton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun BackupRestoreScreen(
@@ -53,7 +55,7 @@ fun BackupRestoreScreen(
                 busy = true
                 error = null
                 try {
-                    manager.exportEncrypted(uri, password.toCharArray())
+                    withContext(Dispatchers.IO) { manager.exportEncrypted(uri, password.toCharArray()) }
                     password = ""
                     Toast.makeText(context, "สำรองข้อมูลแบบเข้ารหัสเรียบร้อย", Toast.LENGTH_LONG).show()
                 } catch (e: Exception) {
@@ -132,7 +134,7 @@ fun BackupRestoreScreen(
                             busy = true
                             error = null
                             try {
-                                manager.restoreEncrypted(uri, password.toCharArray())
+                                withContext(Dispatchers.IO) { manager.restoreEncrypted(uri, password.toCharArray()) }
                                 password = ""
                                 Toast.makeText(context, "กู้คืนข้อมูลสำเร็จ แอปจะปิด กรุณาเปิดใหม่", Toast.LENGTH_LONG).show()
                                 delay(900)
