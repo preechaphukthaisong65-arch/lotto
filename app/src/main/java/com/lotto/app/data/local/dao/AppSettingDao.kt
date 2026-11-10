@@ -33,6 +33,18 @@ abstract class AppSettingDao {
     @Transaction
     open suspend fun saveWithAudit(setting: AppSettingEntity) {
         val previous = getByKey(setting.key)
+        val highWaterRaw = getByKey("clock_high_water_epoch_ms")?.value
+        val highWater = highWaterRaw?.toLongOrNull()
+            ?: if (highWaterRaw == null) 0L else throw IllegalStateException("ข้อมูลตรวจสอบเวลาของระบบเสียหาย")
+        if (setting.key == "clock_high_water_epoch_ms") {
+            val requested = setting.value.toLongOrNull()
+                ?: throw IllegalArgumentException("ค่าเวลาตรวจสอบระบบไม่ถูกต้อง")
+            require(requested >= highWater) { "ไม่อนุญาตให้ลดเวลาตรวจสอบสูงสุดของระบบ" }
+        } else {
+            require(setting.updatedAt >= highWater) {
+                "ตรวจพบนาฬิกาเครื่องเดินย้อนเวลา ไม่สามารถเปลี่ยนการตั้งค่าได้"
+            }
+        }
         upsertInternal(setting)
         if (setting.key != "clock_high_water_epoch_ms") {
             insertAudit(
@@ -48,6 +60,13 @@ abstract class AppSettingDao {
 
     @Transaction
     open suspend fun deleteWithAudit(key: String, changedAt: Long) {
+        require(key != "clock_high_water_epoch_ms") { "ไม่อนุญาตให้ลบข้อมูลตรวจสอบเวลาของระบบ" }
+        val highWaterRaw = getByKey("clock_high_water_epoch_ms")?.value
+        val highWater = highWaterRaw?.toLongOrNull()
+            ?: if (highWaterRaw == null) 0L else throw IllegalStateException("ข้อมูลตรวจสอบเวลาของระบบเสียหาย")
+        require(changedAt >= highWater) {
+            "ตรวจพบนาฬิกาเครื่องเดินย้อนเวลา ไม่สามารถเปลี่ยนการตั้งค่าได้"
+        }
         val previous = getByKey(key) ?: return
         deleteInternal(key)
         insertAudit(
