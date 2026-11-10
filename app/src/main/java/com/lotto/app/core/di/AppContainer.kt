@@ -7,6 +7,8 @@ import com.lotto.app.data.security.DatabaseKeyManager
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import com.lotto.app.data.backup.EncryptedBackupManager
 import com.lotto.app.data.repository.CreditAccountRepository
+import com.lotto.app.data.repository.CustomerRepository
+import com.lotto.app.data.repository.RoomCustomerRepository
 import com.lotto.app.data.repository.DrawCalendarRepository
 import com.lotto.app.data.repository.DrawResultRepository
 import com.lotto.app.data.repository.RoomCreditAccountRepository
@@ -47,6 +49,7 @@ class AppContainer(context: Context) {
         .build()
 
     val settingsRepository: SettingsRepository by lazy { RoomSettingsRepository(database.appSettingDao()) }
+    val customerRepository: CustomerRepository by lazy { RoomCustomerRepository(database.customerDao()) }
     val saleRepository: SaleRepository by lazy { RoomSaleRepository(database.saleDao()) }
     val creditAccountRepository: CreditAccountRepository by lazy { RoomCreditAccountRepository(database.saleDao()) }
     val drawCalendarRepository: DrawCalendarRepository by lazy { DrawCalendarRepository(database.drawCalendarDao()) }
