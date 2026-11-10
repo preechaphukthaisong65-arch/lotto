@@ -21,6 +21,7 @@ import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
 import com.lotto.app.data.local.entity.SettingAuditEntity
 import com.lotto.app.data.local.entity.SaleVoidEventEntity
+import com.lotto.app.data.local.entity.CustomerEntity
 
 @Database(
     entities = [
@@ -38,9 +39,10 @@ import com.lotto.app.data.local.entity.SaleVoidEventEntity
         com.lotto.app.data.local.entity.DrawResultCorrectionEntity::class,
         com.lotto.app.data.local.entity.ExpiredSaleRetentionEntity::class,
         SettingAuditEntity::class,
-        SaleVoidEventEntity::class
+        SaleVoidEventEntity::class,
+        CustomerEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -51,7 +53,7 @@ abstract class LottoDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "lotto_database"
-        const val DATABASE_VERSION = 13
+        const val DATABASE_VERSION = 14
         const val PAID_DOCUMENT_RETENTION_DAYS = 180L
         const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 
@@ -130,6 +132,28 @@ abstract class LottoDatabase : RoomDatabase() {
                 """)
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sale_void_events_saleId ON sale_void_events(saleId)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_sale_void_events_voidedAt ON sale_void_events(voidedAt)")
+            }
+        }
+
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS customers (
+                        customerId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        customerCode TEXT NOT NULL,
+                        firstName TEXT NOT NULL,
+                        lastName TEXT NOT NULL,
+                        phone TEXT,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL
+                    )
+                """)
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_customers_customerCode ON customers(customerCode)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_customers_firstName_lastName ON customers(firstName, lastName)")
+                db.execSQL("ALTER TABLE sales ADD COLUMN customerId INTEGER")
+                db.execSQL("ALTER TABLE sales ADD COLUMN customerPhone TEXT")
+                db.execSQL("ALTER TABLE credit_documents ADD COLUMN customerId INTEGER")
+                db.execSQL("ALTER TABLE credit_documents ADD COLUMN customerPhone TEXT")
             }
         }
         val MIGRATION_9_10 = object : Migration(9, 10) {
