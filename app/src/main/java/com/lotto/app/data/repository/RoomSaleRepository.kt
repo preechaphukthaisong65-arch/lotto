@@ -5,6 +5,7 @@ import com.lotto.app.data.local.dao.SaleDao
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.model.SaleNumberSummary
 import com.lotto.app.data.local.entity.SaleItemEntity
+import com.lotto.app.data.local.entity.SaleVoidEventEntity
 import com.lotto.app.domain.model.SaleDraft
 
 class RoomSaleRepository(private val saleDao: SaleDao) : SaleRepository {
@@ -46,6 +47,20 @@ class RoomSaleRepository(private val saleDao: SaleDao) : SaleRepository {
         saleDao.getNumberStakeForDraw(drawDate, prizeType, number)
 
     override suspend fun getAllSales(): List<SaleEntity> = saleDao.getAllSales()
+
+    override suspend fun getAllSaleVoidEvents(): List<SaleVoidEventEntity> =
+        saleDao.getAllSaleVoidEvents()
+
+    override suspend fun voidConfirmedSale(
+        saleId: Long,
+        reason: String,
+        cashRefundConfirmed: Boolean
+    ): SaleVoidEventEntity = saleDao.voidConfirmedSale(
+        saleId = saleId,
+        reason = reason,
+        voidedAt = System.currentTimeMillis(),
+        cashRefundConfirmed = cashRefundConfirmed
+    )
     override suspend fun getNumberSalesSummary(startAt: Long, endAt: Long): List<SaleNumberSummary> =
         saleDao.getNumberSalesSummary(startAt, endAt)
 
