@@ -2,6 +2,7 @@ package com.lotto.app.data.repository
 
 import com.lotto.app.data.local.dao.AppSettingDao
 import com.lotto.app.data.local.entity.AppSettingEntity
+import com.lotto.app.data.local.entity.SettingAuditEntity
 import kotlinx.coroutines.flow.Flow
 
 class RoomSettingsRepository(
@@ -15,6 +16,9 @@ class RoomSettingsRepository(
     override fun observeAll(): Flow<List<AppSettingEntity>> {
         return appSettingDao.observeAll()
     }
+
+    override fun observeAuditLog(): Flow<List<SettingAuditEntity>> =
+        appSettingDao.observeAuditLog()
 
     override suspend fun save(key: String, value: String) {
         appSettingDao.saveWithAudit(
