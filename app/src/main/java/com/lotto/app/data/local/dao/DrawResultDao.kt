@@ -73,6 +73,15 @@ abstract class DrawResultDao {
     """)
     protected abstract suspend fun upsertSettingValue(key: String, value: String, updatedAt: Long)
 
+    private suspend fun validateAndAdvanceClock(timestamp: Long) {
+        require(timestamp > 0L) { "เวลาอุปกรณ์ไม่ถูกต้อง ไม่สามารถบันทึกธุรกรรมได้" }
+        val raw = getSettingValue("clock_high_water_epoch_ms")
+        val lastSeen = raw?.toLongOrNull()
+            ?: if (raw == null) 0L else throw IllegalStateException("ข้อมูลตรวจสอบเวลาของระบบเสียหาย")
+        require(timestamp >= lastSeen) { "ตรวจพบว่านาฬิกาเครื่องเดินย้อนเวลา ไม่สามารถบันทึกธุรกรรมได้" }
+        upsertSettingValue("clock_high_water_epoch_ms", timestamp.toString(), timestamp)
+    }
+
     @Query("""
         SELECT wi.drawDate AS drawDate, wi.saleId AS saleId,
                s.customerFirstName AS customerFirstName,
@@ -181,13 +190,7 @@ abstract class DrawResultDao {
             "ยังไม่ถึงเวลา 16:00 น. ของวันออกรางวัล จึงยังบันทึกผลรางวัลไม่ได้ หรือวันที่งวดไม่ถูกต้อง"
         }
 
-        val lastSeenRaw = getSettingValue("clock_high_water_epoch_ms")
-        val lastSeen = lastSeenRaw?.toLongOrNull()
-            ?: if (lastSeenRaw == null) 0L else throw IllegalStateException("ข้อมูลตรวจสอบเวลาของระบบเสียหาย")
-        require(result.recordedAt >= lastSeen) {
-            "ตรวจพบว่านาฬิกาเครื่องเดินย้อนเวลา ไม่สามารถบันทึกผลรางวัลได้"
-        }
-        upsertSettingValue("clock_high_water_epoch_ms", result.recordedAt.toString(), result.recordedAt)
+        validateAndAdvanceClock(result.recordedAt)
         require(LottoRules.isValidThreeDigitNumber(result.threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(result.twoDigitTop)) { "กรุณากรอกผล 2 ตัวบนให้ครบ 2 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(result.twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
@@ -212,6 +215,11 @@ abstract class DrawResultDao {
         require(LottoRules.isValidThreeDigitNumber(threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(twoDigitTop)) { "กรุณากรอกผล 2 ตัวบนให้ครบ 2 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
+        require(countScheduledDrawDate(drawDate) == 1) { "ไม่พบวันที่ออกรางวัลนี้ในปฏิทิน" }
+        require(DrawResultEntryPolicy.canEnter(drawDate, correctedAt)) {
+            "ยังไม่ถึงเวลา 16:00 น. ของวันออกรางวัล จึงยังแก้ไขผลรางวัลไม่ได้"
+        }
+        validateAndAdvanceClock(correctedAt)
         require(reason.isNotBlank()) { "กรุณาระบุเหตุผลที่แก้ไขผลรางวัล" }
         val previous = getResult(drawDate) ?: throw IllegalArgumentException("ไม่พบผลรางวัลของงวดนี้")
         require(!previous.payoutLocked) {
@@ -281,6 +289,7 @@ abstract class DrawResultDao {
     @Transaction
     open suspend fun markWinningBillPaid(drawDate: String, saleId: Long, recipientName: String, paidAt: Long) {
         require(recipientName.isNotBlank()) { "กรุณากรอกชื่อผู้รับรางวัล" }
+        validateAndAdvanceClock(paidAt)
         require(getWinningBillStatus(drawDate, saleId) == "UNPAID") { "บิลนี้จ่ายรางวัลแล้วหรือไม่พบข้อมูล" }
         require(updateWinningBillPaid(drawDate, saleId, recipientName.trim(), paidAt) > 0) { "บันทึกการจ่ายรางวัลไม่สำเร็จ" }
         lockResultAfterPayout(drawDate)
