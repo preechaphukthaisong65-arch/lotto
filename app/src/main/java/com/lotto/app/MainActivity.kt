@@ -235,6 +235,9 @@ class MainActivity : FragmentActivity() {
                             onBack = { currentScreen = AppScreen.Home.name },
                             drawDate = activeSaleDrawDate,
                             customerRepository = customerRepository,
+                            onGetLegacyOutstandingCredit = { firstName, lastName ->
+                                creditAccountRepository.getOutstandingCreditByCustomer(firstName, lastName)
+                            },
                             fullLimitsByPrizeType = currentFullLimits,
                             noAcceptNumbersByPrizeType = currentNoAcceptNumbers,
                             halfPayoutNumbersByPrizeType = currentHalfPayoutNumbers,
