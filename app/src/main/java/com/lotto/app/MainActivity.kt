@@ -3,8 +3,23 @@ package com.lotto.app
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import android.content.Intent
+import android.app.KeyguardManager
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
@@ -43,6 +58,59 @@ private enum class AppScreen {
 }
 
 class MainActivity : ComponentActivity() {
+    private val isAuthenticated = mutableStateOf(false)
+    private val authenticationError = mutableStateOf<String?>(null)
+
+    private fun requestDeviceAuthentication() {
+        val keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+        if (!keyguard.isDeviceSecure) {
+            authenticationError.value = "กรุณาตั้ง PIN, รหัสผ่าน หรือรูปแบบล็อกหน้าจอของเครื่องก่อนใช้งาน Lotto"
+            return
+        }
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+            BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        val availability = BiometricManager.from(this).canAuthenticate(authenticators)
+        if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+            authenticationError.value = "อุปกรณ์ยังไม่พร้อมสำหรับการยืนยันตัวตน กรุณาตรวจสอบการล็อกหน้าจอ"
+            return
+        }
+        val prompt = BiometricPrompt(
+            this,
+            ContextCompat.getMainExecutor(this),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    authenticationError.value = null
+                    isAuthenticated.value = true
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    isAuthenticated.value = false
+                    authenticationError.value = errString.toString()
+                }
+
+                override fun onAuthenticationFailed() {
+                    isAuthenticated.value = false
+                    authenticationError.value = "ยืนยันตัวตนไม่สำเร็จ กรุณาลองอีกครั้ง"
+                }
+            }
+        )
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("ยืนยันตัวตนเพื่อเข้าใช้งาน Lotto")
+            .setSubtitle("ใช้ลายนิ้วมือ ใบหน้า หรือ PIN/รหัสล็อกหน้าจอของอุปกรณ์")
+            .setAllowedAuthenticators(authenticators)
+            .build()
+        prompt.authenticate(promptInfo)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (!isAuthenticated.value) requestDeviceAuthentication()
+    }
+
+    override fun onStop() {
+        isAuthenticated.value = false
+        super.onStop()
+    }
     @Suppress("DEPRECATION")
     private fun hideSystemBars() {
         window.decorView.systemUiVisibility = (
@@ -71,7 +139,30 @@ class MainActivity : ComponentActivity() {
         val settingsRepository = container.settingsRepository
 
         setContent {
-            MaterialTheme {
+            if (!isAuthenticated.value) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Lotto ถูกล็อกเพื่อป้องกันการเข้าถึงข้อมูลลูกค้าและรายการเงิน")
+                    authenticationError.value?.let { Text(it, modifier = Modifier.padding(top = 12.dp)) }
+                    Button(
+                        onClick = {
+                            val keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+                            if (!keyguard.isDeviceSecure) {
+                                startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+                            } else {
+                                requestDeviceAuthentication()
+                            }
+                        },
+                        modifier = Modifier.padding(top = 16.dp)
+                    ) {
+                        Text(if ((getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isDeviceSecure) "ยืนยันตัวตนอีกครั้ง" else "ตั้งค่าล็อกหน้าจอ")
+                    }
+                }
+            } else {
+                MaterialTheme {
                 var currentScreen by rememberSaveable { mutableStateOf(AppScreen.Home.name) }
                 val drawDates by drawCalendarRepository.observeAllDrawDates().collectAsState(initial = emptyList())
                 val drawResults by drawResultRepository.observeAllResults().collectAsState(initial = emptyList())
@@ -247,6 +338,7 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
+                }
                 }
             }
         }
