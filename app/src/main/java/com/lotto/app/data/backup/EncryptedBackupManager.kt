@@ -1,7 +1,8 @@
 package com.lotto.app.data.backup
 
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteDatabase as PlatformSQLiteDatabase
+import net.zetetic.database.sqlcipher.SQLiteDatabase as CipherDatabase
 import android.net.Uri
 import com.lotto.app.data.local.LottoDatabase
 import java.io.DataInputStream
@@ -21,7 +22,8 @@ import javax.crypto.spec.SecretKeySpec
 
 class EncryptedBackupManager(
     private val context: Context,
-    private val database: LottoDatabase
+    private val database: LottoDatabase,
+    private val databasePassphrase: ByteArray
 ) {
     @Volatile
     var requiresRestartForDatabaseReload: Boolean = false
@@ -65,12 +67,8 @@ class EncryptedBackupManager(
                     throw IllegalStateException("ไม่สามารถเตรียมฐานข้อมูลเพื่อสำรองได้ กรุณาลองใหม่")
                 }
             }
-            database.runInTransaction {
-                FileInputStream(dbFile).use { input ->
-                    FileOutputStream(snapshot, false).use { output -> input.copyTo(output) }
-                }
-            }
-            validateDatabase(snapshot)
+            exportPlaintextSnapshot(dbFile, snapshot)
+            validatePlainDatabase(snapshot)
             val salt = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes)
             val iv = ByteArray(IV_BYTES).also(SecureRandom()::nextBytes)
             val cipher = createCipher(Cipher.ENCRYPT_MODE, password, salt, iv)
@@ -119,13 +117,16 @@ class EncryptedBackupManager(
                 }
             } ?: throw IllegalStateException("ไม่สามารถอ่านไฟล์สำรองได้")
 
-            validateDatabase(decrypted)
+            validatePlainDatabase(decrypted)
             val target = context.getDatabasePath(LottoDatabase.DATABASE_NAME)
             val parent = target.parentFile ?: throw IllegalStateException("ไม่พบโฟลเดอร์ฐานข้อมูล")
             parent.mkdirs()
             val replacement = File(parent, "${LottoDatabase.DATABASE_NAME}.restore.tmp")
             val previous = File(parent, "${LottoDatabase.DATABASE_NAME}.pre_restore")
-            decrypted.copyTo(replacement, overwrite = true)
+            encryptPlaintextDatabase(decrypted, replacement)
+            check(isEncryptedDatabaseValid(replacement)) {
+                "ฐานข้อมูลหลังเข้ารหัสจากไฟล์สำรองไม่ผ่านการตรวจสอบ จึงยกเลิกการกู้คืน"
+            }
             FileOutputStream(replacement, true).use { it.fd.sync() }
 
             // Checkpoint the current database before touching it, then replace it atomically.
@@ -180,8 +181,64 @@ class EncryptedBackupManager(
         }
     }
 
-    private fun validateDatabase(file: File) {
-        val candidate = SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+    private fun exportPlaintextSnapshot(encryptedFile: File, plaintextTarget: File) {
+        val source = CipherDatabase.openDatabase(
+            encryptedFile.absolutePath,
+            databasePassphrase,
+            null,
+            CipherDatabase.OPEN_READWRITE,
+            null
+        )
+        try {
+            val schemaVersion = source.version
+            source.rawExecSQL(
+                "ATTACH DATABASE ? AS plaintext KEY ''",
+                plaintextTarget.absolutePath
+            )
+            try {
+                source.rawExecSQL("SELECT sqlcipher_export('plaintext')")
+                source.rawExecSQL("PRAGMA plaintext.user_version = $schemaVersion")
+            } finally {
+                source.rawExecSQL("DETACH DATABASE plaintext")
+            }
+        } finally {
+            source.close()
+        }
+    }
+
+    private fun encryptPlaintextDatabase(plaintextFile: File, encryptedTarget: File) {
+        encryptedTarget.delete()
+        val source = CipherDatabase.openDatabase(
+            plaintextFile.absolutePath,
+            ByteArray(0),
+            null,
+            CipherDatabase.OPEN_READWRITE,
+            null
+        )
+        try {
+            val schemaVersion = source.version
+            source.rawExecSQL(
+                "ATTACH DATABASE ? AS encrypted KEY ?",
+                encryptedTarget.absolutePath,
+                databasePassphrase
+            )
+            try {
+                source.rawExecSQL("SELECT sqlcipher_export('encrypted')")
+                source.rawExecSQL("PRAGMA encrypted.user_version = $schemaVersion")
+            } finally {
+                source.rawExecSQL("DETACH DATABASE encrypted")
+            }
+        } finally {
+            source.close()
+        }
+    }
+
+    private fun validatePlainDatabase(file: File) {
+        val candidate = PlatformSQLiteDatabase.openDatabase(
+            file.absolutePath,
+            null,
+            PlatformSQLiteDatabase.OPEN_READONLY
+        )
         try {
             candidate.rawQuery("PRAGMA integrity_check", null).use { cursor ->
                 require(cursor.moveToFirst() && cursor.getString(0) == "ok") {
@@ -194,5 +251,25 @@ class EncryptedBackupManager(
         } finally {
             candidate.close()
         }
+    }
+
+    private fun isEncryptedDatabaseValid(file: File): Boolean = try {
+        val candidate = CipherDatabase.openDatabase(
+            file.absolutePath,
+            databasePassphrase,
+            null,
+            CipherDatabase.OPEN_READONLY,
+            null
+        )
+        try {
+            candidate.rawQuery("PRAGMA integrity_check", null).use { cursor ->
+                cursor.moveToFirst() && cursor.getString(0) == "ok" &&
+                    candidate.version == LottoDatabase.DATABASE_VERSION
+            }
+        } finally {
+            candidate.close()
+        }
+    } catch (_: Exception) {
+        false
     }
 }
