@@ -40,14 +40,33 @@ class DatabaseKeyManager private constructor(context: Context) {
     fun ensureEncryptedDatabase(): ByteArray {
         val passphrase = getOrCreatePassphrase()
         val database = appContext.getDatabasePath(DATABASE_NAME)
-        if (!database.exists() || database.length() == 0L) return passphrase
-
-        if (isEncryptedAndValid(database, passphrase)) return passphrase
-        requirePlainDatabaseIsValid(database) // Never overwrite an unknown or corrupt database.
-
         val parent = database.parentFile ?: error("ไม่พบโฟลเดอร์ฐานข้อมูล")
         val encryptedTemp = File(parent, "$DATABASE_NAME.encrypting")
         val plaintextBackup = File(parent, "$DATABASE_NAME.plaintext_migration_backup")
+
+        // Recover an interrupted conversion before allowing Room to create/open anything.
+        if (!database.exists() && plaintextBackup.exists()) {
+            if (encryptedTemp.exists() && isEncryptedAndValid(encryptedTemp, passphrase)) {
+                check(encryptedTemp.renameTo(database)) { "ไม่สามารถกู้คืนฐานข้อมูลที่เข้ารหัสระหว่างการเริ่มระบบได้" }
+                plaintextBackup.delete()
+            } else {
+                check(plaintextBackup.renameTo(database)) { "ไม่สามารถคืนฐานข้อมูลเดิมหลังการเข้ารหัสที่ขัดข้องได้" }
+            }
+        }
+        if (database.exists() && isEncryptedAndValid(database, passphrase)) {
+            encryptedTemp.delete()
+            plaintextBackup.delete()
+            return passphrase
+        }
+        if (database.exists() && !isPlainDatabaseValid(database) && plaintextBackup.exists() &&
+            isPlainDatabaseValid(plaintextBackup)
+        ) {
+            database.delete()
+            check(plaintextBackup.renameTo(database)) { "ไม่สามารถคืนฐานข้อมูลเดิมที่ยังอ่านได้" }
+        }
+        if (!database.exists() || database.length() == 0L) return passphrase
+
+        requirePlainDatabaseIsValid(database) // Never overwrite an unknown or corrupt database.
         encryptedTemp.delete()
         plaintextBackup.delete()
 
@@ -103,23 +122,26 @@ class DatabaseKeyManager private constructor(context: Context) {
         return passphrase
     }
 
-    private fun requirePlainDatabaseIsValid(file: File) {
-        val db = try {
-            PlatformSQLiteDatabase.openDatabase(file.absolutePath, null, PlatformSQLiteDatabase.OPEN_READONLY)
-        } catch (error: Exception) {
-            throw IllegalStateException(
-                "ไม่สามารถเปิดฐานข้อมูลเดิมหรือฐานข้อมูลเข้ารหัสได้ ระบบจะไม่ลบหรือเขียนทับข้อมูลเดิม",
-                error
-            )
-        }
+    private fun isPlainDatabaseValid(file: File): Boolean = try {
+        val db = PlatformSQLiteDatabase.openDatabase(
+            file.absolutePath,
+            null,
+            PlatformSQLiteDatabase.OPEN_READONLY
+        )
         try {
             db.rawQuery("PRAGMA integrity_check", null).use { cursor ->
-                check(cursor.moveToFirst() && cursor.getString(0) == "ok") {
-                    "ฐานข้อมูลเดิมไม่ผ่าน integrity_check ระบบจะไม่ดำเนินการเข้ารหัสทับ"
-                }
+                cursor.moveToFirst() && cursor.getString(0) == "ok"
             }
         } finally {
             db.close()
+        }
+    } catch (_: Exception) {
+        false
+    }
+
+    private fun requirePlainDatabaseIsValid(file: File) {
+        check(isPlainDatabaseValid(file)) {
+            "ไม่สามารถเปิดฐานข้อมูลเดิมหรือฐานข้อมูลเข้ารหัสได้ ระบบจะไม่ลบหรือเขียนทับข้อมูลเดิม"
         }
     }
 
