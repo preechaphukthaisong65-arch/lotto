@@ -17,7 +17,7 @@ class RoomSettingsRepository(
     }
 
     override suspend fun save(key: String, value: String) {
-        appSettingDao.upsert(
+        appSettingDao.saveWithAudit(
             AppSettingEntity(
                 key = key,
                 value = value,
@@ -27,6 +27,6 @@ class RoomSettingsRepository(
     }
 
     override suspend fun delete(key: String) {
-        appSettingDao.deleteByKey(key)
+        appSettingDao.deleteWithAudit(key, System.currentTimeMillis())
     }
 }
