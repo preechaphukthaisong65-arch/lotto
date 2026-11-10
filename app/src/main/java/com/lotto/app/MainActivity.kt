@@ -246,6 +246,7 @@ class MainActivity : ComponentActivity() {
                         )
                         AppScreen.Payout.name -> PayoutScreen(
                             repository = drawResultRepository,
+                            creditRepository = creditAccountRepository,
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
                         AppScreen.Winners.name -> WinningResultsScreen(
