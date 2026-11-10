@@ -3,6 +3,7 @@ package com.lotto.app.core.di
 import android.content.Context
 import androidx.room.Room
 import com.lotto.app.data.local.LottoDatabase
+import com.lotto.app.data.backup.EncryptedBackupManager
 import com.lotto.app.data.repository.CreditAccountRepository
 import com.lotto.app.data.repository.DrawCalendarRepository
 import com.lotto.app.data.repository.DrawResultRepository
@@ -39,4 +40,7 @@ class AppContainer(context: Context) {
     val creditAccountRepository: CreditAccountRepository by lazy { RoomCreditAccountRepository(database.saleDao()) }
     val drawCalendarRepository: DrawCalendarRepository by lazy { DrawCalendarRepository(database.drawCalendarDao()) }
     val drawResultRepository: DrawResultRepository by lazy { RoomDrawResultRepository(database.drawResultDao()) }
+    val encryptedBackupManager: EncryptedBackupManager by lazy {
+        EncryptedBackupManager(context.applicationContext, database)
+    }
 }
