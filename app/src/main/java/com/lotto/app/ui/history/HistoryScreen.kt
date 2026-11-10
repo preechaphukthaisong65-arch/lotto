@@ -13,6 +13,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -25,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +39,7 @@ import com.lotto.app.data.local.entity.CreditPaymentEntity
 import com.lotto.app.data.local.entity.DrawDateChangeEntity
 import com.lotto.app.data.local.entity.DrawResultEntity
 import com.lotto.app.data.local.entity.SaleEntity
+import com.lotto.app.data.local.entity.SaleVoidEventEntity
 import com.lotto.app.data.local.model.WinningBillSummary
 import com.lotto.app.data.repository.CreditAccountRepository
 import com.lotto.app.data.repository.DrawCalendarRepository
@@ -50,12 +56,13 @@ private data class HistoryRecord(
     val timestamp: Long,
     val title: String,
     val detail: String,
-    val searchText: String
+    val searchText: String,
+    val sale: SaleEntity? = null
 )
 
 private val historyCategories = listOf(
     "ทั้งหมด", "ขายหวย", "บัญชีเชื่อ", "รับชำระ", "ผลรางวัล",
-    "บิลถูกรางวัล", "จ่ายรางวัล", "แก้ไขวันออกรางวัล"
+    "บิลถูกรางวัล", "จ่ายรางวัล", "แก้ไขวันออกรางวัล", "ยกเลิก/คืนบิล"
 )
 
 @Composable
@@ -73,6 +80,13 @@ fun HistoryScreen(
     var loadError by remember { mutableStateOf<String?>(null) }
     var selectedCategory by remember { mutableStateOf("ทั้งหมด") }
     var searchQuery by remember { mutableStateOf("") }
+    var voidEvents by remember { mutableStateOf<List<SaleVoidEventEntity>>(emptyList()) }
+    var selectedVoidSale by remember { mutableStateOf<SaleEntity?>(null) }
+    var voidReason by remember { mutableStateOf("") }
+    var cashRefundConfirmed by remember { mutableStateOf(false) }
+    var voidError by remember { mutableStateOf<String?>(null) }
+    var isVoiding by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     val drawResults by drawResultRepository.observeAllResults().collectAsState(initial = emptyList())
     val drawDateChanges by drawCalendarRepository.observeAllChanges().collectAsState(initial = emptyList())
@@ -82,6 +96,7 @@ fun HistoryScreen(
     LaunchedEffect(saleRepository, creditAccountRepository) {
         try {
             sales = saleRepository.getAllSales()
+            voidEvents = saleRepository.getAllSaleVoidEvents()
             openCreditBills = creditAccountRepository.getOpenBills()
             paidCreditBills = creditAccountRepository.getPaidBills()
             val documents = openCreditBills + paidCreditBills
@@ -96,7 +111,7 @@ fun HistoryScreen(
 
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")) }
     val records = remember(
-        sales, openCreditBills, paidCreditBills, creditPayments, drawResults,
+        sales, voidEvents, openCreditBills, paidCreditBills, creditPayments, drawResults,
         drawDateChanges, unpaidWinningBills, paidWinningBills
     ) {
         buildList {
@@ -111,8 +126,9 @@ fun HistoryScreen(
                     category = "ขายหวย",
                     timestamp = sale.createdAt,
                     title = "บิลขายเลขที่ ${sale.saleId}",
-                    detail = "${sale.customerFirstName} ${sale.customerLastName} · $paymentType · ยอด ${sale.totalAmount} บาท · งวด ${sale.drawDate ?: "-"}",
-                    searchText = "${sale.saleId} ${sale.customerFirstName} ${sale.customerLastName} $paymentType ${sale.drawDate} ${sale.totalAmount}"
+                    detail = "${sale.customerFirstName} ${sale.customerLastName} · $paymentType · ยอด ${sale.totalAmount} บาท · งวด ${sale.drawDate ?: "-"} · สถานะ ${if (sale.status == "VOIDED") "ยกเลิกแล้ว" else "ยืนยันแล้ว"}",
+                    searchText = "${sale.saleId} ${sale.customerFirstName} ${sale.customerLastName} $paymentType ${sale.drawDate} ${sale.totalAmount} ${sale.status}",
+                    sale = sale
                 ))
             }
             (openCreditBills + paidCreditBills).filter { it.creditAmount > 0L }.forEach { bill ->
@@ -156,6 +172,16 @@ fun HistoryScreen(
                     detail = "${bill.customerFirstName} ${bill.customerLastName} · งวด ${bill.drawDate} · ${bill.totalPrize} บาท" +
                         if (isPaid) " · ผู้รับ ${bill.recipientName.orEmpty()}" else " · ยังไม่จ่าย",
                     searchText = "${bill.saleId} ${bill.customerFirstName} ${bill.customerLastName} ${bill.drawDate} ${bill.totalPrize} ${bill.recipientName.orEmpty()}"
+                ))
+            }
+            voidEvents.forEach { event ->
+                add(HistoryRecord(
+                    id = "void-${event.voidId}",
+                    category = "ยกเลิก/คืนบิล",
+                    timestamp = event.voidedAt,
+                    title = "ยกเลิกบิลขายเลขที่ ${event.saleId}",
+                    detail = "งวด ${event.drawDate} · คืนเงินสด ${event.cashRefundAmount} บาท · ยกเลิกยอดเชื่อ ${event.cancelledCreditAmount} บาท · เหตุผล: ${event.reason}",
+                    searchText = "${event.saleId} ${event.drawDate} ${event.reason} ${event.cashRefundAmount} ${event.cancelledCreditAmount}"
                 ))
             }
             drawDateChanges.forEach { change ->
@@ -246,11 +272,80 @@ fun HistoryScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                if (record.sale?.status == "CONFIRMED") {
+                                    TextButton(onClick = {
+                                        selectedVoidSale = record.sale
+                                        voidReason = ""
+                                        cashRefundConfirmed = false
+                                        voidError = null
+                                    }) { Text("ยกเลิก / คืนบิล") }
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    selectedVoidSale?.let { sale ->
+        AlertDialog(
+            onDismissRequest = { if (!isVoiding) selectedVoidSale = null },
+            title = { Text("ยืนยันยกเลิกบิลและคืนเงิน") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("บิลเลขที่ ${sale.saleId} · งวด ${sale.drawDate ?: "-"}")
+                    Text("ลูกค้า: ${sale.customerFirstName} ${sale.customerLastName}")
+                    Text("คืนเงินสดให้ลูกค้า: ${sale.cashAmount} บาท")
+                    Text("ยกเลิกยอดเงินเชื่อ: ${sale.creditAmount} บาท")
+                    Text("ข้อจำกัด: ยกเลิกได้ก่อนบันทึกผลรางวัลเท่านั้น และบิลที่มีประวัติรับชำระเงินเชื่อจะยกเลิกไม่ได้")
+                    if (sale.cashAmount > 0L) {
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = cashRefundConfirmed,
+                                onCheckedChange = { cashRefundConfirmed = it }
+                            )
+                            Text("ยืนยันว่าได้คืนเงินสดจำนวน ${sale.cashAmount} บาทให้ลูกค้าจริงแล้ว")
+                        }
+                    }
+                    OutlinedTextField(
+                        value = voidReason,
+                        onValueChange = { voidReason = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("เหตุผลการยกเลิก *") }
+                    )
+                    voidError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isVoiding && voidReason.isNotBlank() &&
+                        (sale.cashAmount == 0L || cashRefundConfirmed),
+                    onClick = {
+                        if (isVoiding) return@TextButton
+                        isVoiding = true
+                        scope.launch {
+                            try {
+                                saleRepository.voidConfirmedSale(
+                                    saleId = sale.saleId,
+                                    reason = voidReason,
+                                    cashRefundConfirmed = cashRefundConfirmed
+                                )
+                                sales = saleRepository.getAllSales()
+                                voidEvents = saleRepository.getAllSaleVoidEvents()
+                                selectedVoidSale = null
+                            } catch (error: Exception) {
+                                voidError = error.message ?: "ยกเลิกบิลไม่สำเร็จ"
+                            } finally {
+                                isVoiding = false
+                            }
+                        }
+                    }
+                ) { Text(if (isVoiding) "กำลังบันทึก..." else "ยืนยันยกเลิกบิล") }
+            },
+            dismissButton = {
+                TextButton(enabled = !isVoiding, onClick = { selectedVoidSale = null }) { Text("กลับไปตรวจสอบ") }
+            }
+        )
     }
 }
