@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -28,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.lotto.app.data.repository.DrawResultRepository
+import com.lotto.app.data.repository.CreditAccountRepository
 import com.lotto.app.data.local.model.WinningBillSummary
 import com.lotto.app.ui.components.buttons.BackButton
 import java.text.SimpleDateFormat
@@ -36,18 +38,42 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 @Composable
-fun PayoutScreen(repository: DrawResultRepository, onBack: () -> Unit) {
+fun PayoutScreen(repository: DrawResultRepository, creditRepository: CreditAccountRepository, onBack: () -> Unit) {
     var tab by remember { mutableStateOf(0) }
     var selected by remember { mutableStateOf<WinningBillSummary?>(null) }
     var recipient by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var isProcessingPayout by remember { mutableStateOf(false) }
+    var outstandingDebt by remember { mutableStateOf<Long?>(null) }
+    var debtLookupError by remember { mutableStateOf<String?>(null) }
+    var debtWarningAcknowledged by remember { mutableStateOf(false) }
     val unpaid by repository.observeWinningBills("UNPAID").collectAsState(initial = emptyList())
     val paid by repository.observeWinningBills("PAID").collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")) }
 
     androidx.compose.runtime.LaunchedEffect(Unit) { repository.cleanupExpiredPaidWinningBills() }
+
+    androidx.compose.runtime.LaunchedEffect(selected?.saleId, selected?.customerFirstName, selected?.customerLastName) {
+        val bill = selected
+        if (bill == null) {
+            outstandingDebt = null
+            debtLookupError = null
+            debtWarningAcknowledged = false
+        } else {
+            outstandingDebt = null
+            debtLookupError = null
+            debtWarningAcknowledged = false
+            try {
+                outstandingDebt = creditRepository.getOutstandingCreditByCustomer(
+                    bill.customerFirstName,
+                    bill.customerLastName
+                )
+            } catch (e: Exception) {
+                debtLookupError = e.message ?: "ตรวจสอบยอดหนี้ลูกค้าไม่สำเร็จ"
+            }
+        }
+    }
 
     Scaffold(bottomBar = {
         Row(Modifier.fillMaxWidth().padding(16.dp)) { BackButton(onBack = onBack) }
@@ -85,7 +111,7 @@ fun PayoutScreen(repository: DrawResultRepository, onBack: () -> Unit) {
                                     Text("ผู้รับรางวัล: ${bill.recipientName.orEmpty()}")
                                     Text("วันที่จ่าย: ${bill.paidAt?.let { dateFormat.format(Date(it)) } ?: "-"}")
                                 } else {
-                                    Button(onClick = { selected = bill; recipient = ""; error = null; isProcessingPayout = false }, modifier = Modifier.fillMaxWidth()) {
+                                    Button(onClick = { selected = bill; recipient = ""; error = null; isProcessingPayout = false; outstandingDebt = null; debtWarningAcknowledged = false }, modifier = Modifier.fillMaxWidth()) {
                                         Text("บันทึกการจ่ายรางวัล")
                                     }
                                 }
@@ -108,6 +134,27 @@ fun PayoutScreen(repository: DrawResultRepository, onBack: () -> Unit) {
                     Text("ลูกค้า: ${bill.customerFirstName} ${bill.customerLastName}")
                     bill.itemDetails.lines().forEach { detail -> Text(detail, style = MaterialTheme.typography.bodySmall) }
                     Text("ยอดจ่ายรวม ${bill.totalPrize} บาท", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    when {
+                        debtLookupError != null -> Text(
+                            debtLookupError.orEmpty(),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        outstandingDebt == null -> Text("กำลังตรวจสอบยอดหนี้ค้างชำระ...")
+                        outstandingDebt!! > 0L -> {
+                            Text(
+                                "⚠ พบยอดหนี้ค้างชำระชื่อตรงกัน ${outstandingDebt} บาท กรุณาตรวจสอบว่าเป็นลูกค้าคนเดียวกันก่อนจ่ายรางวัล ระบบจะยังไม่หักกลบหนี้ให้อัตโนมัติ",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = debtWarningAcknowledged,
+                                    onCheckedChange = { debtWarningAcknowledged = it }
+                                )
+                                Text("ตรวจสอบยอดหนี้และยืนยันการจ่ายรางวัลเต็มจำนวนแล้ว")
+                            }
+                        }
+                        else -> Text("ไม่พบยอดหนี้ค้างชำระที่ตรงกับชื่อ-นามสกุลนี้")
+                    }
                     OutlinedTextField(
                         value = recipient, onValueChange = { recipient = it },
                         label = { Text("ชื่อผู้รับรางวัล *") }, singleLine = true,
@@ -116,7 +163,7 @@ fun PayoutScreen(repository: DrawResultRepository, onBack: () -> Unit) {
                 }
             },
             confirmButton = {
-                TextButton(enabled = recipient.isNotBlank() && !isProcessingPayout, onClick = {
+                TextButton(enabled = recipient.isNotBlank() && !isProcessingPayout && outstandingDebt != null && debtLookupError == null && (outstandingDebt == 0L || debtWarningAcknowledged), onClick = {
                     if (isProcessingPayout) return@TextButton
                     scope.launch {
                         isProcessingPayout = true
