@@ -28,6 +28,20 @@ class EncryptedBackupManager(
         private set
 
     companion object {
+        fun recoverInterruptedRestore(context: Context) {
+            val target = context.getDatabasePath(LottoDatabase.DATABASE_NAME)
+            val parent = target.parentFile ?: return
+            val previous = File(parent, "${LottoDatabase.DATABASE_NAME}.pre_restore")
+            val replacement = File(parent, "${LottoDatabase.DATABASE_NAME}.restore.tmp")
+            if (!target.exists() && previous.exists()) {
+                check(previous.renameTo(target)) {
+                    "ไม่สามารถกู้คืนฐานข้อมูลเดิมหลังการกู้คืนที่ขัดข้องได้"
+                }
+            }
+            if (target.exists()) previous.delete()
+            replacement.delete()
+        }
+
         private val MAGIC = "LOTTOBK1".toByteArray(StandardCharsets.US_ASCII)
         private const val ITERATIONS = 310_000
         private const val KEY_BITS = 256
@@ -56,6 +70,7 @@ class EncryptedBackupManager(
                     FileOutputStream(snapshot, false).use { output -> input.copyTo(output) }
                 }
             }
+            validateDatabase(snapshot)
             val salt = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes)
             val iv = ByteArray(IV_BYTES).also(SecureRandom()::nextBytes)
             val cipher = createCipher(Cipher.ENCRYPT_MODE, password, salt, iv)
