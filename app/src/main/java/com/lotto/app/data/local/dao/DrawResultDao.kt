@@ -66,6 +66,16 @@ abstract class DrawResultDao {
     @Query("SELECT COUNT(*) FROM draw_dates WHERE drawDate = :drawDate")
     protected abstract suspend fun countScheduledDrawDate(drawDate: String): Int
 
+    @Query("SELECT value FROM app_settings WHERE key = :key LIMIT 1")
+    protected abstract suspend fun getSettingValue(key: String): String?
+
+    @Query("""
+        INSERT INTO app_settings (key, value, updatedAt)
+        VALUES (:key, :value, :updatedAt)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt
+    """)
+    protected abstract suspend fun upsertSettingValue(key: String, value: String, updatedAt: Long)
+
     @Query("""
         SELECT wi.drawDate AS drawDate, wi.saleId AS saleId,
                s.customerFirstName AS customerFirstName,
@@ -177,6 +187,14 @@ abstract class DrawResultDao {
         require(!resultLocalTime.isBefore(resultDate.atTime(LocalTime.of(16, 0)))) {
             "ยังไม่ถึงเวลา 16:00 น. ของวันออกรางวัล จึงยังบันทึกผลรางวัลไม่ได้"
         }
+
+        val lastSeenRaw = getSettingValue("clock_high_water_epoch_ms")
+        val lastSeen = lastSeenRaw?.toLongOrNull()
+            ?: if (lastSeenRaw == null) 0L else throw IllegalStateException("ข้อมูลตรวจสอบเวลาของระบบเสียหาย")
+        require(result.recordedAt >= lastSeen) {
+            "ตรวจพบว่านาฬิกาเครื่องเดินย้อนเวลา ไม่สามารถบันทึกผลรางวัลได้"
+        }
+        upsertSettingValue("clock_high_water_epoch_ms", result.recordedAt.toString(), result.recordedAt)
         require(LottoRules.isValidThreeDigitNumber(result.threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(result.twoDigitTop)) { "กรุณากรอกผล 2 ตัวบนให้ครบ 2 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(result.twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
