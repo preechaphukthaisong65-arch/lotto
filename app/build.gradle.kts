@@ -11,7 +11,7 @@ ksp {
 
 android {
     namespace = "com.lotto.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.lotto.app"
