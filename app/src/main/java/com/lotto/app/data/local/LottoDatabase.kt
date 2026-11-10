@@ -20,6 +20,7 @@ import com.lotto.app.data.local.entity.DrawProfitSummaryEntity
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
 import com.lotto.app.data.local.entity.SettingAuditEntity
+import com.lotto.app.data.local.entity.SaleVoidEventEntity
 
 @Database(
     entities = [
@@ -36,9 +37,10 @@ import com.lotto.app.data.local.entity.SettingAuditEntity
         DrawProfitSummaryEntity::class,
         com.lotto.app.data.local.entity.DrawResultCorrectionEntity::class,
         com.lotto.app.data.local.entity.ExpiredSaleRetentionEntity::class,
-        SettingAuditEntity::class
+        SettingAuditEntity::class,
+        SaleVoidEventEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -49,7 +51,7 @@ abstract class LottoDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "lotto_database"
-        const val DATABASE_VERSION = 12
+        const val DATABASE_VERSION = 13
         const val PAID_DOCUMENT_RETENTION_DAYS = 180L
         const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 
@@ -109,6 +111,25 @@ abstract class LottoDatabase : RoomDatabase() {
                 """)
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_setting_audit_log_settingKey ON setting_audit_log(settingKey)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_setting_audit_log_changedAt ON setting_audit_log(changedAt)")
+            }
+        }
+
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS sale_void_events (
+                        voidId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        saleId INTEGER NOT NULL,
+                        drawDate TEXT NOT NULL,
+                        reason TEXT NOT NULL,
+                        cashRefundAmount INTEGER NOT NULL,
+                        cancelledCreditAmount INTEGER NOT NULL,
+                        voidedAt INTEGER NOT NULL,
+                        FOREIGN KEY(saleId) REFERENCES sales(saleId) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """)
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sale_void_events_saleId ON sale_void_events(saleId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_sale_void_events_voidedAt ON sale_void_events(voidedAt)")
             }
         }
         val MIGRATION_9_10 = object : Migration(9, 10) {
