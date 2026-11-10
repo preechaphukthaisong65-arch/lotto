@@ -174,8 +174,12 @@ abstract class SaleDao {
                 sale.customerFirstName,
                 sale.customerLastName
             )
-            require(sameNameCustomerCount == 0 || sale.newCustomerIdentityConfirmed) {
-                "พบรหัสลูกค้าเดิมที่ใช้ชื่อและนามสกุลตรงกัน กรุณาเลือกรหัสลูกค้าเดิม หรือยืนยันว่าเป็นคนละคนก่อนสร้างรหัสใหม่"
+            require(sale.newCustomerIdentityConfirmed) {
+                if (sameNameCustomerCount > 0) {
+                    "พบรหัสลูกค้าเดิมที่ใช้ชื่อและนามสกุลตรงกัน กรุณาเลือกรหัสลูกค้าเดิม หรือยืนยันว่าเป็นคนละคนก่อนสร้างรหัสใหม่"
+                } else {
+                    "กรุณาตรวจสอบรายชื่อลูกค้าเดิมและยืนยันการสร้างรหัสลูกค้าใหม่ก่อนขายเงินเชื่อ"
+                }
             }
         }
 
