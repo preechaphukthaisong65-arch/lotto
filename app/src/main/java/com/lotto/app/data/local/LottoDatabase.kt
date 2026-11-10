@@ -38,7 +38,7 @@ import com.lotto.app.data.local.entity.SettingAuditEntity
         com.lotto.app.data.local.entity.ExpiredSaleRetentionEntity::class,
         SettingAuditEntity::class
     ],
-    version = DATABASE_VERSION,
+    version = 12,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
