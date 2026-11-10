@@ -41,6 +41,7 @@ fun PayoutScreen(repository: DrawResultRepository, onBack: () -> Unit) {
     var selected by remember { mutableStateOf<WinningBillSummary?>(null) }
     var recipient by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var isProcessingPayout by remember { mutableStateOf(false) }
     val unpaid by repository.observeWinningBills("UNPAID").collectAsState(initial = emptyList())
     val paid by repository.observeWinningBills("PAID").collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
@@ -84,7 +85,7 @@ fun PayoutScreen(repository: DrawResultRepository, onBack: () -> Unit) {
                                     Text("ผู้รับรางวัล: ${bill.recipientName.orEmpty()}")
                                     Text("วันที่จ่าย: ${bill.paidAt?.let { dateFormat.format(Date(it)) } ?: "-"}")
                                 } else {
-                                    Button(onClick = { selected = bill; recipient = ""; error = null }, modifier = Modifier.fillMaxWidth()) {
+                                    Button(onClick = { selected = bill; recipient = ""; error = null; isProcessingPayout = false }, modifier = Modifier.fillMaxWidth()) {
                                         Text("บันทึกการจ่ายรางวัล")
                                     }
                                 }
@@ -115,18 +116,21 @@ fun PayoutScreen(repository: DrawResultRepository, onBack: () -> Unit) {
                 }
             },
             confirmButton = {
-                TextButton(enabled = recipient.isNotBlank(), onClick = {
+                TextButton(enabled = recipient.isNotBlank() && !isProcessingPayout, onClick = {
+                    if (isProcessingPayout) return@TextButton
                     scope.launch {
+                        isProcessingPayout = true
+                        error = null
                         try {
                             repository.markWinningBillPaid(bill.drawDate, bill.saleId, recipient)
                             selected = null
-                            error = null
                         } catch (e: Exception) {
                             error = e.message ?: "บันทึกการจ่ายรางวัลไม่สำเร็จ"
-                            selected = null
+                        } finally {
+                            isProcessingPayout = false
                         }
                     }
-                }) { Text("ยืนยันจ่ายแล้ว") }
+                }) { Text(if (isProcessingPayout) "กำลังบันทึก..." else "ยืนยันจ่ายแล้ว") }
             },
             dismissButton = { TextButton(onClick = { selected = null }) { Text("ยกเลิก") } }
         )
