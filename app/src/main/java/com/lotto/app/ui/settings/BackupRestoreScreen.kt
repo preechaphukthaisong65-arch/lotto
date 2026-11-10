@@ -138,10 +138,16 @@ fun BackupRestoreScreen(
                                 delay(900)
                                 Process.killProcess(Process.myPid())
                             } catch (e: Exception) {
-                                error = e.message ?: "กู้คืนข้อมูลไม่สำเร็จ"
-                                busy = false
-                                showRestoreConfirmation = false
-                                restoreUri = null
+                                if (manager.requiresRestartForDatabaseReload) {
+                                    Toast.makeText(context, "กู้คืนไม่สมบูรณ์ แอปจะปิดเพื่อป้องกันการใช้ฐานข้อมูลที่ปิดแล้ว กรุณาเปิดใหม่และตรวจสอบข้อมูลเดิม", Toast.LENGTH_LONG).show()
+                                    delay(900)
+                                    Process.killProcess(Process.myPid())
+                                } else {
+                                    error = e.message ?: "กู้คืนข้อมูลไม่สำเร็จ"
+                                    busy = false
+                                    showRestoreConfirmation = false
+                                    restoreUri = null
+                                }
                             }
                         }
                     }
