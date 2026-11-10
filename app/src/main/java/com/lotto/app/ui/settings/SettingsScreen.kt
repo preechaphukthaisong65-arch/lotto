@@ -33,7 +33,7 @@ import com.lotto.app.data.repository.SettingsRepository
 import com.lotto.app.ui.components.buttons.BackButton
 
 private enum class SettingsSection {
-    MENU, FULL_LIMIT, NO_ACCEPT, HALF_PAYOUT, DRAW_CALENDAR, BACKUP
+    MENU, FULL_LIMIT, NO_ACCEPT, HALF_PAYOUT, DRAW_CALENDAR, BACKUP, AUDIT
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -64,6 +64,10 @@ fun SettingsScreen(
             manager = backupManager,
             onBack = { section = SettingsSection.MENU }
         )
+        SettingsSection.AUDIT -> SettingsAuditScreen(
+            repository = settingsRepository,
+            onBack = { section = SettingsSection.MENU }
+        )
         SettingsSection.MENU -> {
             Scaffold(
                 topBar = { TopAppBar(title = { Text("ตั้งค่า") }) },
@@ -91,6 +95,9 @@ fun SettingsScreen(
                     }
                     SettingsMenuCard("สำรองและกู้คืนข้อมูล", "ส่งออกและนำเข้าฐานข้อมูลด้วยไฟล์เข้ารหัสและรหัสผ่าน") {
                         section = SettingsSection.BACKUP
+                    }
+                    SettingsMenuCard("ประวัติการเปลี่ยนการตั้งค่า", "ตรวจสอบค่าก่อนหน้า ค่าใหม่ และเวลาที่มีการแก้ไข") {
+                        section = SettingsSection.AUDIT
                     }
                 }
             }
