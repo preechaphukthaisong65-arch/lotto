@@ -126,8 +126,8 @@ fun PerformanceReportScreen(
                             Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text("งวดวันที่ " + row.drawDate.format(dateFormat), fontWeight = FontWeight.SemiBold)
                                 if (row.needsReview) Text("ข้อมูลย้อนหลัง · ต้องตรวจสอบ", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-                                SummaryLine("ยอดขาย", row.sales, money)
-                                SummaryLine("เงินรางวัล", row.prizes, money)
+                                SummaryLine("ยอดขาย", BigInteger.valueOf(row.sales), money)
+                                SummaryLine("เงินรางวัล", BigInteger.valueOf(row.prizes), money)
                                 Text((if (row.net.signum() < 0) "ขาดทุน " else "กำไร ") + money.format(row.net.abs()) + " บาท", color = if (row.net.signum() < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                             }
                         }
