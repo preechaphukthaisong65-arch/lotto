@@ -23,6 +23,10 @@ class EncryptedBackupManager(
     private val context: Context,
     private val database: LottoDatabase
 ) {
+    @Volatile
+    var requiresRestartForDatabaseReload: Boolean = false
+        private set
+
     companion object {
         private val MAGIC = "LOTTOBK1".toByteArray(StandardCharsets.US_ASCII)
         private const val ITERATIONS = 310_000
@@ -116,14 +120,18 @@ class EncryptedBackupManager(
                 }
             }
             database.close()
+            requiresRestartForDatabaseReload = true
             previous.delete()
             if (target.exists() && !target.renameTo(previous)) {
                 throw IllegalStateException("ไม่สามารถเก็บฐานข้อมูลเดิมไว้เป็นข้อมูลสำรองชั่วคราวได้")
             }
             try {
-                File(target.path + "-wal").delete()
-                File(target.path + "-shm").delete()
-                File(target.path + "-journal").delete()
+                listOf("-wal", "-shm", "-journal").forEach { suffix ->
+                    val sidecar = File(target.path + suffix)
+                    if (sidecar.exists() && !sidecar.delete()) {
+                        throw IllegalStateException("ไม่สามารถล้างไฟล์ธุรกรรมเก่าก่อนกู้คืนได้")
+                    }
+                }
                 if (!replacement.renameTo(target)) {
                     throw IllegalStateException("ไม่สามารถแทนที่ฐานข้อมูลด้วยไฟล์กู้คืนได้")
                 }
