@@ -21,6 +21,7 @@ Android application for recording lottery sales, credit accounts, draw results, 
 - Android automatic cloud backup is disabled because the database contains customer and financial records.
 - Owners can create and restore password-encrypted database backups from Settings. Backup passwords must be at least 12 characters and are not recoverable by the app.
 - Restore accepts only an intact database with the exact schema version supported by the installed app. The app closes after a successful restore and must be opened again.
+- The live Room/SQLite database is still stored as a normal app-private SQLite file; only exported backup files are password-encrypted. Full database-at-rest encryption has not yet been implemented or migrated.
 
 ## Build outputs
 
