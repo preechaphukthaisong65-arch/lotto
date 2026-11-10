@@ -6,6 +6,7 @@ data class SaleDraft(
     val customerId: Long? = null,
     val customerPhone: String? = null,
     val legacyDebtReviewed: Boolean = false,
+    val newCustomerIdentityConfirmed: Boolean = false,
     val totalAmount: Long,
     val cashAmount: Long,
     val creditAmount: Long,
