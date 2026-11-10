@@ -58,7 +58,7 @@ fun FullNumberLimitScreen(
                     onConfirm = {
                         scope.launch {
                             FullNumberLimitPolicy.settingKeys.forEach { (type, key) ->
-                                repository.save(key, values[type].orEmpty().toLongOrNull()?.coerceAtLeast(0L)?.toString() ?: "0")
+                                repository.save(key, values[type].orEmpty().toLongOrNull()?.toString() ?: error("ค่าลิมิตไม่ถูกต้อง"))
                             }
                         }
                     },
@@ -66,7 +66,7 @@ fun FullNumberLimitScreen(
                     confirmationTitle = "ยืนยันการตั้งค่าหวยเต็ม",
                     confirmationMessage = "ระบบจะใช้วงเงินใหม่นี้กับการขายในงวดปัจจุบันและงวดถัดไป",
                     enabled = FullNumberLimitPolicy.settingKeys.keys.all { type ->
-                        values[type].orEmpty().isNotBlank() && values[type].orEmpty().toLongOrNull() != null
+                        values[type].orEmpty().isNotBlank() && (values[type].orEmpty().toLongOrNull() ?: 0L) > 0L
                     }
                 )
             }
@@ -92,7 +92,7 @@ fun FullNumberLimitScreen(
                 )
             }
             Text(
-                "ตัวอย่าง: ตั้ง 3 ตัวตรง 100 บาท หมายถึงเลข 000–999 ทุกเลขมีเพดาน 100 บาทต่อเลขในงวดนั้น หากตั้ง 0 บาท จะถือว่าไม่จำกัดวงเงิน",
+                "ตัวอย่าง: ตั้ง 3 ตัวตรง 100 บาท หมายถึงเลข 000–999 ทุกเลขมีเพดาน 100 บาทต่อเลขในงวดนั้น ต้องกำหนดวงเงินมากกว่า 0 บาททุกประเภท ระบบจะไม่อนุญาตให้ขายหากยังไม่ได้กำหนดวงเงิน",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
