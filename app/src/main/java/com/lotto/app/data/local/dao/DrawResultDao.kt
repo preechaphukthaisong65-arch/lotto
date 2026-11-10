@@ -103,8 +103,25 @@ abstract class DrawResultDao {
 
     private suspend fun calculateWinningItems(result: DrawResultEntity): List<WinningSaleItemEntity> =
         getItemsForDraw(result.drawDate).mapNotNull { item ->
-            val type = runCatching { PrizeType.valueOf(item.prizeType) }.getOrNull()
-                ?: return@mapNotNull null
+            // Never silently omit an invalid legacy sale item from prize calculation:
+            // doing so would understate the operator's prize liability.
+            val type = runCatching { PrizeType.valueOf(item.prizeType) }.getOrElse {
+                throw IllegalStateException(
+                    "พบรายการขายเลขที่ ${item.itemId} ที่มีประเภทหวยไม่ถูกต้อง (${item.prizeType}) กรุณาตรวจสอบข้อมูลก่อนบันทึกผล"
+                )
+            }
+            require(item.amount > 0L && item.payoutMultiplier > 0L) {
+                "พบรายการขายเลขที่ ${item.itemId} ที่มียอดเงินหรืออัตราจ่ายไม่ถูกต้อง กรุณาตรวจสอบข้อมูลก่อนบันทึกผล"
+            }
+            val validNumber = when (type) {
+                PrizeType.THREE_DIGIT_STRAIGHT, PrizeType.THREE_DIGIT_TOD ->
+                    LottoRules.isValidThreeDigitNumber(item.number)
+                PrizeType.TWO_DIGIT_TOP, PrizeType.TWO_DIGIT_BOTTOM ->
+                    LottoRules.isValidTwoDigitNumber(item.number)
+            }
+            require(validNumber) {
+                "พบเลข ${item.number} ในรายการขายเลขที่ ${item.itemId} ที่ไม่ถูกต้อง กรุณาตรวจสอบข้อมูลก่อนบันทึกผล"
+            }
             val matched = when (type) {
                 PrizeType.THREE_DIGIT_STRAIGHT -> LottoRules.isThreeDigitStraightMatch(item.number, result.threeDigit)
                 PrizeType.THREE_DIGIT_TOD -> LottoRules.isThreeDigitTodMatch(item.number, result.threeDigit)
