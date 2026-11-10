@@ -171,9 +171,8 @@ abstract class SaleDao {
             }
             existingCustomer.customerId
         } else if (sale.customerFirstName.isNotBlank() || sale.customerLastName.isNotBlank()) {
-            require(sale.customerFirstName.isNotBlank() && sale.customerLastName.isNotBlank()) {
-                "กรุณากรอกชื่อและนามสกุลให้ครบก่อนสร้างรหัสลูกค้า"
-            }
+            // Cash sales may still use a first-name-only label as before.
+            // Credit sales have already been required to provide both names above.
             insertCustomer(
                 CustomerEntity(
                     customerCode = "CUS-" + UUID.randomUUID().toString().replace("-", "").take(12).uppercase(),
