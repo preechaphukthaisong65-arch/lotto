@@ -273,7 +273,7 @@ abstract class DrawResultDao {
                ) AS itemDetails
         FROM winning_sale_items wi INNER JOIN sales s ON s.saleId = wi.saleId
         WHERE wi.payoutStatus = :status
-        GROUP BY wi.drawDate, wi.saleId, s.customerFirstName, s.customerLastName, s.createdAt
+        GROUP BY wi.drawDate, wi.saleId, s.customerFirstName, s.customerLastName, s.customerId, s.createdAt
         ORDER BY COALESCE(MAX(wi.paidAt), s.createdAt) DESC, wi.saleId DESC
     """)
     abstract fun observeWinningBills(status: String): Flow<List<WinningBillSummary>>
