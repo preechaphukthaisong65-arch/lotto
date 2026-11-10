@@ -104,6 +104,56 @@ class SaleDaoFinancialSafetyTest {
     }
 
     @Test
+    fun newCreditSaleRequiresReviewWhenLegacySameNameDebtExists() {
+        val legacySaleId = saveSale(
+            at = saleTime,
+            firstName = "สมชาย",
+            lastName = "ใจดี",
+            total = 100,
+            cash = 0,
+            credit = 100
+        )
+        database.openHelper.writableDatabase.execSQL(
+            "UPDATE credit_documents SET customerId = NULL WHERE sourceSaleId = ?",
+            arrayOf(legacySaleId)
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            kotlinx.coroutines.runBlocking {
+                saleDao.insertSaleWithItems(
+                    SaleEntity(
+                        customerFirstName = "สมชาย",
+                        customerLastName = "ใจดี",
+                        totalAmount = 20,
+                        cashAmount = 0,
+                        creditAmount = 20,
+                        createdAt = saleTime + 1_000,
+                        drawDate = drawDate
+                    ),
+                    listOf(item(amount = 20))
+                )
+            }
+        }
+
+        val acceptedId = kotlinx.coroutines.runBlocking {
+            saleDao.insertSaleWithItems(
+                SaleEntity(
+                    customerFirstName = "สมชาย",
+                    customerLastName = "ใจดี",
+                    totalAmount = 20,
+                    cashAmount = 0,
+                    creditAmount = 20,
+                    createdAt = saleTime + 2_000,
+                    drawDate = drawDate,
+                    legacyDebtReviewed = true
+                ),
+                listOf(item(amount = 20))
+            )
+        }
+        assertNotNull(kotlinx.coroutines.runBlocking { saleDao.getSaleById(acceptedId) }?.customerId)
+    }
+
+    @Test
     fun twoDifferentCustomersWithTheSameNameKeepSeparateCreditBalances() {
         val firstSaleId = saveSale(
             at = saleTime,
