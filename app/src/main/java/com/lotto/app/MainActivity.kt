@@ -139,6 +139,7 @@ class MainActivity : ComponentActivity() {
         val settingsRepository = container.settingsRepository
 
         setContent {
+            MaterialTheme {
             if (!isAuthenticated.value) {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -352,6 +353,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 }
+            }
             }
         }
     }
