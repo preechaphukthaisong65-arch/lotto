@@ -95,7 +95,8 @@ class SaleDaoFinancialSafetyTest {
             lastName = "ใจดี",
             total = 100,
             cash = 0,
-            credit = 100
+            credit = 100,
+            newCustomerIdentityConfirmed = true
         )
         val customerId = kotlinx.coroutines.runBlocking { saleDao.getSaleById(firstId) }?.customerId
         assertNotNull(customerId)
