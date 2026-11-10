@@ -6,6 +6,7 @@ import com.lotto.app.data.local.entity.CreditPaymentEntity
 interface CreditAccountRepository {
     suspend fun getOpenBills(): List<CreditDocumentEntity>
     suspend fun getOutstandingCreditByCustomer(firstName: String, lastName: String): Long
+    suspend fun getOutstandingCreditByCustomerId(customerId: Long): Long
     suspend fun getPaidBills(): List<CreditDocumentEntity>
     suspend fun getPayments(creditDocumentId: Long): List<CreditPaymentEntity>
     suspend fun receivePayment(creditDocumentId: Long, amount: Long)
