@@ -27,6 +27,13 @@ abstract class SaleDao {
     @Query("SELECT * FROM customers WHERE customerId = :customerId LIMIT 1")
     protected abstract suspend fun getCustomerById(customerId: Long): CustomerEntity?
 
+    @Query("""
+        SELECT COUNT(*) FROM customers
+        WHERE lower(trim(firstName)) = lower(trim(:firstName))
+          AND lower(trim(lastName)) = lower(trim(:lastName))
+    """)
+    protected abstract suspend fun countCustomersByExactName(firstName: String, lastName: String): Int
+
     @Insert
     protected abstract suspend fun insertSaleItems(items: List<SaleItemEntity>)
 
@@ -162,6 +169,16 @@ abstract class SaleDao {
             }
         }
 
+        if (sale.creditAmount > 0L && sale.customerId == null) {
+            val sameNameCustomerCount = countCustomersByExactName(
+                sale.customerFirstName,
+                sale.customerLastName
+            )
+            require(sameNameCustomerCount == 0 || sale.newCustomerIdentityConfirmed) {
+                "พบรหัสลูกค้าเดิมที่ใช้ชื่อและนามสกุลตรงกัน กรุณาเลือกรหัสลูกค้าเดิม หรือยืนยันว่าเป็นคนละคนก่อนสร้างรหัสใหม่"
+            }
+        }
+
         val customerId = if (sale.customerId != null) {
             val existingCustomer = getCustomerById(sale.customerId)
                 ?: throw IllegalArgumentException("ไม่พบรหัสลูกค้าที่เลือก กรุณาเลือกลูกค้าใหม่อีกครั้ง")
@@ -190,7 +207,8 @@ abstract class SaleDao {
         val customer = customerId?.let { getCustomerById(it) }
         val saleToInsert = sale.copy(
             customerId = customerId,
-            customerPhone = customer?.phone
+            customerPhone = customer?.phone,
+            newCustomerIdentityConfirmed = sale.newCustomerIdentityConfirmed
         )
         items.forEach { item ->
             val type = runCatching { PrizeType.valueOf(item.prizeType) }
