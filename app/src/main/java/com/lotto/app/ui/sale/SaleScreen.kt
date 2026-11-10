@@ -83,7 +83,20 @@ fun SaleScreen(
     var legacyDebtAmount by remember { mutableStateOf<Long?>(0L) }
     var legacyDebtReviewed by remember { mutableStateOf(false) }
     var legacyDebtCheckError by remember { mutableStateOf<String?>(null) }
+    var newCustomerIdentityConfirmed by remember { mutableStateOf(false) }
     val customers by customerRepository.observeAll().collectAsState(initial = emptyList())
+    val matchingCustomers = customers.filter { customer ->
+        (firstName.isBlank() || customer.firstName.contains(firstName.trim(), ignoreCase = true)) &&
+            (lastName.isBlank() || customer.lastName.contains(lastName.trim(), ignoreCase = true)) &&
+            (customerPhone.isBlank() || customer.phone.orEmpty().contains(customerPhone.trim())) &&
+            (firstName.isNotBlank() || lastName.isNotBlank() || customerPhone.isNotBlank())
+    }.take(20)
+    val exactNameCustomers = if (firstName.isNotBlank() && lastName.isNotBlank()) {
+        customers.filter {
+            it.firstName.trim().equals(firstName.trim(), ignoreCase = true) &&
+                it.lastName.trim().equals(lastName.trim(), ignoreCase = true)
+        }
+    } else emptyList()
     var cashSelected by remember { mutableStateOf(true) }
     var creditSelected by remember { mutableStateOf(false) }
     var cashAmount by remember { mutableStateOf("") }
@@ -380,7 +393,8 @@ fun SaleScreen(
     val canSave = total > 0L && totalResult.isSuccess && amountInputsValid && paymentSelected && splitValid &&
         customerValid && activeEntriesValid && !hasNoAcceptItems && !isSaving && savedReceipt == null &&
         legacyDebtCheckError == null && legacyDebtAmount != null &&
-        (legacyDebtAmount == 0L || legacyDebtReviewed)
+        (legacyDebtAmount == 0L || legacyDebtReviewed) &&
+        (!creditSelected || selectedCustomerId != null || exactNameCustomers.isEmpty() || newCustomerIdentityConfirmed)
 
     fun createDraft(): SaleDraft {
         val items = buildList {
@@ -445,6 +459,7 @@ fun SaleScreen(
             customerId = selectedCustomerId,
             customerPhone = customerPhone.trim().takeIf { it.isNotBlank() },
             legacyDebtReviewed = legacyDebtReviewed,
+            newCustomerIdentityConfirmed = newCustomerIdentityConfirmed,
             totalAmount = total,
             cashAmount = cashValue,
             creditAmount = creditValue,
@@ -664,24 +679,19 @@ fun SaleScreen(
                     ) {
                         OutlinedTextField(
                             value = firstName,
-                            onValueChange = { firstName = it; selectedCustomerId = null; customerPhone = "" },
+                            onValueChange = { firstName = it; selectedCustomerId = null; customerPhone = ""; newCustomerIdentityConfirmed = false },
                             modifier = Modifier.weight(1f),
                             label = { Text("ชื่อ") },
                             singleLine = true
                         )
                         OutlinedTextField(
                             value = lastName,
-                            onValueChange = { lastName = it; selectedCustomerId = null; customerPhone = "" },
+                            onValueChange = { lastName = it; selectedCustomerId = null; customerPhone = ""; newCustomerIdentityConfirmed = false },
                             modifier = Modifier.weight(1f),
                             label = { Text("นามสกุล") },
                             singleLine = true
                         )
                     }
-                    val matchingCustomers = customers.filter { customer ->
-                        (firstName.isBlank() || customer.firstName.contains(firstName.trim(), ignoreCase = true)) &&
-                            (lastName.isBlank() || customer.lastName.contains(lastName.trim(), ignoreCase = true)) &&
-                            (firstName.isNotBlank() || lastName.isNotBlank())
-                    }.take(6)
                     if (selectedCustomerId != null) {
                         val selectedCustomer = customers.firstOrNull { it.customerId == selectedCustomerId }
                         Text(
@@ -698,6 +708,7 @@ fun SaleScreen(
                                     firstName = customer.firstName
                                     lastName = customer.lastName
                                     customerPhone = customer.phone.orEmpty()
+                                    newCustomerIdentityConfirmed = false
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -705,9 +716,23 @@ fun SaleScreen(
                             }
                         }
                     }
+                    if (creditSelected && selectedCustomerId == null && exactNameCustomers.isNotEmpty()) {
+                        Text(
+                            "พบรหัสลูกค้าเดิมที่ชื่อและนามสกุลตรงกัน หากเป็นคนละคนต้องยืนยันก่อนสร้างรหัสใหม่ เพื่อไม่ให้หลบเพดานเครดิต",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = newCustomerIdentityConfirmed,
+                                onCheckedChange = { newCustomerIdentityConfirmed = it }
+                            )
+                            Text("ยืนยันว่าเป็นคนละคนและสร้างรหัสลูกค้าใหม่")
+                        }
+                    }
                     OutlinedTextField(
                         value = customerPhone,
-                        onValueChange = { customerPhone = it.filter { ch -> ch.isDigit() || ch == '+' || ch == '-' || ch == ' ' }; selectedCustomerId = null },
+                        onValueChange = { customerPhone = it.filter { ch -> ch.isDigit() || ch == '+' || ch == '-' || ch == ' ' }; selectedCustomerId = null; newCustomerIdentityConfirmed = false },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("เบอร์โทรศัพท์ (ไม่บังคับ)") },
                         singleLine = true,
@@ -961,6 +986,7 @@ fun SaleScreen(
                     selectedCustomerId = null
                     customerPhone = ""
                     legacyDebtReviewed = false
+                    newCustomerIdentityConfirmed = false
                     cashSelected = true
                     creditSelected = false
                     cashAmount = ""
