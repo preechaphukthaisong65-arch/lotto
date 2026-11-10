@@ -31,21 +31,7 @@ class AppContainer(context: Context) {
         LottoDatabase.DATABASE_NAME
     )
         .openHelperFactory(SupportOpenHelperFactory(databasePassphrase.copyOf()))
-        .addMigrations(
-            LottoDatabase.MIGRATION_1_2,
-            LottoDatabase.MIGRATION_2_3,
-            LottoDatabase.MIGRATION_3_4,
-            LottoDatabase.MIGRATION_4_5,
-            LottoDatabase.MIGRATION_5_6,
-            LottoDatabase.MIGRATION_6_7,
-            LottoDatabase.MIGRATION_7_8,
-            LottoDatabase.MIGRATION_8_9,
-            LottoDatabase.MIGRATION_9_10,
-            LottoDatabase.MIGRATION_10_11,
-            LottoDatabase.MIGRATION_11_12,
-            LottoDatabase.MIGRATION_12_13,
-            LottoDatabase.MIGRATION_13_14
-        )
+        .addMigrations(*LottoDatabase.ALL_MIGRATIONS)
         .build()
 
     val settingsRepository: SettingsRepository by lazy { RoomSettingsRepository(database.appSettingDao()) }
