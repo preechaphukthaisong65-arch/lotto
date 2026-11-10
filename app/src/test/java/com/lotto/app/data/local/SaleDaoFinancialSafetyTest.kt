@@ -104,6 +104,37 @@ class SaleDaoFinancialSafetyTest {
     }
 
     @Test
+    fun twoDifferentCustomersWithTheSameNameKeepSeparateCreditBalances() {
+        val firstSaleId = saveSale(
+            at = saleTime,
+            firstName = "สมชาย",
+            lastName = "ใจดี",
+            total = 100,
+            cash = 0,
+            credit = 100
+        )
+        val secondSaleId = saveSale(
+            at = saleTime + 1_000,
+            firstName = "สมชาย",
+            lastName = "ใจดี",
+            total = 60,
+            cash = 0,
+            credit = 60
+        )
+        val firstCustomerId = kotlinx.coroutines.runBlocking { saleDao.getSaleById(firstSaleId) }?.customerId
+        val secondCustomerId = kotlinx.coroutines.runBlocking { saleDao.getSaleById(secondSaleId) }?.customerId
+        assertNotNull(firstCustomerId)
+        assertNotNull(secondCustomerId)
+        org.junit.Assert.assertNotEquals(firstCustomerId, secondCustomerId)
+        assertEquals(100L, kotlinx.coroutines.runBlocking {
+            saleDao.getOutstandingCreditByCustomer(firstCustomerId!!)
+        })
+        assertEquals(60L, kotlinx.coroutines.runBlocking {
+            saleDao.getOutstandingCreditByCustomer(secondCustomerId!!)
+        })
+    }
+
+    @Test
     fun saleCannotBeVoidedAfterDrawResultHasBeenRecorded() {
         val saleId = saveSale(
             at = saleTime,
