@@ -183,15 +183,19 @@ class MainActivity : ComponentActivity() {
                 val activeSaleDrawDate = SaleWindowPolicy.activeDrawDate(drawDates, currentThailandTime).orEmpty()
                 var selectedResultDrawDate by rememberSaveable { mutableStateOf("") }
                 LaunchedEffect(Unit) {
+                    var lastClockPersistAt = 0L
                     while (true) {
                         currentThailandTime = DrawCalendarRepository.nowInThailand()
                         val wallClock = System.currentTimeMillis()
-                        val lastSeenRaw = settingsRepository.get("clock_high_water_epoch_ms")
-                        val lastSeen = lastSeenRaw?.toLongOrNull()
-                        if (lastSeenRaw == null || (lastSeen != null && wallClock >= lastSeen)) {
-                            settingsRepository.save("clock_high_water_epoch_ms", wallClock.toString())
+                        if (wallClock - lastClockPersistAt >= 30_000L) {
+                            val lastSeenRaw = settingsRepository.get("clock_high_water_epoch_ms")
+                            val lastSeen = lastSeenRaw?.toLongOrNull()
+                            if (lastSeenRaw == null || (lastSeen != null && wallClock >= lastSeen)) {
+                                settingsRepository.save("clock_high_water_epoch_ms", wallClock.toString())
+                                lastClockPersistAt = wallClock
+                            }
                         }
-                        delay(30_000L)
+                        delay(1_000L)
                     }
                 }
                 val saleWindow = SaleWindowPolicy.evaluate(drawDates, currentThailandTime)
