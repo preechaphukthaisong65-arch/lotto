@@ -19,6 +19,7 @@ import com.lotto.app.data.local.entity.WinningSaleItemEntity
 import com.lotto.app.data.local.entity.DrawProfitSummaryEntity
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
+import com.lotto.app.data.local.entity.SettingAuditEntity
 
 @Database(
     entities = [
@@ -34,9 +35,10 @@ import com.lotto.app.data.local.entity.SaleItemEntity
         WinningSaleItemEntity::class,
         DrawProfitSummaryEntity::class,
         com.lotto.app.data.local.entity.DrawResultCorrectionEntity::class,
-        com.lotto.app.data.local.entity.ExpiredSaleRetentionEntity::class
+        com.lotto.app.data.local.entity.ExpiredSaleRetentionEntity::class,
+        SettingAuditEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -91,6 +93,21 @@ abstract class LottoDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS expired_sale_retention (saleId INTEGER NOT NULL PRIMARY KEY, eligibleAt INTEGER NOT NULL)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_expired_sale_retention_eligibleAt ON expired_sale_retention(eligibleAt)")
+            }
+        }
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS setting_audit_log (
+                        auditId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        settingKey TEXT NOT NULL,
+                        previousValue TEXT,
+                        newValue TEXT,
+                        changedAt INTEGER NOT NULL
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_setting_audit_log_settingKey ON setting_audit_log(settingKey)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_setting_audit_log_changedAt ON setting_audit_log(changedAt)")
             }
         }
         val MIGRATION_9_10 = object : Migration(9, 10) {
