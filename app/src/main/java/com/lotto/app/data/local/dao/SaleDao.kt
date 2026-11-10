@@ -416,6 +416,19 @@ abstract class SaleDao {
     """)
     abstract suspend fun getOutstandingCreditByCustomer(customerId: Long): Long
 
+    @Query("""
+        SELECT COALESCE(SUM(d.creditAmount - COALESCE((
+            SELECT SUM(p.amount) FROM credit_payments p
+            WHERE p.creditDocumentId = d.creditDocumentId
+        ), 0)), 0)
+        FROM credit_documents d
+        WHERE d.status = 'OPEN'
+          AND d.customerId IS NULL
+          AND lower(trim(d.customerFirstName)) = lower(trim(:firstName))
+          AND lower(trim(d.customerLastName)) = lower(trim(:lastName))
+    """)
+    abstract suspend fun getOutstandingCreditByLegacyName(firstName: String, lastName: String): Long
+
     @Query("SELECT * FROM credit_documents WHERE status = 'PAID' ORDER BY paidAt DESC, creditDocumentId DESC")
     abstract suspend fun getPaidDocuments(): List<CreditDocumentEntity>
 
