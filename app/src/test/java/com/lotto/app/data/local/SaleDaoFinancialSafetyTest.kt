@@ -46,6 +46,22 @@ class SaleDaoFinancialSafetyTest {
     }
 
     @Test
+    fun cashSaleStillAllowsFirstNameOnlyCustomerLabel() {
+        val saleId = saveSale(
+            at = saleTime,
+            firstName = "นิด",
+            lastName = "",
+            total = 10,
+            cash = 10,
+            credit = 0
+        )
+        val sale = kotlinx.coroutines.runBlocking { saleDao.getSaleById(saleId) }
+        assertEquals("นิด", sale?.customerFirstName)
+        assertEquals("", sale?.customerLastName)
+        assertNotNull(sale?.customerId)
+    }
+
+    @Test
     fun cashSaleCanBeVoidedOnlyAfterCashRefundIsConfirmedAndAuditIsStored() {
         val saleId = saveSale(
             at = saleTime,
