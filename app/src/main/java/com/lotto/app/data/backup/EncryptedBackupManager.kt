@@ -4,6 +4,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase as PlatformSQLiteDatabase
 import net.zetetic.database.sqlcipher.SQLiteDatabase as CipherDatabase
 import android.net.Uri
+import androidx.room.Room
 import com.lotto.app.data.local.LottoDatabase
 import java.io.DataInputStream
 import java.io.DataOutputStream
@@ -117,6 +118,7 @@ class EncryptedBackupManager(
                 }
             } ?: throw IllegalStateException("ไม่สามารถอ่านไฟล์สำรองได้")
 
+            migratePlainBackupToCurrent(decrypted)
             validatePlainDatabase(decrypted)
             val target = context.getDatabasePath(LottoDatabase.DATABASE_NAME)
             val parent = target.parentFile ?: throw IllegalStateException("ไม่พบโฟลเดอร์ฐานข้อมูล")
@@ -230,6 +232,69 @@ class EncryptedBackupManager(
             }
         } finally {
             source.close()
+        }
+    }
+
+    private fun migratePlainBackupToCurrent(file: File) {
+        val original = PlatformSQLiteDatabase.openDatabase(
+            file.absolutePath,
+            null,
+            PlatformSQLiteDatabase.OPEN_READONLY
+        )
+        val sourceVersion = try {
+            original.version.also {
+                original.rawQuery("PRAGMA integrity_check", null).use { cursor ->
+                    require(cursor.moveToFirst() && cursor.getString(0) == "ok") {
+                        "ฐานข้อมูลสำรองไม่ผ่านการตรวจสอบความสมบูรณ์"
+                    }
+                }
+            }
+        } finally {
+            original.close()
+        }
+        require(sourceVersion in 1..LottoDatabase.DATABASE_VERSION) {
+            "เวอร์ชันฐานข้อมูลสำรองใหม่กว่าแอปนี้หรือไม่รองรับ"
+        }
+        if (sourceVersion == LottoDatabase.DATABASE_VERSION) return
+
+        val migrated = File(context.cacheDir, "lotto-backup-migration.db")
+        migrated.delete()
+        file.copyTo(migrated, overwrite = true)
+        try {
+            val migrationDatabase = Room.databaseBuilder(
+                context,
+                LottoDatabase::class.java,
+                migrated.absolutePath
+            )
+                .addMigrations(*LottoDatabase.ALL_MIGRATIONS)
+                .build()
+            try {
+                migrationDatabase.openHelper.writableDatabase
+            } finally {
+                migrationDatabase.close()
+            }
+            val migratedCheck = PlatformSQLiteDatabase.openDatabase(
+                migrated.absolutePath,
+                null,
+                PlatformSQLiteDatabase.OPEN_READONLY
+            )
+            try {
+                require(migratedCheck.version == LottoDatabase.DATABASE_VERSION) {
+                    "ไม่สามารถปรับเวอร์ชันฐานข้อมูลสำรองให้ตรงกับแอปได้"
+                }
+                migratedCheck.rawQuery("PRAGMA integrity_check", null).use { cursor ->
+                    require(cursor.moveToFirst() && cursor.getString(0) == "ok") {
+                        "ฐานข้อมูลหลังปรับเวอร์ชันไม่ผ่านการตรวจสอบ"
+                    }
+                }
+            } finally {
+                migratedCheck.close()
+            }
+            migrated.copyTo(file, overwrite = true)
+        } finally {
+            listOf("", "-wal", "-shm", "-journal").forEach { suffix ->
+                File(migrated.absolutePath + suffix).delete()
+            }
         }
     }
 
