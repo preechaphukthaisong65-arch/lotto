@@ -34,6 +34,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
@@ -95,6 +97,7 @@ fun SaleScreen(
     var pendingHalfAddThree by remember { mutableStateOf(false) }
     var pendingHalfAddTwo by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     fun halfKey(prizeType: String, number: String) = "$prizeType|$number"
     fun isHalfAccepted(prizeType: String, number: String) = acceptedHalfPayoutKeys[halfKey(prizeType, number)] == true
@@ -859,7 +862,44 @@ fun SaleScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        val paymentLabel = when {
+                            draft.cashAmount > 0L && draft.creditAmount > 0L ->
+                                "เงินสด ${draft.cashAmount} บาท / เงินเชื่อ ${draft.creditAmount} บาท"
+                            draft.cashAmount > 0L -> "เงินสด ${draft.cashAmount} บาท"
+                            else -> "เงินเชื่อ ${draft.creditAmount} บาท"
+                        }
+                        val receiptText = buildString {
+                            appendLine("ใบเสร็จ Lotto เลขที่ #$saleId")
+                            appendLine("งวดวันที่ $drawDate")
+                            appendLine("ลูกค้า: ${(draft.customerFirstName + " " + draft.customerLastName).trim().ifBlank { "ลูกค้าทั่วไป" }}")
+                            appendLine("------------------------------")
+                            draft.items.forEach { item ->
+                                val type = runCatching { PrizeType.valueOf(item.prizeType) }.getOrNull()
+                                val label = when (type) {
+                                    PrizeType.THREE_DIGIT_STRAIGHT -> "3 ตัวตรง"
+                                    PrizeType.THREE_DIGIT_TOD -> "3 ตัวโต๊ด"
+                                    PrizeType.TWO_DIGIT_TOP -> "2 ตัวบน"
+                                    PrizeType.TWO_DIGIT_BOTTOM -> "2 ตัวล่าง"
+                                    null -> item.prizeType
+                                }
+                                val half = type != null && item.payoutMultiplier < LottoRules.payoutMultiplier(type)
+                                appendLine("${item.number} $label · ${item.amount} บาท${if (half) " · จ่ายครึ่ง" else ""}")
+                            }
+                            appendLine("------------------------------")
+                            appendLine("ยอดรวม: ${draft.totalAmount} บาท")
+                            appendLine("การชำระ: $paymentLabel")
+                            appendLine("ขอบคุณที่ใช้บริการ")
+                        }
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "ใบเสร็จ Lotto #$saleId")
+                            putExtra(Intent.EXTRA_TEXT, receiptText)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "แชร์ใบเสร็จให้ลูกค้า"))
+                    }) { Text("แชร์ใบเสร็จ") }
+                    TextButton(onClick = {
                     threeDigitEntries.clear()
                     threeDigitEntries.add(ThreeDigitEntry(id = 1L))
                     twoDigitEntries.clear()
@@ -876,7 +916,8 @@ fun SaleScreen(
                     quotaHints.clear()
                     saveError = null
                     savedReceipt = null
-                }) { Text("เริ่มขายรายการใหม่") }
+                    }) { Text("เริ่มขายรายการใหม่") }
+                }
             },
             dismissButton = {
                 TextButton(onClick = {
