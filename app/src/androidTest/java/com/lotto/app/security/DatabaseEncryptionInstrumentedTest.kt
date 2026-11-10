@@ -45,10 +45,12 @@ class DatabaseEncryptionInstrumentedTest {
         assertTrue("Encrypted backup file should exist", backup.exists() && backup.length() > 0L)
 
         assertThrows(IllegalArgumentException::class.java) {
-            application.container.encryptedBackupManager.restoreEncrypted(
-                uri,
-                "WrongBackupPassword-2026".toCharArray()
-            )
+            runBlocking {
+                application.container.encryptedBackupManager.restoreEncrypted(
+                    uri,
+                    "WrongBackupPassword-2026".toCharArray()
+                )
+            }
         }
         assertEquals("must-survive-restore", application.container.settingsRepository.get(testKey))
 
