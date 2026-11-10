@@ -5,6 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.lotto.app.data.local.dao.AppSettingDao
+import com.lotto.app.data.local.dao.CustomerDao
 import com.lotto.app.data.local.dao.DrawCalendarDao
 import com.lotto.app.data.local.dao.DrawResultDao
 import com.lotto.app.data.local.dao.SaleDao
@@ -47,6 +48,7 @@ import com.lotto.app.data.local.entity.CustomerEntity
 )
 abstract class LottoDatabase : RoomDatabase() {
     abstract fun appSettingDao(): AppSettingDao
+    abstract fun customerDao(): CustomerDao
     abstract fun saleDao(): SaleDao
     abstract fun drawCalendarDao(): DrawCalendarDao
     abstract fun drawResultDao(): DrawResultDao
