@@ -35,6 +35,13 @@ abstract class SaleDao {
     protected abstract suspend fun getSettingValue(key: String): String?
 
     @Query("""
+        INSERT INTO app_settings (key, value, updatedAt)
+        VALUES (:key, :value, :updatedAt)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt
+    """)
+    protected abstract suspend fun upsertSettingValue(key: String, value: String, updatedAt: Long)
+
+    @Query("""
         SELECT COUNT(*) FROM draw_dates d
         WHERE d.drawDate = :drawDate
           AND NOT EXISTS (SELECT 1 FROM draw_results r WHERE r.drawDate = d.drawDate)
@@ -107,6 +114,18 @@ abstract class SaleDao {
         require(isDrawSaleWindowOpen(targetDrawDate, sale.createdAt) > 0) {
             "อยู่นอกเวลาเปิดรับขาย หรือมีการบันทึกผลรางวัลของงวดนี้แล้ว ไม่สามารถบันทึกบิลได้"
         }
+
+        // Persist a monotonic wall-clock high-water mark. If the device clock is
+        // moved backwards after the app has observed a later time, fail closed.
+        val lastSeenRaw = getSettingValue("clock_high_water_epoch_ms")
+        val lastSeen = lastSeenRaw?.toLongOrNull()
+            ?: if (lastSeenRaw == null) 0L else throw IllegalStateException(
+                "ข้อมูลตรวจสอบเวลาของระบบเสียหาย กรุณาตรวจสอบอุปกรณ์ก่อนขาย"
+            )
+        require(sale.createdAt >= lastSeen) {
+            "ตรวจพบว่านาฬิกาเครื่องเดินย้อนเวลา ไม่สามารถบันทึกการขายได้ กรุณาตั้งเวลาอัตโนมัติและตรวจสอบเวลา"
+        }
+        upsertSettingValue("clock_high_water_epoch_ms", sale.createdAt.toString(), sale.createdAt)
         // Keep draw-level totals within Long capacity so later financial summaries cannot overflow.
         Math.addExact(getSalesTotalForDraw(targetDrawDate), sale.totalAmount)
 
@@ -142,24 +161,20 @@ abstract class SaleDao {
             val settingKey = "full_limit_${key.first}"
             val persistedLimit = getSettingValue(settingKey)
             val limit = if (persistedLimit != null) {
-                val parsed = persistedLimit.toLongOrNull()
+                persistedLimit.toLongOrNull()
                     ?: throw IllegalStateException("ค่าลิมิต $settingKey ในฐานข้อมูลไม่ถูกต้อง กรุณาตรวจสอบการตั้งค่าก่อนขาย")
-                require(parsed >= 0L) {
-                    "ค่าลิมิต $settingKey ต้องไม่ติดลบ กรุณาตรวจสอบการตั้งค่าก่อนขาย"
-                }
-                parsed
             } else {
-                fullLimitsByPrizeType[key.first]?.also { value ->
-                    require(value >= 0L) { "ค่าลิมิตหวยต้องไม่ติดลบ" }
-                } ?: 0L
+                fullLimitsByPrizeType[key.first]
+                    ?: throw IllegalStateException("ยังไม่ได้กำหนดวงเงินรับซื้อสำหรับหมวด ${key.first} กรุณาตั้งค่าก่อนขาย")
             }
-            if (limit > 0L) {
-                val alreadySold = getNumberStakeForDraw(sale.drawDate.orEmpty(), key.first, key.second)
-                val requested = requestedItems.fold(0L) { total, item -> Math.addExact(total, item.amount) }
-                val combined = Math.addExact(alreadySold, requested)
-                require(combined <= limit) {
-                    "เลข ${key.second} ในหมวด ${key.first} เต็มแล้ว (รับได้สูงสุด ${limit} บาท/งวด, สะสมเดิม ${alreadySold} บาท, รายการนี้ ${requested} บาท)"
-                }
+            require(limit > 0L) {
+                "วงเงินรับซื้อหมวด ${key.first} ต้องมากกว่า 0 บาท ระบบปิดการขายไว้จนกว่าจะกำหนดวงเงินเพื่อป้องกันการรับซื้อไม่จำกัด"
+            }
+            val alreadySold = getNumberStakeForDraw(sale.drawDate.orEmpty(), key.first, key.second)
+            val requested = requestedItems.fold(0L) { total, item -> Math.addExact(total, item.amount) }
+            val combined = Math.addExact(alreadySold, requested)
+            require(combined <= limit) {
+                "เลข ${key.second} ในหมวด ${key.first} เต็มแล้ว (รับได้สูงสุด ${limit} บาท/งวด, สะสมเดิม ${alreadySold} บาท, รายการนี้ ${requested} บาท)"
             }
         }
 
