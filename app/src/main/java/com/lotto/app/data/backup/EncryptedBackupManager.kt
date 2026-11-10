@@ -36,6 +36,12 @@ class EncryptedBackupManager(
             val parent = target.parentFile ?: return
             val previous = File(parent, "${LottoDatabase.DATABASE_NAME}.pre_restore")
             val replacement = File(parent, "${LottoDatabase.DATABASE_NAME}.restore.tmp")
+            // Remove plaintext temporary snapshots left behind by a process interruption.
+            listOf(
+                "lotto-restore-candidate.db",
+                "lotto-backup-snapshot.db",
+                "lotto-backup-migration.db"
+            ).forEach { File(context.cacheDir, it).delete() }
             if (!target.exists() && previous.exists()) {
                 check(previous.renameTo(target)) {
                     "ไม่สามารถกู้คืนฐานข้อมูลเดิมหลังการกู้คืนที่ขัดข้องได้"
