@@ -97,6 +97,9 @@ class DatabaseKeyManager private constructor(context: Context) {
         check(encryptedTemp.exists() && isEncryptedAndValid(encryptedTemp, passphrase)) {
             "ไม่สามารถตรวจสอบฐานข้อมูลที่เข้ารหัสใหม่ได้ จึงเก็บฐานข้อมูลเดิมไว้และยกเลิกการเปลี่ยน"
         }
+        // The exported encrypted snapshot is complete; remove only the legacy
+        // database's now-checkpointed WAL sidecars before reusing the same path.
+        deleteSqliteSidecars(database)
 
         check(database.renameTo(plaintextBackup)) {
             "ไม่สามารถเก็บฐานข้อมูลเดิมไว้ก่อนเข้ารหัสได้"
