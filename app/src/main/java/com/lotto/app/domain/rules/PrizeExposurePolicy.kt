@@ -36,18 +36,22 @@ object PrizeExposurePolicy {
             .groupBy { it.number }
             .mapValues { (_, rows) -> sumExact(rows.map { Math.multiplyExact(it.stakeAmount, it.payoutMultiplier) }) }
 
-        val maximumThreeDigitAndTop = (0..999).maxOf { value ->
+        // The official three-digit, two-digit-top and two-digit-bottom results
+        // are independent outcomes. Never tie the two-digit top result to the
+        // last two digits of the three-digit result when estimating liability.
+        val maximumThreeDigitLiability = (0..999).maxOf { value ->
             val result = value.toString().padStart(3, '0')
             val todLiability = sumExact(tod.filterKeys { number ->
                 LottoRules.isThreeDigitTodMatch(number, result)
             }.values)
-            sumExact(listOf(
-                straight[result] ?: 0L,
-                todLiability,
-                top[result.takeLast(2)] ?: 0L
-            ))
+            sumExact(listOf(straight[result] ?: 0L, todLiability))
         }
+        val maximumTwoDigitTop = top.values.maxOrNull() ?: 0L
         val maximumTwoDigitBottom = bottom.values.maxOrNull() ?: 0L
-        return Math.addExact(maximumThreeDigitAndTop, maximumTwoDigitBottom)
+        return sumExact(listOf(
+            maximumThreeDigitLiability,
+            maximumTwoDigitTop,
+            maximumTwoDigitBottom
+        ))
     }
 }
