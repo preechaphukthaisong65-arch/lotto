@@ -41,6 +41,15 @@ jobs:
         with:
           packages: platform-tools platforms;android-36 build-tools;35.0.0
 
+      - name: Prepare optional release signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/lotto-release.jks"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/lotto-release.jks" >> "$GITHUB_ENV"
+          fi
+
       - name: Run unit tests
         run: gradle --no-daemon :app:testDebugUnitTest
 
@@ -55,13 +64,27 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Build release APK
-        run: gradle --no-daemon :app:assembleRelease
+      - name: Build release APK and App Bundle
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          gradle --no-daemon :app:assembleRelease
+          gradle --no-daemon :app:bundleRelease
 
-      - name: Upload unsigned release APK
+      - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
-          name: lotto-release-unsigned-apk
+          name: lotto-release-apk
           path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload release App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: lotto-release-aab
+          path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 14
