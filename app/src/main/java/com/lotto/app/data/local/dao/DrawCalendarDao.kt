@@ -29,6 +29,12 @@ abstract class DrawCalendarDao {
     @Query("SELECT COUNT(*) FROM winning_sale_items WHERE drawDate = :date")
     protected abstract suspend fun countWinningItemsForDraw(date: String): Int
 
+    @Query("SELECT COUNT(*) FROM draw_profit_summaries WHERE drawDate = :date")
+    protected abstract suspend fun countProfitSummariesForDraw(date: String): Int
+
+    @Query("SELECT COUNT(*) FROM draw_result_corrections WHERE drawDate = :date")
+    protected abstract suspend fun countCorrectionsForDraw(date: String): Int
+
     @Query("SELECT * FROM draw_date_changes ORDER BY changedAt DESC")
     abstract fun observeAllChanges(): Flow<List<DrawDateChangeEntity>>
 
@@ -48,8 +54,14 @@ abstract class DrawCalendarDao {
         require(getByDate(newDate) == null) { "มีงวดออกรางวัลในวันที่เลือกแล้ว" }
 
         val current = getByDate(oldDate) ?: error("ไม่พบงวดที่ต้องการแก้ไข")
-        require(countSalesForDraw(oldDate) == 0 && countResultsForDraw(oldDate) == 0 && countWinningItemsForDraw(oldDate) == 0) {
-            "งวดนี้มีบิลขายหรือผลรางวัลแล้ว จึงไม่อนุญาตให้เปลี่ยนวัน เพื่อป้องกันข้อมูลเดิมคลาดเคลื่อน"
+        require(
+            countSalesForDraw(oldDate) == 0 &&
+                countResultsForDraw(oldDate) == 0 &&
+                countWinningItemsForDraw(oldDate) == 0 &&
+                countProfitSummariesForDraw(oldDate) == 0 &&
+                countCorrectionsForDraw(oldDate) == 0
+        ) {
+            "งวดนี้มีข้อมูลทางการเงินหรือผลรางวัลผูกอยู่ (บิลขาย/ผลรางวัล/บิลถูกรางวัล/สรุปผล/ประวัติแก้ผล) จึงห้ามเปลี่ยนวัน เพื่อป้องกันข้อมูลเดิมคลาดเคลื่อน"
         }
         insertChange(
             DrawDateChangeEntity(
