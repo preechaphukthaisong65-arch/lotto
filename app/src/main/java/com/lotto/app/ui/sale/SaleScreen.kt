@@ -65,6 +65,7 @@ fun SaleScreen(
     onBack: () -> Unit,
     drawDate: String,
     customerRepository: CustomerRepository,
+    onGetLegacyOutstandingCredit: suspend (String, String) -> Long,
     fullLimitsByPrizeType: Map<String, Long>,
     noAcceptNumbersByPrizeType: Map<String, Set<String>>,
     halfPayoutNumbersByPrizeType: Map<String, Set<String>>,
@@ -79,6 +80,9 @@ fun SaleScreen(
     var lastName by remember { mutableStateOf("") }
     var selectedCustomerId by remember { mutableStateOf<Long?>(null) }
     var customerPhone by remember { mutableStateOf("") }
+    var legacyDebtAmount by remember { mutableStateOf<Long?>(0L) }
+    var legacyDebtReviewed by remember { mutableStateOf(false) }
+    var legacyDebtCheckError by remember { mutableStateOf<String?>(null) }
     val customers by customerRepository.observeAll().collectAsState(initial = emptyList())
     var cashSelected by remember { mutableStateOf(true) }
     var creditSelected by remember { mutableStateOf(false) }
@@ -88,6 +92,26 @@ fun SaleScreen(
     var saveError by remember { mutableStateOf<String?>(null) }
     var savedReceipt by remember { mutableStateOf<Pair<Long, SaleDraft>?>(null) }
     val quotaHints = remember { mutableStateMapOf<String, String>() }
+
+    androidx.compose.runtime.LaunchedEffect(
+        creditSelected,
+        firstName.trim(),
+        lastName.trim(),
+        selectedCustomerId
+    ) {
+        legacyDebtReviewed = false
+        legacyDebtCheckError = null
+        if (!creditSelected || firstName.isBlank() || lastName.isBlank()) {
+            legacyDebtAmount = 0L
+        } else {
+            legacyDebtAmount = null
+            try {
+                legacyDebtAmount = onGetLegacyOutstandingCredit(firstName.trim(), lastName.trim())
+            } catch (error: Exception) {
+                legacyDebtCheckError = error.message ?: "ตรวจสอบหนี้จากข้อมูลเดิมไม่สำเร็จ"
+            }
+        }
+    }
     val quotaRequestVersions = remember { mutableStateMapOf<String, Int>() }
     var pendingQuotaAdjustments by remember { mutableStateOf<List<QuotaAdjustment>>(emptyList()) }
     var pendingAddThree by remember { mutableStateOf(false) }
@@ -354,7 +378,9 @@ fun SaleScreen(
     }
 
     val canSave = total > 0L && totalResult.isSuccess && amountInputsValid && paymentSelected && splitValid &&
-        customerValid && activeEntriesValid && !hasNoAcceptItems && !isSaving && savedReceipt == null
+        customerValid && activeEntriesValid && !hasNoAcceptItems && !isSaving && savedReceipt == null &&
+        legacyDebtCheckError == null && legacyDebtAmount != null &&
+        (legacyDebtAmount == 0L || legacyDebtReviewed)
 
     fun createDraft(): SaleDraft {
         val items = buildList {
@@ -418,6 +444,7 @@ fun SaleScreen(
             customerLastName = lastName.trim(),
             customerId = selectedCustomerId,
             customerPhone = customerPhone.trim().takeIf { it.isNotBlank() },
+            legacyDebtReviewed = legacyDebtReviewed,
             totalAmount = total,
             cashAmount = cashValue,
             creditAmount = creditValue,
@@ -686,6 +713,28 @@ fun SaleScreen(
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
                     )
+                    if (creditSelected && legacyDebtCheckError != null) {
+                        Text(
+                            legacyDebtCheckError.orEmpty(),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else if (creditSelected && legacyDebtAmount == null) {
+                        Text("กำลังตรวจสอบยอดเชื่อจากบิลเดิม...", style = MaterialTheme.typography.bodySmall)
+                    } else if (creditSelected && (legacyDebtAmount ?: 0L) > 0L) {
+                        Text(
+                            "พบยอดเชื่อค้างจากข้อมูลเดิมที่ยังไม่มีรหัสลูกค้า ${legacyDebtAmount} บาท ระบบจะไม่รวมยอดนี้อัตโนมัติเพราะอาจเป็นคนละคน",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = legacyDebtReviewed,
+                                onCheckedChange = { legacyDebtReviewed = it }
+                            )
+                            Text("ตรวจสอบแล้วว่าเป็นลูกค้ารายเดียวกัน/คนละคน และยืนยันการขายเชื่อ")
+                        }
+                    }
                     if (creditSelected && !customerValid) {
                         Text(
                             "การขายเงินเชื่อต้องกรอกชื่อและนามสกุลลูกค้า",
@@ -911,6 +960,7 @@ fun SaleScreen(
                     lastName = ""
                     selectedCustomerId = null
                     customerPhone = ""
+                    legacyDebtReviewed = false
                     cashSelected = true
                     creditSelected = false
                     cashAmount = ""
