@@ -16,10 +16,7 @@ import com.lotto.app.data.local.model.WinningBillSummary
 import com.lotto.app.domain.rules.LottoRules
 import com.lotto.app.domain.rules.PrizeType
 import kotlinx.coroutines.flow.Flow
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneId
+import com.lotto.app.domain.rules.DrawResultEntryPolicy
 
 @Dao
 abstract class DrawResultDao {
@@ -180,12 +177,8 @@ abstract class DrawResultDao {
     open suspend fun saveResultAndFindWinners(result: DrawResultEntity): Int {
         require(countScheduledDrawDate(result.drawDate) == 1) { "ไม่พบวันที่ออกรางวัลนี้ในปฏิทินหวย กรุณาตรวจสอบงวดก่อนบันทึกผล" }
 
-        val resultDate = runCatching { LocalDate.parse(result.drawDate) }
-            .getOrElse { throw IllegalArgumentException("วันที่งวดหวยไม่ถูกต้อง") }
-        val resultLocalTime = Instant.ofEpochMilli(result.recordedAt)
-            .atZone(ZoneId.of("Asia/Bangkok")).toLocalDateTime()
-        require(!resultLocalTime.isBefore(resultDate.atTime(LocalTime.of(16, 0)))) {
-            "ยังไม่ถึงเวลา 16:00 น. ของวันออกรางวัล จึงยังบันทึกผลรางวัลไม่ได้"
+        require(DrawResultEntryPolicy.canEnter(result.drawDate, result.recordedAt)) {
+            "ยังไม่ถึงเวลา 16:00 น. ของวันออกรางวัล จึงยังบันทึกผลรางวัลไม่ได้ หรือวันที่งวดไม่ถูกต้อง"
         }
 
         val lastSeenRaw = getSettingValue("clock_high_water_epoch_ms")
