@@ -50,6 +50,6 @@ class AppContainer(context: Context) {
     val drawCalendarRepository: DrawCalendarRepository by lazy { DrawCalendarRepository(database.drawCalendarDao()) }
     val drawResultRepository: DrawResultRepository by lazy { RoomDrawResultRepository(database.drawResultDao()) }
     val encryptedBackupManager: EncryptedBackupManager by lazy {
-        EncryptedBackupManager(context.applicationContext, database)
+        EncryptedBackupManager(context.applicationContext, database, databasePassphrase.copyOf())
     }
 }
