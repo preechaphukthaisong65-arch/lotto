@@ -188,6 +188,9 @@ fun PayoutScreen(repository: DrawResultRepository, creditRepository: CreditAccou
                         }
                         else -> Text("ไม่พบยอดหนี้ค้างชำระที่ตรงกับชื่อ-นามสกุลนี้")
                     }
+                    if (!legacyIdentityMissing && !legacyDebtLookupComplete && debtLookupError == null) {
+                        Text("กำลังตรวจสอบหนี้จากบิลเดิมที่ยังไม่มีรหัสลูกค้า...")
+                    }
                     if (!legacyIdentityMissing && (legacyOutstandingDebt ?: 0L) > 0L) {
                         Text(
                             "พบยอดเชื่อข้อมูลเดิมที่ยังไม่มีรหัสลูกค้าและใช้ชื่อเดียวกัน ${legacyOutstandingDebt} บาท กรุณาตรวจสอบว่าเป็นบุคคลเดียวกันหรือไม่ ระบบไม่รวมยอดให้อัตโนมัติ",
