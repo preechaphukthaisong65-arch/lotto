@@ -77,6 +77,7 @@ dependencies {
     implementation("androidx.sqlite:sqlite:2.7.0")
     implementation("net.zetetic:sqlcipher-android:4.20.0@aar")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     ksp("androidx.room:room-compiler:2.6.1")
 
     testImplementation("junit:junit:4.13.2")
