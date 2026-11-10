@@ -664,14 +664,14 @@ fun SaleScreen(
                     ) {
                         OutlinedTextField(
                             value = firstName,
-                            onValueChange = { firstName = it; selectedCustomerId = null },
+                            onValueChange = { firstName = it; selectedCustomerId = null; customerPhone = "" },
                             modifier = Modifier.weight(1f),
                             label = { Text("ชื่อ") },
                             singleLine = true
                         )
                         OutlinedTextField(
                             value = lastName,
-                            onValueChange = { lastName = it; selectedCustomerId = null },
+                            onValueChange = { lastName = it; selectedCustomerId = null; customerPhone = "" },
                             modifier = Modifier.weight(1f),
                             label = { Text("นามสกุล") },
                             singleLine = true
