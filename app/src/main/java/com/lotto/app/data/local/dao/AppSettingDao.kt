@@ -18,6 +18,9 @@ abstract class AppSettingDao {
     @Query("SELECT * FROM app_settings ORDER BY key ASC")
     abstract fun observeAll(): Flow<List<AppSettingEntity>>
 
+    @Query("SELECT * FROM setting_audit_log ORDER BY changedAt DESC, auditId DESC LIMIT 500")
+    abstract fun observeAuditLog(): Flow<List<SettingAuditEntity>>
+
     @Upsert
     protected abstract suspend fun upsertInternal(setting: AppSettingEntity)
 
