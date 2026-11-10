@@ -15,7 +15,7 @@ import org.robolectric.annotation.Config
 import java.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [35], application = android.app.Application::class)
 class DrawResultDaoSafetyTest {
     private lateinit var database: LottoDatabase
     private val drawDate = "2026-11-16"
