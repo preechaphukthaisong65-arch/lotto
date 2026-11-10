@@ -185,7 +185,13 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     while (true) {
                         currentThailandTime = DrawCalendarRepository.nowInThailand()
-                        delay(1000L)
+                        val wallClock = System.currentTimeMillis()
+                        val lastSeenRaw = settingsRepository.get("clock_high_water_epoch_ms")
+                        val lastSeen = lastSeenRaw?.toLongOrNull()
+                        if (lastSeenRaw == null || (lastSeen != null && wallClock >= lastSeen)) {
+                            settingsRepository.save("clock_high_water_epoch_ms", wallClock.toString())
+                        }
+                        delay(30_000L)
                     }
                 }
                 val saleWindow = SaleWindowPolicy.evaluate(drawDates, currentThailandTime)
