@@ -6,7 +6,7 @@ import android.widget.Toast
 import android.content.Intent
 import android.app.KeyguardManager
 import android.provider.Settings
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -57,7 +57,7 @@ private enum class AppScreen {
     Home, Sale, History, CreditAccounts, PayDebt, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance, DrawResult, Winners, Payout
 }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private val isAuthenticated = mutableStateOf(false)
     private val authenticationError = mutableStateOf<String?>(null)
 
