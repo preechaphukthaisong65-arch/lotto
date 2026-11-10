@@ -3,6 +3,8 @@ package com.lotto.app.core.di
 import android.content.Context
 import androidx.room.Room
 import com.lotto.app.data.local.LottoDatabase
+import com.lotto.app.data.security.DatabaseKeyManager
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import com.lotto.app.data.backup.EncryptedBackupManager
 import com.lotto.app.data.repository.CreditAccountRepository
 import com.lotto.app.data.repository.DrawCalendarRepository
@@ -19,11 +21,14 @@ class AppContainer(context: Context) {
         EncryptedBackupManager.recoverInterruptedRestore(context.applicationContext)
     }
 
+    private val databasePassphrase: ByteArray = DatabaseKeyManager.get(context).ensureEncryptedDatabase()
+
     private val database: LottoDatabase = Room.databaseBuilder(
         context.applicationContext,
         LottoDatabase::class.java,
         LottoDatabase.DATABASE_NAME
     )
+        .openHelperFactory(SupportOpenHelperFactory(databasePassphrase.copyOf()))
         .addMigrations(
             LottoDatabase.MIGRATION_1_2,
             LottoDatabase.MIGRATION_2_3,
