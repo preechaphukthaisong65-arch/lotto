@@ -10,6 +10,8 @@ import com.lotto.app.data.local.entity.CreditPaymentEntity
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
 import com.lotto.app.data.local.entity.SaleVoidEventEntity
+import com.lotto.app.data.local.entity.CustomerEntity
+import java.util.UUID
 import com.lotto.app.domain.rules.PrizeType
 import com.lotto.app.domain.rules.PrizeExposureEntry
 import com.lotto.app.domain.rules.PrizeExposurePolicy
@@ -18,6 +20,12 @@ import com.lotto.app.domain.rules.PrizeExposurePolicy
 abstract class SaleDao {
     @Insert
     protected abstract suspend fun insertSale(sale: SaleEntity): Long
+
+    @Insert
+    protected abstract suspend fun insertCustomer(customer: CustomerEntity): Long
+
+    @Query("SELECT * FROM customers WHERE customerId = :customerId LIMIT 1")
+    protected abstract suspend fun getCustomerById(customerId: Long): CustomerEntity?
 
     @Insert
     protected abstract suspend fun insertSaleItems(items: List<SaleItemEntity>)
@@ -153,6 +161,38 @@ abstract class SaleDao {
                 "การขายเงินเชื่อต้องระบุชื่อและนามสกุลลูกค้า"
             }
         }
+
+        val customerId = if (sale.customerId != null) {
+            val existingCustomer = getCustomerById(sale.customerId)
+                ?: throw IllegalArgumentException("ไม่พบรหัสลูกค้าที่เลือก กรุณาเลือกลูกค้าใหม่อีกครั้ง")
+            require(existingCustomer.firstName.trim().equals(sale.customerFirstName.trim(), ignoreCase = true) &&
+                existingCustomer.lastName.trim().equals(sale.customerLastName.trim(), ignoreCase = true)) {
+                "ข้อมูลชื่อลูกค้าไม่ตรงกับรหัสลูกค้าที่เลือก กรุณาเลือกลูกค้าใหม่"
+            }
+            existingCustomer.customerId
+        } else if (sale.customerFirstName.isNotBlank() || sale.customerLastName.isNotBlank()) {
+            require(sale.customerFirstName.isNotBlank() && sale.customerLastName.isNotBlank()) {
+                "กรุณากรอกชื่อและนามสกุลให้ครบก่อนสร้างรหัสลูกค้า"
+            }
+            insertCustomer(
+                CustomerEntity(
+                    customerCode = "CUS-" + UUID.randomUUID().toString().replace("-", "").take(12).uppercase(),
+                    firstName = sale.customerFirstName.trim(),
+                    lastName = sale.customerLastName.trim(),
+                    phone = sale.customerPhone?.trim()?.takeIf { it.isNotBlank() },
+                    createdAt = sale.createdAt,
+                    updatedAt = sale.createdAt
+                )
+            )
+        } else null
+        if (sale.creditAmount > 0L) {
+            require(customerId != null) { "การขายเงินเชื่อต้องเลือกลูกค้าหรือสร้างรหัสลูกค้าก่อน" }
+        }
+        val customer = customerId?.let { getCustomerById(it) }
+        val saleToInsert = sale.copy(
+            customerId = customerId,
+            customerPhone = customer?.phone
+        )
         items.forEach { item ->
             val type = runCatching { PrizeType.valueOf(item.prizeType) }
                 .getOrElse { throw IllegalArgumentException("ไม่รู้จักประเภทหวย ${item.prizeType}") }
@@ -194,8 +234,7 @@ abstract class SaleDao {
                 ?: throw IllegalStateException("ค่าเพดานเครดิตต่อลูกค้าไม่ถูกต้อง กรุณาตรวจสอบการตั้งค่า")
             require(creditCap > 0L) { "เพดานเครดิตต่อลูกค้าต้องมากกว่า 0 บาท" }
             val outstanding = getOutstandingCreditByCustomer(
-                sale.customerFirstName,
-                sale.customerLastName
+                customerId ?: throw IllegalStateException("ไม่พบรหัสลูกค้าสำหรับตรวจสอบวงเงินเครดิต")
             )
             val projectedCredit = Math.addExact(outstanding, sale.creditAmount)
             require(projectedCredit <= creditCap) {
@@ -252,7 +291,7 @@ abstract class SaleDao {
             }
         }
 
-        val saleId = insertSale(sale)
+        val saleId = insertSale(saleToInsert)
         insertSaleItems(items.map { it.copy(saleId = saleId) })
 
         // All sales have a document in the same account category.
@@ -268,7 +307,9 @@ abstract class SaleDao {
                 creditAmount = sale.creditAmount,
                 createdAt = sale.createdAt,
                 status = if (isCashSale) CreditDocumentEntity.STATUS_PAID else CreditDocumentEntity.STATUS_OPEN,
-                paidAt = if (isCashSale) sale.createdAt else null
+                paidAt = if (isCashSale) sale.createdAt else null,
+                customerId = customerId,
+                customerPhone = customer?.phone
             )
         )
         insertCreditDocumentItems(
@@ -371,11 +412,9 @@ abstract class SaleDao {
             WHERE p.creditDocumentId = d.creditDocumentId
         ), 0)), 0)
         FROM credit_documents d
-        WHERE d.status = 'OPEN'
-          AND lower(trim(d.customerFirstName)) = lower(trim(:firstName))
-          AND lower(trim(d.customerLastName)) = lower(trim(:lastName))
+        WHERE d.status = 'OPEN' AND d.customerId = :customerId
     """)
-    abstract suspend fun getOutstandingCreditByCustomer(firstName: String, lastName: String): Long
+    abstract suspend fun getOutstandingCreditByCustomer(customerId: Long): Long
 
     @Query("SELECT * FROM credit_documents WHERE status = 'PAID' ORDER BY paidAt DESC, creditDocumentId DESC")
     abstract suspend fun getPaidDocuments(): List<CreditDocumentEntity>
