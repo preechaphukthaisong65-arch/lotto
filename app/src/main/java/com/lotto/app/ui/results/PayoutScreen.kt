@@ -49,6 +49,8 @@ fun PayoutScreen(repository: DrawResultRepository, creditRepository: CreditAccou
     var debtWarningAcknowledged by remember { mutableStateOf(false) }
     var legacyIdentityMissing by remember { mutableStateOf(false) }
     var legacyDebtAcknowledged by remember { mutableStateOf(false) }
+    var legacyOutstandingDebt by remember { mutableStateOf<Long?>(null) }
+    var legacyDebtWarningAcknowledged by remember { mutableStateOf(false) }
     val unpaid by repository.observeWinningBills("UNPAID").collectAsState(initial = emptyList())
     val paid by repository.observeWinningBills("PAID").collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
@@ -64,15 +66,23 @@ fun PayoutScreen(repository: DrawResultRepository, creditRepository: CreditAccou
             debtWarningAcknowledged = false
             legacyIdentityMissing = false
             legacyDebtAcknowledged = false
+            legacyOutstandingDebt = null
+            legacyDebtWarningAcknowledged = false
         } else {
             outstandingDebt = null
             debtLookupError = null
             debtWarningAcknowledged = false
             legacyIdentityMissing = bill.customerId == null
             legacyDebtAcknowledged = false
+            legacyOutstandingDebt = null
+            legacyDebtWarningAcknowledged = false
             if (bill.customerId != null) {
                 try {
                     outstandingDebt = creditRepository.getOutstandingCreditByCustomerId(bill.customerId)
+                    legacyOutstandingDebt = creditRepository.getOutstandingCreditByCustomer(
+                        bill.customerFirstName,
+                        bill.customerLastName
+                    )
                 } catch (e: Exception) {
                     debtLookupError = e.message ?: "ตรวจสอบยอดหนี้ลูกค้าไม่สำเร็จ"
                 }
@@ -173,6 +183,19 @@ fun PayoutScreen(repository: DrawResultRepository, creditRepository: CreditAccou
                         }
                         else -> Text("ไม่พบยอดหนี้ค้างชำระที่ตรงกับชื่อ-นามสกุลนี้")
                     }
+                    if (!legacyIdentityMissing && (legacyOutstandingDebt ?: 0L) > 0L) {
+                        Text(
+                            "พบยอดเชื่อข้อมูลเดิมที่ยังไม่มีรหัสลูกค้าและใช้ชื่อเดียวกัน ${legacyOutstandingDebt} บาท กรุณาตรวจสอบว่าเป็นบุคคลเดียวกันหรือไม่ ระบบไม่รวมยอดให้อัตโนมัติ",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = legacyDebtWarningAcknowledged,
+                                onCheckedChange = { legacyDebtWarningAcknowledged = it }
+                            )
+                            Text("ตรวจสอบหนี้จากข้อมูลเดิมด้วยตนเองแล้ว")
+                        }
+                    }
                     OutlinedTextField(
                         value = recipient, onValueChange = { recipient = it },
                         label = { Text("ชื่อผู้รับรางวัล *") }, singleLine = true,
@@ -181,10 +204,13 @@ fun PayoutScreen(repository: DrawResultRepository, creditRepository: CreditAccou
                 }
             },
             confirmButton = {
-                TextButton(enabled = recipient.isNotBlank() && !isProcessingPayout && (
-                    (outstandingDebt != null && debtLookupError == null && (outstandingDebt == 0L || debtWarningAcknowledged)) ||
-                    (legacyIdentityMissing && legacyDebtAcknowledged && debtLookupError == null)
-                ), onClick = {
+                TextButton(enabled = recipient.isNotBlank() && !isProcessingPayout && debtLookupError == null &&
+                    (
+                        if (legacyIdentityMissing) legacyDebtAcknowledged
+                        else outstandingDebt != null &&
+                            (outstandingDebt == 0L || debtWarningAcknowledged) &&
+                            ((legacyOutstandingDebt ?: 0L) == 0L || legacyDebtWarningAcknowledged)
+                    ), onClick = {
                     if (isProcessingPayout) return@TextButton
                     scope.launch {
                         isProcessingPayout = true
