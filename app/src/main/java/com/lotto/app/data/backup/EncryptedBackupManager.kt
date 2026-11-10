@@ -3,14 +3,12 @@ package com.lotto.app.data.backup
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
-import androidx.room.RoomDatabase
 import com.lotto.app.data.local.LottoDatabase
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.security.SecureRandom
 import javax.crypto.Cipher
@@ -89,8 +87,8 @@ class EncryptedBackupManager(
                     require(magic.contentEquals(MAGIC)) { "ไฟล์นี้ไม่ใช่ข้อมูลสำรอง Lotto ที่รองรับ" }
                     val iterations = input.readInt()
                     require(iterations in 200_000..1_000_000) { "รูปแบบการเข้ารหัสในไฟล์ไม่ถูกต้อง" }
-                    val salt = ByteArray(SALT_BYTES).also(input::readFully)
-                    val iv = ByteArray(IV_BYTES).also(input::readFully)
+                    val salt = ByteArray(SALT_BYTES).also { input.readFully(it) }
+                    val iv = ByteArray(IV_BYTES).also { input.readFully(it) }
                     val cipher = createCipher(Cipher.DECRYPT_MODE, password, salt, iv, iterations)
                     try {
                         CipherInputStream(input, cipher).use { encrypted ->
@@ -104,12 +102,36 @@ class EncryptedBackupManager(
 
             validateDatabase(decrypted)
             val target = context.getDatabasePath(LottoDatabase.DATABASE_NAME)
+            val parent = target.parentFile ?: throw IllegalStateException("ไม่พบโฟลเดอร์ฐานข้อมูล")
+            parent.mkdirs()
+            val replacement = File(parent, "${LottoDatabase.DATABASE_NAME}.restore.tmp")
+            val previous = File(parent, "${LottoDatabase.DATABASE_NAME}.pre_restore")
+            decrypted.copyTo(replacement, overwrite = true)
+            FileOutputStream(replacement, true).use { it.fd.sync() }
+
+            // Checkpoint the current database before touching it, then replace it atomically.
+            database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { cursor ->
+                if (cursor.moveToFirst() && cursor.getInt(0) != 0) {
+                    throw IllegalStateException("ไม่สามารถปิดธุรกรรมฐานข้อมูลเดิมได้ จึงยกเลิกการกู้คืน")
+                }
+            }
             database.close()
-            target.parentFile?.mkdirs()
-            File(context.getDatabasePath(LottoDatabase.DATABASE_NAME).path + "-wal").delete()
-            File(context.getDatabasePath(LottoDatabase.DATABASE_NAME).path + "-shm").delete()
-            File(context.getDatabasePath(LottoDatabase.DATABASE_NAME).path + "-journal").delete()
-            decrypted.copyTo(target, overwrite = true)
+            previous.delete()
+            if (target.exists() && !target.renameTo(previous)) {
+                throw IllegalStateException("ไม่สามารถเก็บฐานข้อมูลเดิมไว้เป็นข้อมูลสำรองชั่วคราวได้")
+            }
+            try {
+                File(target.path + "-wal").delete()
+                File(target.path + "-shm").delete()
+                File(target.path + "-journal").delete()
+                if (!replacement.renameTo(target)) {
+                    throw IllegalStateException("ไม่สามารถแทนที่ฐานข้อมูลด้วยไฟล์กู้คืนได้")
+                }
+                previous.delete()
+            } catch (failure: Exception) {
+                if (!target.exists() && previous.exists()) previous.renameTo(target)
+                throw failure
+            }
         } finally {
             password.fill('\u0000')
             decrypted.delete()
