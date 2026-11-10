@@ -29,7 +29,7 @@ Android application for recording lottery sales, credit accounts, draw results, 
 ## Build outputs
 
 - `lotto-debug-apk`: installable debug build for testing.
-- `lotto-release-unsigned-apk`: optimized release variant, currently unsigned. A production installable APK/AAB requires a private signing key configured through protected CI secrets; no signing key is stored in this repository.
+- `lotto-release-apk` and `lotto-release-aab`: optimized release outputs. They are signed only when the owner configures the four protected GitHub Actions secrets below; otherwise they remain unsigned test artifacts.
 
 ## Important operational limitations
 
@@ -38,3 +38,14 @@ Android application for recording lottery sales, credit accounts, draw results, 
 - Prize payout warnings show outstanding debt for the same customer ID and require acknowledgement when debt exists. Debt is not automatically offset against prizes; the operator must verify the customer and settle amounts explicitly.
 - Voiding is prohibited after a draw result is recorded and for credit bills with any payment history. Such cases require a separately reviewed manual correction/refund so existing financial history is not silently rewritten.
 - A successful CI build does not replace real-device testing, backup/restore rehearsal, or review of all financial workflows before live use.
+
+## Release signing setup
+
+To produce an installable production release, create and securely retain an Android upload/release keystore outside this repository. Add these repository Actions secrets:
+
+- `ANDROID_KEYSTORE_BASE64`: Base64 encoding of the keystore file
+- `ANDROID_KEYSTORE_PASSWORD`: keystore password
+- `ANDROID_KEY_ALIAS`: key alias
+- `ANDROID_KEY_PASSWORD`: key password
+
+The workflow detects the key at build time and signs the release APK/AAB when the secrets are present. Never commit the keystore or passwords to Git. Keep a secure offline copy of the keystore; losing it can prevent future updates to an app published under that signing identity.
