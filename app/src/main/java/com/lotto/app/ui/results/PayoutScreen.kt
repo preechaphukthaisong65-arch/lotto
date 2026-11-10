@@ -51,6 +51,7 @@ fun PayoutScreen(repository: DrawResultRepository, creditRepository: CreditAccou
     var legacyDebtAcknowledged by remember { mutableStateOf(false) }
     var legacyOutstandingDebt by remember { mutableStateOf<Long?>(null) }
     var legacyDebtWarningAcknowledged by remember { mutableStateOf(false) }
+    var legacyDebtLookupComplete by remember { mutableStateOf(false) }
     val unpaid by repository.observeWinningBills("UNPAID").collectAsState(initial = emptyList())
     val paid by repository.observeWinningBills("PAID").collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
@@ -68,6 +69,7 @@ fun PayoutScreen(repository: DrawResultRepository, creditRepository: CreditAccou
             legacyDebtAcknowledged = false
             legacyOutstandingDebt = null
             legacyDebtWarningAcknowledged = false
+            legacyDebtLookupComplete = true
         } else {
             outstandingDebt = null
             debtLookupError = null
@@ -76,6 +78,7 @@ fun PayoutScreen(repository: DrawResultRepository, creditRepository: CreditAccou
             legacyDebtAcknowledged = false
             legacyOutstandingDebt = null
             legacyDebtWarningAcknowledged = false
+            legacyDebtLookupComplete = bill.customerId == null
             if (bill.customerId != null) {
                 try {
                     outstandingDebt = creditRepository.getOutstandingCreditByCustomerId(bill.customerId)
@@ -83,8 +86,10 @@ fun PayoutScreen(repository: DrawResultRepository, creditRepository: CreditAccou
                         bill.customerFirstName,
                         bill.customerLastName
                     )
+                    legacyDebtLookupComplete = true
                 } catch (e: Exception) {
                     debtLookupError = e.message ?: "ตรวจสอบยอดหนี้ลูกค้าไม่สำเร็จ"
+                    legacyDebtLookupComplete = true
                 }
             }
         }
@@ -204,7 +209,7 @@ fun PayoutScreen(repository: DrawResultRepository, creditRepository: CreditAccou
                 }
             },
             confirmButton = {
-                TextButton(enabled = recipient.isNotBlank() && !isProcessingPayout && debtLookupError == null &&
+                TextButton(enabled = recipient.isNotBlank() && !isProcessingPayout && debtLookupError == null && legacyDebtLookupComplete &&
                     (
                         if (legacyIdentityMissing) legacyDebtAcknowledged
                         else outstandingDebt != null &&
