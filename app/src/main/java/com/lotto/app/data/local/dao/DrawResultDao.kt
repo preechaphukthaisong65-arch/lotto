@@ -256,6 +256,7 @@ abstract class DrawResultDao {
     @Query("""
         SELECT wi.drawDate AS drawDate, wi.saleId AS saleId,
                s.customerFirstName AS customerFirstName, s.customerLastName AS customerLastName,
+               s.customerId AS customerId,
                SUM(wi.prizeAmount) AS totalPrize, MAX(wi.payoutStatus) AS payoutStatus,
                MAX(wi.recipientName) AS recipientName, MAX(wi.paidAt) AS paidAt,
                s.createdAt AS saleCreatedAt,
