@@ -19,5 +19,7 @@ data class SaleEntity(
     val customerId: Long? = null,
     val customerPhone: String? = null,
     @ColumnInfo(defaultValue = "0")
-    val legacyDebtReviewed: Boolean = false
+    val legacyDebtReviewed: Boolean = false,
+    @ColumnInfo(defaultValue = "0")
+    val newCustomerIdentityConfirmed: Boolean = false
 )
