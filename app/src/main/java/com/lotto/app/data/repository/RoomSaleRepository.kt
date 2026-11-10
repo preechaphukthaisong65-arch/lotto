@@ -28,6 +28,7 @@ class RoomSaleRepository(private val saleDao: SaleDao) : SaleRepository {
             customerId = draft.customerId,
             customerPhone = draft.customerPhone?.trim()?.takeIf { it.isNotBlank() },
             legacyDebtReviewed = draft.legacyDebtReviewed,
+            newCustomerIdentityConfirmed = draft.newCustomerIdentityConfirmed,
             totalAmount = draft.totalAmount,
             cashAmount = draft.cashAmount,
             creditAmount = draft.creditAmount,
