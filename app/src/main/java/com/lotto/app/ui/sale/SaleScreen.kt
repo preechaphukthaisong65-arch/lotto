@@ -41,6 +41,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.lotto.app.domain.model.SaleDraft
 import com.lotto.app.domain.model.SaleDraftItem
+import com.lotto.app.data.repository.CustomerRepository
 import com.lotto.app.domain.rules.LottoRules
 import com.lotto.app.domain.rules.PayoutMode
 import com.lotto.app.domain.rules.PrizeType
@@ -60,6 +61,7 @@ private data class HalfPayoutPrompt(val isThreeDigit: Boolean, val entryId: Long
 fun SaleScreen(
     onBack: () -> Unit,
     drawDate: String,
+    customerRepository: CustomerRepository,
     fullLimitsByPrizeType: Map<String, Long>,
     noAcceptNumbersByPrizeType: Map<String, Set<String>>,
     halfPayoutNumbersByPrizeType: Map<String, Set<String>>,
@@ -72,6 +74,9 @@ fun SaleScreen(
     var nextTwoId by remember { mutableStateOf(2L) }
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
+    var selectedCustomerId by remember { mutableStateOf<Long?>(null) }
+    var customerPhone by remember { mutableStateOf("") }
+    val customers by customerRepository.observeAll().collectAsState(initial = emptyList())
     var cashSelected by remember { mutableStateOf(true) }
     var creditSelected by remember { mutableStateOf(false) }
     var cashAmount by remember { mutableStateOf("") }
@@ -407,6 +412,8 @@ fun SaleScreen(
         return SaleDraft(
             customerFirstName = firstName.trim(),
             customerLastName = lastName.trim(),
+            customerId = selectedCustomerId,
+            customerPhone = customerPhone.trim().takeIf { it.isNotBlank() },
             totalAmount = total,
             cashAmount = cashValue,
             creditAmount = creditValue,
@@ -626,19 +633,55 @@ fun SaleScreen(
                     ) {
                         OutlinedTextField(
                             value = firstName,
-                            onValueChange = { firstName = it },
+                            onValueChange = { firstName = it; selectedCustomerId = null },
                             modifier = Modifier.weight(1f),
                             label = { Text("ชื่อ") },
                             singleLine = true
                         )
                         OutlinedTextField(
                             value = lastName,
-                            onValueChange = { lastName = it },
+                            onValueChange = { lastName = it; selectedCustomerId = null },
                             modifier = Modifier.weight(1f),
                             label = { Text("นามสกุล") },
                             singleLine = true
                         )
                     }
+                    val matchingCustomers = customers.filter { customer ->
+                        (firstName.isBlank() || customer.firstName.contains(firstName.trim(), ignoreCase = true)) &&
+                            (lastName.isBlank() || customer.lastName.contains(lastName.trim(), ignoreCase = true)) &&
+                            (firstName.isNotBlank() || lastName.isNotBlank())
+                    }.take(6)
+                    if (selectedCustomerId != null) {
+                        val selectedCustomer = customers.firstOrNull { it.customerId == selectedCustomerId }
+                        Text(
+                            "รหัสลูกค้าที่เลือก: ${selectedCustomer?.customerCode ?: selectedCustomerId} · ใช้รหัสนี้รวมยอดหนี้ของลูกค้ารายเดิม",
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else if (matchingCustomers.isNotEmpty()) {
+                        Text("พบลูกค้าที่อาจเป็นรายเดิม กรุณาเลือกรหัสให้ถูกคน หรือไม่เลือกเพื่อสร้างรหัสลูกค้าใหม่", style = MaterialTheme.typography.bodySmall)
+                        matchingCustomers.forEach { customer ->
+                            TextButton(
+                                onClick = {
+                                    selectedCustomerId = customer.customerId
+                                    firstName = customer.firstName
+                                    lastName = customer.lastName
+                                    customerPhone = customer.phone.orEmpty()
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("${customer.firstName} ${customer.lastName} · ${customer.phone ?: "ไม่ระบุเบอร์"} · ${customer.customerCode}")
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = customerPhone,
+                        onValueChange = { customerPhone = it.filter { ch -> ch.isDigit() || ch == '+' || ch == '-' || ch == ' ' }; selectedCustomerId = null },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("เบอร์โทรศัพท์ (ไม่บังคับ)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+                    )
                     if (creditSelected && !customerValid) {
                         Text(
                             "การขายเงินเชื่อต้องกรอกชื่อและนามสกุลลูกค้า",
