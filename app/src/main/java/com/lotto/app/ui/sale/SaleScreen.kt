@@ -394,7 +394,7 @@ fun SaleScreen(
         customerValid && activeEntriesValid && !hasNoAcceptItems && !isSaving && savedReceipt == null &&
         legacyDebtCheckError == null && legacyDebtAmount != null &&
         (legacyDebtAmount == 0L || legacyDebtReviewed) &&
-        (!creditSelected || selectedCustomerId != null || exactNameCustomers.isEmpty() || newCustomerIdentityConfirmed)
+        (!creditSelected || selectedCustomerId != null || newCustomerIdentityConfirmed)
 
     fun createDraft(): SaleDraft {
         val items = buildList {
@@ -716,9 +716,13 @@ fun SaleScreen(
                             }
                         }
                     }
-                    if (creditSelected && selectedCustomerId == null && exactNameCustomers.isNotEmpty()) {
+                    if (creditSelected && selectedCustomerId == null) {
                         Text(
-                            "พบรหัสลูกค้าเดิมที่ชื่อและนามสกุลตรงกัน หากเป็นคนละคนต้องยืนยันก่อนสร้างรหัสใหม่ เพื่อไม่ให้หลบเพดานเครดิต",
+                            if (exactNameCustomers.isNotEmpty()) {
+                                "พบรหัสลูกค้าเดิมที่ชื่อและนามสกุลตรงกัน หากเป็นคนเดิมให้เลือกรหัสเดิมเพื่อรวมวงเงินเครดิต หากเป็นคนละคนให้ยืนยันสร้างรหัสใหม่"
+                            } else {
+                                "หากเป็นลูกค้ารายเดิมให้เลือกรหัสจากรายชื่อด้านบน หากเป็นลูกค้าใหม่ให้ยืนยันสร้างรหัสใหม่ก่อนขายเงินเชื่อ"
+                            },
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -727,7 +731,7 @@ fun SaleScreen(
                                 checked = newCustomerIdentityConfirmed,
                                 onCheckedChange = { newCustomerIdentityConfirmed = it }
                             )
-                            Text("ยืนยันว่าเป็นคนละคนและสร้างรหัสลูกค้าใหม่")
+                            Text("ตรวจสอบรายชื่อลูกค้าเดิมแล้ว ยืนยันสร้างรหัสลูกค้าใหม่")
                         }
                     }
                     OutlinedTextField(
