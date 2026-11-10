@@ -31,14 +31,16 @@ abstract class AppSettingDao {
     open suspend fun saveWithAudit(setting: AppSettingEntity) {
         val previous = getByKey(setting.key)
         upsertInternal(setting)
-        insertAudit(
-            SettingAuditEntity(
-                settingKey = setting.key,
-                previousValue = previous?.value,
-                newValue = setting.value,
-                changedAt = setting.updatedAt
+        if (setting.key != "clock_high_water_epoch_ms") {
+            insertAudit(
+                SettingAuditEntity(
+                    settingKey = setting.key,
+                    previousValue = previous?.value,
+                    newValue = setting.value,
+                    changedAt = setting.updatedAt
+                )
             )
-        )
+        }
     }
 
     @Transaction
