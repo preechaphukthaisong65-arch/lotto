@@ -61,6 +61,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          disable-animations: false
           script: gradle --no-daemon :app:connectedDebugAndroidTest
 
       - name: Build debug APK
