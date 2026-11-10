@@ -93,7 +93,7 @@ fun RiskLimitsScreen(repository: SettingsRepository, onBack: () -> Unit) {
                 onValueChange = { values[RiskLimitPolicy.MAX_CREDIT_PER_CUSTOMER_KEY] = it.filter(Char::isDigit) },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("เพดานยอดเงินเชื่อต่อลูกค้า") },
-                supportingText = { Text("รวมยอดค้างเดิมและยอดเชื่อใหม่ โดยเทียบชื่อ-นามสกุลตรงกัน") },
+                supportingText = { Text("รวมยอดค้างของรหัสลูกค้าที่เลือกกับยอดเชื่อใหม่ ส่วนบิลเก่าที่ไม่มีรหัสลูกค้าจะให้ตรวจสอบแยกต่างหาก") },
                 suffix = { Text("บาท") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true
