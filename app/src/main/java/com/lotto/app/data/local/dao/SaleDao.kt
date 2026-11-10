@@ -77,6 +77,46 @@ abstract class SaleDao {
         number: String
     ): Long
 
+    @Query("""
+        SELECT si.* FROM sale_items si
+        INNER JOIN sales s ON s.saleId = si.saleId
+        WHERE s.drawDate = :drawDate AND s.status = 'CONFIRMED'
+        ORDER BY si.itemId
+    """)
+    protected abstract suspend fun getAllItemsForDraw(drawDate: String): List<SaleItemEntity>
+
+    private fun sumExact(values: Iterable<Long>): Long =
+        values.fold(0L) { total, value -> Math.addExact(total, value) }
+
+    private fun calculateMaximumPrizeExposure(items: List<SaleItemEntity>): Long {
+        val straight = items.filter { it.prizeType == PrizeType.THREE_DIGIT_STRAIGHT.name }
+            .groupBy { it.number }
+            .mapValues { (_, rows) -> sumExact(rows.map { Math.multiplyExact(it.amount, it.payoutMultiplier) }) }
+        val tod = items.filter { it.prizeType == PrizeType.THREE_DIGIT_TOD.name }
+            .groupBy { it.number }
+            .mapValues { (_, rows) -> sumExact(rows.map { Math.multiplyExact(it.amount, it.payoutMultiplier) }) }
+        val top = items.filter { it.prizeType == PrizeType.TWO_DIGIT_TOP.name }
+            .groupBy { it.number }
+            .mapValues { (_, rows) -> sumExact(rows.map { Math.multiplyExact(it.amount, it.payoutMultiplier) }) }
+        val bottom = items.filter { it.prizeType == PrizeType.TWO_DIGIT_BOTTOM.name }
+            .groupBy { it.number }
+            .mapValues { (_, rows) -> sumExact(rows.map { Math.multiplyExact(it.amount, it.payoutMultiplier) }) }
+
+        val maxThreeDigitAndTop = (0..999).maxOf { value ->
+            val result = value.toString().padStart(3, '0')
+            val todLiability = sumExact(tod.filterKeys { number ->
+                com.lotto.app.domain.rules.LottoRules.isThreeDigitTodMatch(number, result)
+            }.values)
+            sumExact(listOf(
+                straight[result] ?: 0L,
+                todLiability,
+                top[result.takeLast(2)] ?: 0L
+            ))
+        }
+        val maxTwoDigitBottom = bottom.values.maxOrNull() ?: 0L
+        return Math.addExact(maxThreeDigitAndTop, maxTwoDigitBottom)
+    }
+
     @Transaction
     open suspend fun insertSaleWithItems(
         sale: SaleEntity,
@@ -128,6 +168,35 @@ abstract class SaleDao {
         upsertSettingValue("clock_high_water_epoch_ms", sale.createdAt.toString(), sale.createdAt)
         // Keep draw-level totals within Long capacity so later financial summaries cannot overflow.
         Math.addExact(getSalesTotalForDraw(targetDrawDate), sale.totalAmount)
+
+        val exposureCapRaw = getSettingValue("risk_max_prize_liability_per_draw")
+            ?: throw IllegalStateException("ยังไม่ได้กำหนดเพดานความเสี่ยงสูงสุดต่องวด กรุณาตั้งค่าก่อนขาย")
+        val exposureCap = exposureCapRaw.toLongOrNull()
+            ?: throw IllegalStateException("ค่าเพดานความเสี่ยงต่องวดไม่ถูกต้อง กรุณาตรวจสอบการตั้งค่า")
+        require(exposureCap > 0L) { "เพดานความเสี่ยงต่องวดต้องมากกว่า 0 บาท จึงจะเปิดรับขายได้" }
+        val existingItems = getAllItemsForDraw(targetDrawDate)
+        val projectedExposure = calculateMaximumPrizeExposure(
+            existingItems + items.map { it.copy(saleId = 0L) }
+        )
+        require(projectedExposure <= exposureCap) {
+            "ยอดรางวัลสูงสุดที่อาจต้องจ่ายต่องวดจะเกินเพดานที่ตั้งไว้ (${projectedExposure} / ${exposureCap} บาท)"
+        }
+
+        if (sale.creditAmount > 0L) {
+            val creditCapRaw = getSettingValue("risk_max_credit_per_customer")
+                ?: throw IllegalStateException("ยังไม่ได้กำหนดเพดานเครดิตต่อลูกค้า กรุณาตั้งค่าก่อนขายเงินเชื่อ")
+            val creditCap = creditCapRaw.toLongOrNull()
+                ?: throw IllegalStateException("ค่าเพดานเครดิตต่อลูกค้าไม่ถูกต้อง กรุณาตรวจสอบการตั้งค่า")
+            require(creditCap > 0L) { "เพดานเครดิตต่อลูกค้าต้องมากกว่า 0 บาท" }
+            val outstanding = getOutstandingCreditByCustomer(
+                sale.customerFirstName,
+                sale.customerLastName
+            )
+            val projectedCredit = Math.addExact(outstanding, sale.creditAmount)
+            require(projectedCredit <= creditCap) {
+                "ยอดเครดิตของลูกค้ารายนี้จะเกินเพดาน (${projectedCredit} / ${creditCap} บาท)"
+            }
+        }
 
         // No-accept rules are absolute and checked inside the sale transaction.
         items.forEach { item ->
