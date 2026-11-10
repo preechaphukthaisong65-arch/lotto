@@ -261,8 +261,6 @@ class EncryptedBackupManager(
         require(sourceVersion in 1..LottoDatabase.DATABASE_VERSION) {
             "เวอร์ชันฐานข้อมูลสำรองใหม่กว่าแอปนี้หรือไม่รองรับ"
         }
-        if (sourceVersion == LottoDatabase.DATABASE_VERSION) return
-
         val migrated = File(context.cacheDir, "lotto-backup-migration.db")
         migrated.delete()
         file.copyTo(migrated, overwrite = true)
