@@ -9,6 +9,7 @@ import com.lotto.app.data.local.LottoDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -52,6 +53,13 @@ class DatabaseEncryptionInstrumentedTest {
         val uri = Uri.fromFile(backup)
         application.container.encryptedBackupManager.exportEncrypted(uri, secret.toCharArray())
         assertTrue("Encrypted backup file should exist", backup.exists() && backup.length() > 0L)
+        assertThrows(IllegalArgumentException::class.java) {
+            application.container.encryptedBackupManager.restoreEncrypted(
+                uri,
+                "WrongBackupPassword-2026".toCharArray()
+            )
+        }
+        assertEquals("must-survive-restore", application.container.settingsRepository.get(testKey))
 
         application.container.settingsRepository.delete(testKey)
         application.container.encryptedBackupManager.restoreEncrypted(uri, secret.toCharArray())
