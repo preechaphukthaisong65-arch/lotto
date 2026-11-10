@@ -41,7 +41,8 @@ class AppContainer(context: Context) {
             LottoDatabase.MIGRATION_9_10,
             LottoDatabase.MIGRATION_10_11,
             LottoDatabase.MIGRATION_11_12,
-            LottoDatabase.MIGRATION_12_13
+            LottoDatabase.MIGRATION_12_13,
+            LottoDatabase.MIGRATION_13_14
         )
         .build()
 
