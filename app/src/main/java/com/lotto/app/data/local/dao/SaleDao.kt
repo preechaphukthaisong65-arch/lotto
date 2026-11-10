@@ -99,6 +99,17 @@ abstract class SaleDao {
             }
         )
 
+    private suspend fun validateAndAdvanceClock(timestamp: Long) {
+        require(timestamp > 0L) { "เวลาอุปกรณ์ไม่ถูกต้อง ไม่สามารถบันทึกรายการการเงินได้" }
+        val lastSeenRaw = getSettingValue("clock_high_water_epoch_ms")
+        val lastSeen = lastSeenRaw?.toLongOrNull()
+            ?: if (lastSeenRaw == null) 0L else throw IllegalStateException("ข้อมูลตรวจสอบเวลาของระบบเสียหาย")
+        require(timestamp >= lastSeen) {
+            "ตรวจพบว่านาฬิกาเครื่องเดินย้อนเวลา ไม่สามารถบันทึกรายการการเงินได้"
+        }
+        upsertSettingValue("clock_high_water_epoch_ms", timestamp.toString(), timestamp)
+    }
+
 
     @Transaction
     open suspend fun insertSaleWithItems(
@@ -140,15 +151,7 @@ abstract class SaleDao {
 
         // Persist a monotonic wall-clock high-water mark. If the device clock is
         // moved backwards after the app has observed a later time, fail closed.
-        val lastSeenRaw = getSettingValue("clock_high_water_epoch_ms")
-        val lastSeen = lastSeenRaw?.toLongOrNull()
-            ?: if (lastSeenRaw == null) 0L else throw IllegalStateException(
-                "ข้อมูลตรวจสอบเวลาของระบบเสียหาย กรุณาตรวจสอบอุปกรณ์ก่อนขาย"
-            )
-        require(sale.createdAt >= lastSeen) {
-            "ตรวจพบว่านาฬิกาเครื่องเดินย้อนเวลา ไม่สามารถบันทึกการขายได้ กรุณาตั้งเวลาอัตโนมัติและตรวจสอบเวลา"
-        }
-        upsertSettingValue("clock_high_water_epoch_ms", sale.createdAt.toString(), sale.createdAt)
+        validateAndAdvanceClock(sale.createdAt)
         // Keep draw-level totals within Long capacity so later financial summaries cannot overflow.
         Math.addExact(getSalesTotalForDraw(targetDrawDate), sale.totalAmount)
 
@@ -322,6 +325,7 @@ abstract class SaleDao {
     @Transaction
     open suspend fun recordCreditPayment(creditDocumentId: Long, amount: Long, paidAt: Long) {
         require(amount > 0L) { "ยอดรับชำระต้องมากกว่า 0 บาท" }
+        validateAndAdvanceClock(paidAt)
         val document = getCreditDocumentById(creditDocumentId)
             ?: throw IllegalArgumentException("ไม่พบเอกสารบัญชีเชื่อ")
         require(document.status == CreditDocumentEntity.STATUS_OPEN) { "บิลนี้ชำระครบแล้ว" }
@@ -337,7 +341,7 @@ abstract class SaleDao {
             paidAt = paidAt
         ))
 
-        if (alreadyPaid + amount == document.creditAmount) {
+        if (Math.addExact(alreadyPaid, amount) == document.creditAmount) {
             updateCreditStatus(creditDocumentId, CreditDocumentEntity.STATUS_PAID, paidAt)
         }
     }
