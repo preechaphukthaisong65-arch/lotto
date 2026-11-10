@@ -136,10 +136,23 @@ abstract class SaleDao {
         // Check each number/type pair inside the same transaction as insertion.
         // Grouping also prevents duplicate rows in one bill from bypassing the cap.
         items.groupBy { it.prizeType to it.number }.forEach { (key, requestedItems) ->
-            // The persisted setting is authoritative; the UI-supplied map is only a fallback.
-            val limit = getSettingValue("full_limit_${key.first}")?.toLongOrNull()?.coerceAtLeast(0L)
-                ?: fullLimitsByPrizeType[key.first]?.coerceAtLeast(0L)
-                ?: 0L
+            // A stored setting is authoritative. Never turn malformed or negative
+            // persisted limits into zero (zero means unlimited), and never silently
+            // fall back to a potentially stale UI value when storage is corrupt.
+            val settingKey = "full_limit_${key.first}"
+            val persistedLimit = getSettingValue(settingKey)
+            val limit = if (persistedLimit != null) {
+                val parsed = persistedLimit.toLongOrNull()
+                    ?: throw IllegalStateException("ค่าลิมิต $settingKey ในฐานข้อมูลไม่ถูกต้อง กรุณาตรวจสอบการตั้งค่าก่อนขาย")
+                require(parsed >= 0L) {
+                    "ค่าลิมิต $settingKey ต้องไม่ติดลบ กรุณาตรวจสอบการตั้งค่าก่อนขาย"
+                }
+                parsed
+            } else {
+                fullLimitsByPrizeType[key.first]?.also { value ->
+                    require(value >= 0L) { "ค่าลิมิตหวยต้องไม่ติดลบ" }
+                } ?: 0L
+            }
             if (limit > 0L) {
                 val alreadySold = getNumberStakeForDraw(sale.drawDate.orEmpty(), key.first, key.second)
                 val requested = requestedItems.fold(0L) { total, item -> Math.addExact(total, item.amount) }
