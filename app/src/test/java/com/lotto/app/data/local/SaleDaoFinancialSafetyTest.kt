@@ -18,7 +18,7 @@ import org.robolectric.annotation.Config
 import java.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [35], application = android.app.Application::class)
 class SaleDaoFinancialSafetyTest {
     private lateinit var database: LottoDatabase
     private val saleDao get() = database.saleDao()
