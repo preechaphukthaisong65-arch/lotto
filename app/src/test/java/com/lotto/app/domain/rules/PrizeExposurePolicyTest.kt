@@ -33,7 +33,7 @@ class PrizeExposurePolicyTest {
         val liability = PrizeExposurePolicy.maximumPossiblePrizeLiability(
             listOf(
                 PrizeExposureEntry("123", PrizeType.THREE_DIGIT_STRAIGHT, 2, 500),
-                PrizeExposureEntry("23", PrizeType.TWO_DIGIT_TOP, 3, 70),
+                PrizeExposureEntry("99", PrizeType.TWO_DIGIT_TOP, 3, 70),
                 PrizeExposureEntry("99", PrizeType.TWO_DIGIT_BOTTOM, 4, 35)
             )
         )
