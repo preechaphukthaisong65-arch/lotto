@@ -144,7 +144,8 @@ class SaleDaoFinancialSafetyTest {
                         cashAmount = 0,
                         creditAmount = 20,
                         createdAt = saleTime + 1_000,
-                        drawDate = drawDate
+                        drawDate = drawDate,
+                        newCustomerIdentityConfirmed = true
                     ),
                     listOf(item(amount = 20))
                 )
