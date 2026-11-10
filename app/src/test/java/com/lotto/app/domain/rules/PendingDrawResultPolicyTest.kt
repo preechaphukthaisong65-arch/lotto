@@ -26,15 +26,17 @@ class PendingDrawResultPolicyTest {
     }
 
     @Test
-    fun doesNotPromptBeforeSixteenHundredOnDrawDate() {
+    fun doesNotPromptBeforeSixteenHundredForCurrentDrawWhenOlderDrawsAreComplete() {
         val now = ZonedDateTime.of(2026, 11, 1, 15, 59, 59, 0, zone)
-        assertNull(PendingDrawResultPolicy.nextPendingDrawDate(dates, emptySet(), now))
+        val completed = setOf("2026-10-01", "2026-10-16")
+        assertNull(PendingDrawResultPolicy.nextPendingDrawDate(dates, completed, now))
     }
 
     @Test
-    fun promptsAtSixteenHundredOnDrawDate() {
+    fun promptsAtSixteenHundredForCurrentDrawWhenOlderDrawsAreComplete() {
         val now = ZonedDateTime.of(2026, 11, 1, 16, 0, 0, 0, zone)
-        assertEquals("2026-10-01", PendingDrawResultPolicy.nextPendingDrawDate(dates, emptySet(), now))
+        val completed = setOf("2026-10-01", "2026-10-16")
+        assertEquals("2026-11-01", PendingDrawResultPolicy.nextPendingDrawDate(dates, completed, now))
     }
 
     @Test
