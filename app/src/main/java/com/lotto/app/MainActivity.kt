@@ -134,6 +134,7 @@ class MainActivity : FragmentActivity() {
         val container = (application as LottoApplication).container
         val saleRepository = container.saleRepository
         val creditAccountRepository = container.creditAccountRepository
+        val customerRepository = container.customerRepository
         val drawCalendarRepository = container.drawCalendarRepository
         val drawResultRepository = container.drawResultRepository
         val settingsRepository = container.settingsRepository
@@ -216,6 +217,7 @@ class MainActivity : FragmentActivity() {
                         AppScreen.Sale.name -> SaleScreen(
                             onBack = { currentScreen = AppScreen.Home.name },
                             drawDate = activeSaleDrawDate,
+                            customerRepository = customerRepository,
                             fullLimitsByPrizeType = currentFullLimits,
                             noAcceptNumbersByPrizeType = currentNoAcceptNumbers,
                             halfPayoutNumbersByPrizeType = currentHalfPayoutNumbers,
