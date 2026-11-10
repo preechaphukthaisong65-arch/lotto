@@ -9,6 +9,7 @@ import com.lotto.app.data.local.entity.CreditDocumentItemEntity
 import com.lotto.app.data.local.entity.CreditPaymentEntity
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
+import com.lotto.app.data.local.entity.SaleVoidEventEntity
 import com.lotto.app.domain.rules.PrizeType
 import com.lotto.app.domain.rules.PrizeExposureEntry
 import com.lotto.app.domain.rules.PrizeExposurePolicy
@@ -29,6 +30,24 @@ abstract class SaleDao {
 
     @Insert
     protected abstract suspend fun insertCreditPayment(payment: CreditPaymentEntity): Long
+
+    @Insert
+    protected abstract suspend fun insertSaleVoidEvent(event: SaleVoidEventEntity): Long
+
+    @Query("SELECT * FROM credit_documents WHERE sourceSaleId = :saleId LIMIT 1")
+    protected abstract suspend fun getCreditDocumentForSale(saleId: Long): CreditDocumentEntity?
+
+    @Query("SELECT COUNT(*) FROM credit_payments WHERE creditDocumentId = :creditDocumentId")
+    protected abstract suspend fun countCreditPayments(creditDocumentId: Long): Int
+
+    @Query("SELECT COUNT(*) FROM draw_results WHERE drawDate = :drawDate")
+    protected abstract suspend fun countResultsForDraw(drawDate: String): Int
+
+    @Query("SELECT COUNT(*) FROM winning_sale_items WHERE saleId = :saleId")
+    protected abstract suspend fun countWinningItemsForSale(saleId: Long): Int
+
+    @Query("UPDATE sales SET status = 'VOIDED' WHERE saleId = :saleId AND status = 'CONFIRMED'")
+    protected abstract suspend fun markSaleVoided(saleId: Long): Int
 
     @Query("SELECT COALESCE(SUM(amount), 0) FROM credit_payments WHERE creditDocumentId = :creditDocumentId")
     protected abstract suspend fun getTotalPayments(creditDocumentId: Long): Long
@@ -291,6 +310,54 @@ abstract class SaleDao {
 
     @Query("SELECT * FROM sales WHERE saleId = :saleId LIMIT 1")
     abstract suspend fun getSaleById(saleId: Long): SaleEntity?
+
+    @Query("SELECT * FROM sale_void_events ORDER BY voidedAt DESC, voidId DESC")
+    abstract suspend fun getAllSaleVoidEvents(): List<SaleVoidEventEntity>
+
+    @Transaction
+    open suspend fun voidConfirmedSale(
+        saleId: Long,
+        reason: String,
+        voidedAt: Long,
+        cashRefundConfirmed: Boolean
+    ): SaleVoidEventEntity {
+        require(reason.isNotBlank()) { "กรุณาระบุเหตุผลการยกเลิกบิล" }
+        validateAndAdvanceClock(voidedAt)
+        val sale = getSaleById(saleId) ?: throw IllegalArgumentException("ไม่พบบิลขายเลขที่ $saleId")
+        require(sale.status == "CONFIRMED") { "บิลนี้ถูกยกเลิกไปแล้วหรือไม่อยู่ในสถานะที่ยกเลิกได้" }
+        val drawDate = sale.drawDate ?: throw IllegalStateException("บิลเก่าไม่มีวันที่งวด จึงยกเลิกอัตโนมัติไม่ได้")
+        require(countResultsForDraw(drawDate) == 0) {
+            "งวดนี้บันทึกผลรางวัลแล้ว ไม่อนุญาตให้ยกเลิกบิลย้อนหลัง"
+        }
+        require(countWinningItemsForSale(saleId) == 0) {
+            "บิลนี้มีรายการรางวัลแล้ว ไม่อนุญาตให้ยกเลิก"
+        }
+        val creditDocument = getCreditDocumentForSale(saleId)
+            ?: throw IllegalStateException("ไม่พบเอกสารบัญชีเชื่อที่เชื่อมกับบิลนี้ จึงยกเลิกอย่างปลอดภัยไม่ได้")
+        require(creditDocument.status == CreditDocumentEntity.STATUS_OPEN ||
+            creditDocument.status == CreditDocumentEntity.STATUS_PAID) {
+            "สถานะเอกสารบัญชีเชื่อไม่รองรับการยกเลิก"
+        }
+        require(countCreditPayments(creditDocument.creditDocumentId) == 0) {
+            "บิลนี้มีประวัติรับชำระเงินเชื่อแล้ว กรุณาตรวจสอบและปิดบัญชีด้วยวิธีที่มีหลักฐานก่อนยกเลิก"
+        }
+        require(sale.cashAmount == 0L || cashRefundConfirmed) {
+            "กรุณายืนยันว่าได้คืนเงินสดให้ลูกค้าครบตามยอดแล้วก่อนบันทึกยกเลิก"
+        }
+
+        val event = SaleVoidEventEntity(
+            saleId = saleId,
+            drawDate = drawDate,
+            reason = reason.trim(),
+            cashRefundAmount = sale.cashAmount,
+            cancelledCreditAmount = sale.creditAmount,
+            voidedAt = voidedAt
+        )
+        check(markSaleVoided(saleId) == 1) { "เปลี่ยนสถานะบิลเป็นยกเลิกไม่สำเร็จ" }
+        updateCreditStatus(creditDocument.creditDocumentId, "VOIDED", null)
+        val voidId = insertSaleVoidEvent(event)
+        return event.copy(voidId = voidId)
+    }
 
     @Query("SELECT * FROM sale_items WHERE saleId = :saleId ORDER BY itemId ASC")
     abstract suspend fun getItemsForSale(saleId: Long): List<SaleItemEntity>
