@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import com.lotto.app.domain.rules.SaleWindowPolicy
+import com.lotto.app.domain.rules.PendingDrawResultPolicy
 import com.lotto.app.domain.rules.FullNumberLimitPolicy
 import com.lotto.app.domain.rules.NoAcceptNumberPolicy
 import com.lotto.app.domain.rules.HalfPayoutNumberPolicy
@@ -97,14 +98,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 val saleWindow = SaleWindowPolicy.evaluate(drawDates, currentThailandTime)
-                val pendingResultDate = drawDates.mapNotNull { runCatching { LocalDate.parse(it.drawDate) }.getOrNull() }
-                    .filter { date ->
-                        !date.isAfter(currentThailandTime.toLocalDate()) &&
-                            !currentThailandTime.toLocalDateTime().isBefore(date.atTime(16, 0)) &&
-                            drawResults.none { it.drawDate == date.toString() }
-                    }
-                    .minOrNull()
-                    ?.toString()
+                val pendingResultDate = PendingDrawResultPolicy.nextPendingDrawDate(
+                    drawDates = drawDates,
+                    completedDrawDates = drawResults.mapTo(mutableSetOf()) { it.drawDate },
+                    nowThailand = currentThailandTime
+                )
                 LaunchedEffect(currentScreen, saleWindow.isOpen) {
                     if (currentScreen == AppScreen.Sale.name && !saleWindow.isOpen) {
                         Toast.makeText(this@MainActivity, "ปิดรับขายแล้ว", Toast.LENGTH_SHORT).show()
