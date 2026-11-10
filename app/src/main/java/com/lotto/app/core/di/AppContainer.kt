@@ -15,6 +15,10 @@ import com.lotto.app.data.repository.SaleRepository
 import com.lotto.app.data.repository.SettingsRepository
 
 class AppContainer(context: Context) {
+    init {
+        EncryptedBackupManager.recoverInterruptedRestore(context.applicationContext)
+    }
+
     private val database: LottoDatabase = Room.databaseBuilder(
         context.applicationContext,
         LottoDatabase::class.java,
