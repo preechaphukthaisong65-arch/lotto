@@ -30,6 +30,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
 import com.lotto.app.domain.rules.SaleWindowPolicy
 import com.lotto.app.domain.rules.PendingDrawResultPolicy
 import com.lotto.app.domain.rules.FullNumberLimitPolicy
@@ -105,6 +108,20 @@ class MainActivity : FragmentActivity() {
     override fun onStart() {
         super.onStart()
         if (!isAuthenticated.value) requestDeviceAuthentication()
+    }
+
+    override fun onPause() {
+        val settings = (application as LottoApplication).container.settingsRepository
+        val observedNow = System.currentTimeMillis()
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching {
+                val stored = settings.get("clock_high_water_epoch_ms")?.toLongOrNull() ?: 0L
+                if (observedNow > stored) {
+                    settings.save("clock_high_water_epoch_ms", observedNow.toString())
+                }
+            }
+        }
+        super.onPause()
     }
 
     override fun onStop() {
