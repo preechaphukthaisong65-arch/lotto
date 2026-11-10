@@ -38,7 +38,7 @@ import com.lotto.app.data.local.entity.SettingAuditEntity
         com.lotto.app.data.local.entity.ExpiredSaleRetentionEntity::class,
         SettingAuditEntity::class
     ],
-    version = 12,
+    version = DATABASE_VERSION,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -49,6 +49,7 @@ abstract class LottoDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "lotto_database"
+        const val DATABASE_VERSION = 12
         const val PAID_DOCUMENT_RETENTION_DAYS = 180L
         const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 
