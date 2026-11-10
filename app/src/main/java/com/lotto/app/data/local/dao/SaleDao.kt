@@ -10,6 +10,8 @@ import com.lotto.app.data.local.entity.CreditPaymentEntity
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
 import com.lotto.app.domain.rules.PrizeType
+import com.lotto.app.domain.rules.PrizeExposureEntry
+import com.lotto.app.domain.rules.PrizeExposurePolicy
 
 @Dao
 abstract class SaleDao {
@@ -85,37 +87,18 @@ abstract class SaleDao {
     """)
     protected abstract suspend fun getAllItemsForDraw(drawDate: String): List<SaleItemEntity>
 
-    private fun sumExact(values: Iterable<Long>): Long =
-        values.fold(0L) { total, value -> Math.addExact(total, value) }
+    private fun calculateMaximumPrizeExposure(items: List<SaleItemEntity>): Long =
+        PrizeExposurePolicy.maximumPossiblePrizeLiability(
+            items.map { item ->
+                PrizeExposureEntry(
+                    number = item.number,
+                    prizeType = PrizeType.valueOf(item.prizeType),
+                    stakeAmount = item.amount,
+                    payoutMultiplier = item.payoutMultiplier
+                )
+            }
+        )
 
-    private fun calculateMaximumPrizeExposure(items: List<SaleItemEntity>): Long {
-        val straight = items.filter { it.prizeType == PrizeType.THREE_DIGIT_STRAIGHT.name }
-            .groupBy { it.number }
-            .mapValues { (_, rows) -> sumExact(rows.map { Math.multiplyExact(it.amount, it.payoutMultiplier) }) }
-        val tod = items.filter { it.prizeType == PrizeType.THREE_DIGIT_TOD.name }
-            .groupBy { it.number }
-            .mapValues { (_, rows) -> sumExact(rows.map { Math.multiplyExact(it.amount, it.payoutMultiplier) }) }
-        val top = items.filter { it.prizeType == PrizeType.TWO_DIGIT_TOP.name }
-            .groupBy { it.number }
-            .mapValues { (_, rows) -> sumExact(rows.map { Math.multiplyExact(it.amount, it.payoutMultiplier) }) }
-        val bottom = items.filter { it.prizeType == PrizeType.TWO_DIGIT_BOTTOM.name }
-            .groupBy { it.number }
-            .mapValues { (_, rows) -> sumExact(rows.map { Math.multiplyExact(it.amount, it.payoutMultiplier) }) }
-
-        val maxThreeDigitAndTop = (0..999).maxOf { value ->
-            val result = value.toString().padStart(3, '0')
-            val todLiability = sumExact(tod.filterKeys { number ->
-                com.lotto.app.domain.rules.LottoRules.isThreeDigitTodMatch(number, result)
-            }.values)
-            sumExact(listOf(
-                straight[result] ?: 0L,
-                todLiability,
-                top[result.takeLast(2)] ?: 0L
-            ))
-        }
-        val maxTwoDigitBottom = bottom.values.maxOrNull() ?: 0L
-        return Math.addExact(maxThreeDigitAndTop, maxTwoDigitBottom)
-    }
 
     @Transaction
     open suspend fun insertSaleWithItems(
