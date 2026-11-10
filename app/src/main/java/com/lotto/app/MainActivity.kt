@@ -298,6 +298,7 @@ class MainActivity : ComponentActivity() {
                         AppScreen.Settings.name -> SettingsScreen(
                             repository = drawCalendarRepository,
                             settingsRepository = settingsRepository,
+                            backupManager = container.encryptedBackupManager,
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
                         AppScreen.Reports.name -> ReportsScreen(
