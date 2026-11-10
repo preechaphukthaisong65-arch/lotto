@@ -33,7 +33,7 @@ import com.lotto.app.data.repository.SettingsRepository
 import com.lotto.app.ui.components.buttons.BackButton
 
 private enum class SettingsSection {
-    MENU, FULL_LIMIT, NO_ACCEPT, HALF_PAYOUT, DRAW_CALENDAR, BACKUP, AUDIT
+    MENU, FULL_LIMIT, NO_ACCEPT, HALF_PAYOUT, DRAW_CALENDAR, BACKUP, AUDIT, RISK_LIMITS
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -68,6 +68,10 @@ fun SettingsScreen(
             repository = settingsRepository,
             onBack = { section = SettingsSection.MENU }
         )
+        SettingsSection.RISK_LIMITS -> RiskLimitsScreen(
+            repository = settingsRepository,
+            onBack = { section = SettingsSection.MENU }
+        )
         SettingsSection.MENU -> {
             Scaffold(
                 topBar = { TopAppBar(title = { Text("ตั้งค่า") }) },
@@ -83,6 +87,9 @@ fun SettingsScreen(
                 ) {
                     SettingsMenuCard("ตั้งค่าหวยเต็ม", "กำหนดวงเงินรับซื้อสูงสุดต่อตัว แยกตามประเภทหวย") {
                         section = SettingsSection.FULL_LIMIT
+                    }
+                    SettingsMenuCard("ตั้งค่าเพดานความเสี่ยง", "กำหนดเพดานเงินรางวัลสูงสุดต่องวดและเพดานเครดิตต่อลูกค้า") {
+                        section = SettingsSection.RISK_LIMITS
                     }
                     SettingsMenuCard("ตั้งค่าหวยไม่รับ", "กำหนดเลขที่ไม่เปิดรับซื้อ") {
                         section = SettingsSection.NO_ACCEPT
