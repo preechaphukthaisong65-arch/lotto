@@ -20,7 +20,9 @@ data class CreditDocumentEntity(
      * Set once, when the document becomes fully paid.
      * This timestamp starts the 180-day retention period.
      */
-    val paidAt: Long? = null
+    val paidAt: Long? = null,
+    val customerId: Long? = null,
+    val customerPhone: String? = null
 ) {
     companion object {
         const val STATUS_OPEN = "OPEN"
