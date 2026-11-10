@@ -908,6 +908,8 @@ fun SaleScreen(
                     nextTwoId = 2L
                     firstName = ""
                     lastName = ""
+                    selectedCustomerId = null
+                    customerPhone = ""
                     cashSelected = true
                     creditSelected = false
                     cashAmount = ""
