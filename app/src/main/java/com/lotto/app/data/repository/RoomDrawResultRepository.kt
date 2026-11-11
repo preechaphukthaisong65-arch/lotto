@@ -39,9 +39,14 @@ class RoomDrawResultRepository(private val dao: DrawResultDao) : DrawResultRepos
         threeDigit: String,
         twoDigitTop: String,
         twoDigitBottom: String,
+        verificationDecision: String,
         verificationRunId: String,
         approvedAt: Long
     ): Int {
+        require(verificationDecision == "APPROVED_3_OF_4" ||
+            verificationDecision == "MANUAL_REVIEW_APPROVED") {
+            "ผลรางวัลยังไม่ผ่านการอนุมัติจากการตรวจสอบของบอท"
+        }
         require(verificationRunId.isNotBlank()) { "ต้องมีรหัสรอบตรวจสอบจากบอท" }
         require(approvedAt > 0L) { "เวลาอนุมัติจากบอทไม่ถูกต้อง" }
         return dao.saveBotVerifiedResultAndFindWinners(
@@ -52,6 +57,7 @@ class RoomDrawResultRepository(private val dao: DrawResultDao) : DrawResultRepos
                 twoDigitBottom = twoDigitBottom,
                 recordedAt = maxOf(System.currentTimeMillis(), approvedAt),
                 source = "BOT_VERIFIED",
+                verificationDecision = verificationDecision,
                 verificationRunId = verificationRunId,
                 approvedAt = approvedAt
             )
