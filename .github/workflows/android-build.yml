@@ -12,6 +12,7 @@ on:
   pull_request:
     branches:
       - main
+      - security-hardening
   workflow_dispatch:
 
 permissions:
