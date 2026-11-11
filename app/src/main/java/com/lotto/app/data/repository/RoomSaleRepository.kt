@@ -50,6 +50,9 @@ class RoomSaleRepository(private val saleDao: SaleDao) : SaleRepository {
     override suspend fun getNumberStakeForDraw(drawDate: String, prizeType: String, number: String): Long =
         saleDao.getNumberStakeForDraw(drawDate, prizeType, number)
 
+    override suspend fun getPrizeTypeStakeForDraw(drawDate: String, prizeType: String): Long =
+        saleDao.getPrizeTypeStakeForDraw(drawDate, prizeType)
+
     override suspend fun getAllSales(): List<SaleEntity> = saleDao.getAllSales()
 
     override suspend fun getAllSaleVoidEvents(): List<SaleVoidEventEntity> =
