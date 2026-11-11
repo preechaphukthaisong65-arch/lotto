@@ -2,11 +2,14 @@ package com.lotto.app.security
 
 import android.content.Context
 import android.net.Uri
+import android.database.sqlite.SQLiteDatabase as PlatformSQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lotto.app.LottoApplication
 import com.lotto.app.core.di.AppContainer
 import com.lotto.app.data.local.LottoDatabase
+import com.lotto.app.data.security.encryptLegacyDatabaseFile
+import net.zetetic.database.sqlcipher.SQLiteDatabase as CipherDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -21,7 +24,50 @@ import java.nio.charset.StandardCharsets
 @RunWith(AndroidJUnit4::class)
 class DatabaseEncryptionInstrumentedTest {
     @Test
-    fun liveDatabaseIsEncryptedAndPasswordBackupRestoresWithoutDataLoss() = runBlocking<Unit> {
+    fun legacyPlainDatabaseConversionPreservesVersionAndData() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val plain = File(context.cacheDir, "legacy-conversion-source.db")
+        val encrypted = File(context.cacheDir, "legacy-conversion-target.db")
+        val passphrase = ByteArray(32) { (it + 1).toByte() }
+        plain.delete()
+        encrypted.delete()
+
+        val legacy = PlatformSQLiteDatabase.openOrCreateDatabase(plain, null)
+        try {
+            legacy.version = LottoDatabase.DATABASE_VERSION
+            legacy.execSQL("CREATE TABLE migration_probe (value TEXT NOT NULL)")
+            legacy.execSQL("INSERT INTO migration_probe(value) VALUES ('preserve-me')")
+        } finally {
+            legacy.close()
+        }
+
+        try {
+            encryptLegacyDatabaseFile(plain, encrypted, passphrase)
+            val secured = CipherDatabase.openDatabase(
+                encrypted.absolutePath,
+                passphrase,
+                null,
+                CipherDatabase.OPEN_READONLY,
+                null
+            )
+            try {
+                assertEquals(LottoDatabase.DATABASE_VERSION, secured.version)
+                secured.rawQuery("SELECT value FROM migration_probe", null).use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals("preserve-me", cursor.getString(0))
+                }
+            } finally {
+                secured.close()
+            }
+        } finally {
+            plain.delete()
+            encrypted.delete()
+            passphrase.fill(0)
+        }
+    }
+
+    @Test
+    fun liveDatabaseIsEncryptedAndPasswordBackupRestoresWithoutDataLoss()) = runBlocking<Unit> {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val application = context.applicationContext as LottoApplication
         val testKey = "instrumented_backup_roundtrip"
