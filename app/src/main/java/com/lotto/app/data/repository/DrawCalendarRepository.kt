@@ -17,6 +17,21 @@ class DrawCalendarRepository(
     /** Only dates accepted by the verification bot may drive sales or the app calendar. */
     fun observeBotVerifiedDrawDates(): Flow<List<DrawDateEntity>> = dao.observeBotVerifiedDrawDates()
 
+    /** Imports a draw date from a bot-generated verification export. */
+    suspend fun importBotVerifiedDrawDate(date: LocalDate, evidenceReference: String, verifiedAt: Long) {
+        require(evidenceReference.isNotBlank()) { "ต้องมีรหัสหลักฐานจากบอท" }
+        require(verifiedAt > 0L) { "เวลาอนุมัติจากบอทไม่ถูกต้อง" }
+        dao.upsertBotVerifiedDrawDate(
+            DrawDateEntity(
+                drawDate = date.toString(),
+                referenceDate = date.toString(),
+                source = "BOT_VERIFIED",
+                note = "verification=$evidenceReference",
+                updatedAt = verifiedAt
+            )
+        )
+    }
+
     companion object {
         val THAILAND_ZONE: ZoneId = ZoneId.of("Asia/Bangkok")
         fun todayInThailand(): LocalDate = LocalDate.now(THAILAND_ZONE)
