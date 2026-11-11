@@ -164,6 +164,10 @@ class MainActivity : FragmentActivity() {
         val creditAccountRepository = container.creditAccountRepository
         val customerRepository = container.customerRepository
         val drawCalendarRepository = container.drawCalendarRepository
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching { drawCalendarRepository.ensureBaselineCalendar() }
+                .onFailure { android.util.Log.e("LottoCalendar", "Unable to seed baseline draw calendar", it) }
+        }
         val drawResultRepository = container.drawResultRepository
         val settingsRepository = container.settingsRepository
 
