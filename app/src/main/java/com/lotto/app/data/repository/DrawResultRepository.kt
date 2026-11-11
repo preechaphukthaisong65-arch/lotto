@@ -21,6 +21,7 @@ interface DrawResultRepository {
         threeDigit: String,
         twoDigitTop: String,
         twoDigitBottom: String,
+        verificationDecision: String,
         verificationRunId: String,
         approvedAt: Long
     ): Int
