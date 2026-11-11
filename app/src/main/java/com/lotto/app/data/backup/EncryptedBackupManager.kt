@@ -66,6 +66,20 @@ class EncryptedBackupManager(
         }
         val snapshot = File(context.cacheDir, "lotto-backup-snapshot.db")
         try {
+            val snapshotDirectory = snapshot.parentFile
+                ?: throw IllegalStateException("ไม่พบโฟลเดอร์ชั่วคราวสำหรับสร้างข้อมูลสำรอง")
+            check(snapshotDirectory.isDirectory || snapshotDirectory.mkdirs()) {
+                "ไม่สามารถสร้างโฟลเดอร์ชั่วคราวสำหรับข้อมูลสำรองได้"
+            }
+            if (snapshot.exists()) {
+                check(snapshot.delete()) {
+                    "ไม่สามารถลบไฟล์ Snapshot เก่าก่อนสำรองข้อมูลได้"
+                }
+            }
+            check(snapshot.createNewFile() && snapshot.canRead() && snapshot.canWrite()) {
+                "ไม่สามารถเตรียมไฟล์ Snapshot สำหรับสำรองข้อมูลได้"
+            }
+
             val dbFile = context.getDatabasePath(LottoDatabase.DATABASE_NAME)
             require(dbFile.exists()) { "ไม่พบฐานข้อมูลสำหรับสำรอง" }
 
