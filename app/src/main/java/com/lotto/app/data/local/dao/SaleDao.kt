@@ -114,6 +114,19 @@ abstract class SaleDao {
     ): Long
 
     @Query("""
+        SELECT COALESCE(SUM(si.amount), 0)
+        FROM sale_items si
+        INNER JOIN sales s ON s.saleId = si.saleId
+        WHERE s.drawDate = :drawDate
+          AND s.status = 'CONFIRMED'
+          AND si.prizeType = :prizeType
+    """)
+    abstract suspend fun getPrizeTypeStakeForDraw(
+        drawDate: String,
+        prizeType: String
+    ): Long
+
+    @Query("""
         SELECT si.* FROM sale_items si
         INNER JOIN sales s ON s.saleId = si.saleId
         WHERE s.drawDate = :drawDate AND s.status = 'CONFIRMED'
@@ -293,29 +306,32 @@ abstract class SaleDao {
             }
         }
 
-        // Check each number/type pair inside the same transaction as insertion.
-        // Grouping also prevents duplicate rows in one bill from bypassing the cap.
-        items.groupBy { it.prizeType to it.number }.forEach { (key, requestedItems) ->
-            // A stored setting is authoritative. Never turn malformed or negative
-            // persisted limits into zero (zero means unlimited), and never silently
-            // fall back to a potentially stale UI value when storage is corrupt.
-            val settingKey = "full_limit_${key.first}"
+        // The configured cap is shared by every number in a prize category
+        // for this draw. Grouping by prizeType prevents different numbers or
+        // duplicate rows in one bill from bypassing the same category-wide cap.
+        items.groupBy { it.prizeType }.forEach { (prizeType, requestedItems) ->
+            val settingKey = "full_limit_$prizeType"
             val persistedLimit = getSettingValue(settingKey)
             val limit = if (persistedLimit != null) {
                 persistedLimit.toLongOrNull()
                     ?: throw IllegalStateException("ค่าลิมิต $settingKey ในฐานข้อมูลไม่ถูกต้อง กรุณาตรวจสอบการตั้งค่าก่อนขาย")
             } else {
-                fullLimitsByPrizeType[key.first]
-                    ?: throw IllegalStateException("ยังไม่ได้กำหนดวงเงินรับซื้อสำหรับหมวด ${key.first} กรุณาตั้งค่าก่อนขาย")
+                fullLimitsByPrizeType[prizeType]
+                    ?: throw IllegalStateException("ยังไม่ได้กำหนดวงเงินรับซื้อสำหรับหมวด $prizeType กรุณาตั้งค่าก่อนขาย")
             }
             require(limit > 0L) {
-                "วงเงินรับซื้อหมวด ${key.first} ต้องมากกว่า 0 บาท ระบบปิดการขายไว้จนกว่าจะกำหนดวงเงินเพื่อป้องกันการรับซื้อไม่จำกัด"
+                "วงเงินรับซื้อหมวด $prizeType ต้องมากกว่า 0 บาท ระบบปิดการขายไว้จนกว่าจะกำหนดวงเงินเพื่อป้องกันการรับซื้อไม่จำกัด"
             }
-            val alreadySold = getNumberStakeForDraw(sale.drawDate.orEmpty(), key.first, key.second)
-            val requested = requestedItems.fold(0L) { total, item -> Math.addExact(total, item.amount) }
+            val alreadySold = getPrizeTypeStakeForDraw(
+                targetDrawDate,
+                prizeType
+            )
+            val requested = requestedItems.fold(0L) { total, item ->
+                Math.addExact(total, item.amount)
+            }
             val combined = Math.addExact(alreadySold, requested)
             require(combined <= limit) {
-                "เลข ${key.second} ในหมวด ${key.first} เต็มแล้ว (รับได้สูงสุด ${limit} บาท/งวด, สะสมเดิม ${alreadySold} บาท, รายการนี้ ${requested} บาท)"
+                "หมวด $prizeType เต็มแล้ว (รับได้สูงสุด $limit บาท/งวด, สะสมเดิม $alreadySold บาท, รายการนี้ $requested บาท)"
             }
         }
 
