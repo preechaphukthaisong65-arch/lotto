@@ -36,13 +36,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lotto.app.data.local.entity.CreditDocumentEntity
 import com.lotto.app.data.local.entity.CreditPaymentEntity
-import com.lotto.app.data.local.entity.DrawDateChangeEntity
 import com.lotto.app.data.local.entity.DrawResultEntity
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleVoidEventEntity
 import com.lotto.app.data.local.model.WinningBillSummary
 import com.lotto.app.data.repository.CreditAccountRepository
-import com.lotto.app.data.repository.DrawCalendarRepository
 import com.lotto.app.data.repository.DrawResultRepository
 import com.lotto.app.data.repository.SaleRepository
 import com.lotto.app.ui.components.buttons.BackButton
@@ -62,14 +60,13 @@ private data class HistoryRecord(
 
 private val historyCategories = listOf(
     "ทั้งหมด", "ขายหวย", "บัญชีเชื่อ", "รับชำระ", "ผลรางวัล",
-    "บิลถูกรางวัล", "จ่ายรางวัล", "แก้ไขวันออกรางวัล", "ยกเลิก/คืนบิล"
+    "บิลถูกรางวัล", "จ่ายรางวัล", "ยกเลิก/คืนบิล"
 )
 
 @Composable
 fun HistoryScreen(
     saleRepository: SaleRepository,
     creditAccountRepository: CreditAccountRepository,
-    drawCalendarRepository: DrawCalendarRepository,
     drawResultRepository: DrawResultRepository,
     onBack: () -> Unit
 ) {
@@ -89,7 +86,6 @@ fun HistoryScreen(
     val scope = rememberCoroutineScope()
 
     val drawResults by drawResultRepository.observeAllResults().collectAsState(initial = emptyList())
-    val drawDateChanges by drawCalendarRepository.observeAllChanges().collectAsState(initial = emptyList())
     val unpaidWinningBills by drawResultRepository.observeWinningBills("UNPAID").collectAsState(initial = emptyList())
     val paidWinningBills by drawResultRepository.observeWinningBills("PAID").collectAsState(initial = emptyList())
 
@@ -112,7 +108,7 @@ fun HistoryScreen(
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("th", "TH")) }
     val records = remember(
         sales, voidEvents, openCreditBills, paidCreditBills, creditPayments, drawResults,
-        drawDateChanges, unpaidWinningBills, paidWinningBills
+        unpaidWinningBills, paidWinningBills
     ) {
         buildList {
             sales.forEach { sale ->
@@ -187,16 +183,6 @@ fun HistoryScreen(
                     title = "ยกเลิกบิลขายเลขที่ ${event.saleId}",
                     detail = "งวด ${event.drawDate} · คืนเงินสด ${event.cashRefundAmount} บาท · ยกเลิกยอดเชื่อ ${event.cancelledCreditAmount} บาท · เหตุผล: ${event.reason}",
                     searchText = "${event.saleId} ${event.drawDate} ${event.reason} ${event.cashRefundAmount} ${event.cancelledCreditAmount}"
-                ))
-            }
-            drawDateChanges.forEach { change ->
-                add(HistoryRecord(
-                    id = "draw-change-${change.changeId}",
-                    category = "แก้ไขวันออกรางวัล",
-                    timestamp = change.changedAt,
-                    title = "เปลี่ยนวันออกรางวัล",
-                    detail = "${change.previousDate ?: "-"} → ${change.newDate}",
-                    searchText = "${change.previousDate} ${change.newDate} ${change.drawDate}"
                 ))
             }
         }.sortedByDescending { it.timestamp }
