@@ -67,6 +67,26 @@ class DatabaseEncryptionInstrumentedTest {
     }
 
     @Test
+    fun legacyConversionRejectsMissingSourceWithoutCreatingTarget() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val missing = File(context.cacheDir, "missing-legacy-source.db")
+        val target = File(context.cacheDir, "must-not-be-created.db")
+        val passphrase = ByteArray(32) { (it + 7).toByte() }
+        missing.delete()
+        target.delete()
+
+        try {
+            assertThrows(IllegalArgumentException::class.java) {
+                encryptLegacyDatabaseFile(missing, target, passphrase)
+            }
+            assertFalse("A missing source must never produce an empty encrypted database", target.exists())
+        } finally {
+            target.delete()
+            passphrase.fill(0)
+        }
+    }
+
+    @Test
     fun liveDatabaseIsEncryptedAndPasswordBackupRestoresWithoutDataLoss() = runBlocking<Unit> {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val application = context.applicationContext as LottoApplication
