@@ -277,9 +277,14 @@ abstract class SaleDao {
             val outstanding = getOutstandingCreditByCustomer(
                 customerId ?: throw IllegalStateException("ไม่พบรหัสลูกค้าสำหรับตรวจสอบวงเงินเครดิต")
             )
-            val projectedCredit = Math.addExact(outstanding, sale.creditAmount)
+            // A reviewed unlinked legacy balance is conservatively treated as
+            // belonging to this customer. This prevents same-name legacy debt
+            // from being bypassed to obtain a fresh credit allowance.
+            val reviewedLegacyDebt = if (legacyOutstanding > 0L) legacyOutstanding else 0L
+            val existingDebt = Math.addExact(outstanding, reviewedLegacyDebt)
+            val projectedCredit = Math.addExact(existingDebt, sale.creditAmount)
             require(projectedCredit <= creditCap) {
-                "ยอดเครดิตของลูกค้ารายนี้จะเกินเพดาน (${projectedCredit} / ${creditCap} บาท)"
+                "ยอดเครดิตรวมกับหนี้เดิมของลูกค้ารายนี้จะเกินเพดาน (${projectedCredit} / ${creditCap} บาท)"
             }
         }
 
