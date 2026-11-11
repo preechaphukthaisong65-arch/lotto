@@ -39,7 +39,7 @@ class DrawResultDaoSafetyTest {
     fun refusesManuallyEnteredResultEvenWhenTheValuesAreValid() {
         assertThrows(IllegalArgumentException::class.java) {
             kotlinx.coroutines.runBlocking {
-                database.drawResultDao().saveResultAndFindWinners(
+                database.drawResultDao().saveBotVerifiedResultAndFindWinners(
                     DrawResultEntity(
                         drawDate = drawDate,
                         threeDigit = "123",
@@ -56,7 +56,7 @@ class DrawResultDaoSafetyTest {
     @Test
     fun acceptsOnlyBotVerifiedResultWithRunEvidence() {
         val winners = kotlinx.coroutines.runBlocking {
-            database.drawResultDao().saveResultAndFindWinners(
+            database.drawResultDao().saveBotVerifiedResultAndFindWinners(
                 DrawResultEntity(
                     drawDate = drawDate,
                     threeDigit = "012",
