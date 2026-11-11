@@ -2,6 +2,8 @@ package com.lotto.app
 
 import android.os.Bundle
 import android.view.View
+import android.view.WindowManager
+import android.os.SystemClock
 import android.widget.Toast
 import android.content.Intent
 import android.app.KeyguardManager
@@ -63,6 +65,16 @@ private enum class AppScreen {
 class MainActivity : FragmentActivity() {
     private val isAuthenticated = mutableStateOf(false)
     private val authenticationError = mutableStateOf<String?>(null)
+    @Volatile private var lastInteractionElapsedRealtime = 0L
+
+    private companion object {
+        const val INACTIVITY_LOCK_TIMEOUT_MS = 3 * 60 * 1000L
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        lastInteractionElapsedRealtime = SystemClock.elapsedRealtime()
+    }
 
     private fun requestDeviceAuthentication() {
         val keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
@@ -97,6 +109,7 @@ class MainActivity : FragmentActivity() {
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     authenticationError.value = null
+                    lastInteractionElapsedRealtime = SystemClock.elapsedRealtime()
                     isAuthenticated.value = true
                 }
 
@@ -156,8 +169,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // TEMPORARY QA: FLAG_SECURE is disabled so screenshots and screen recordings
-        // can be captured while debugging. Re-enable protection before production use.
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        lastInteractionElapsedRealtime = SystemClock.elapsedRealtime()
         hideSystemBars()
         val container = (application as LottoApplication).container
         val saleRepository = container.saleRepository
@@ -220,6 +233,13 @@ class MainActivity : FragmentActivity() {
                     var lastClockPersistAt = 0L
                     while (true) {
                         currentThailandTime = DrawCalendarRepository.nowInThailand()
+                        val elapsedNow = SystemClock.elapsedRealtime()
+                        if (isAuthenticated.value &&
+                            elapsedNow - lastInteractionElapsedRealtime >= INACTIVITY_LOCK_TIMEOUT_MS
+                        ) {
+                            authenticationError.value = "ล็อกอัตโนมัติเนื่องจากไม่มีการใช้งาน กรุณายืนยันตัวตนอีกครั้ง"
+                            isAuthenticated.value = false
+                        }
                         val wallClock = System.currentTimeMillis()
                         if (wallClock - lastClockPersistAt >= 30_000L) {
                             val lastSeenRaw = settingsRepository.get("clock_high_water_epoch_ms")
