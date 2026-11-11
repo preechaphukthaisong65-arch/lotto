@@ -14,14 +14,25 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-private fun checkAttachedDatabase(database: CipherDatabase, schema: String) {
-    var attached = false
+private fun checkAttachedDatabase(
+    database: CipherDatabase,
+    schema: String,
+    expectedFile: File
+) {
+    var attachedPath: String? = null
     database.rawQuery("PRAGMA database_list", null).use { cursor ->
         while (cursor.moveToNext()) {
-            if (cursor.getString(1) == schema) attached = true
+            if (cursor.getString(1) == schema) {
+                attachedPath = cursor.getString(2)
+                break
+            }
         }
     }
-    check(attached) { "ไม่สามารถแนบฐานข้อมูลปลายทาง ($schema) ได้" }
+    val actualPath = attachedPath
+        ?: throw IllegalStateException("ไม่สามารถแนบฐานข้อมูลปลายทาง ($schema) ได้")
+    check(File(actualPath).canonicalFile == expectedFile.canonicalFile) {
+        "ตำแหน่งฐานข้อมูลที่แนบไม่ตรงกับไฟล์ปลายทางที่กำหนด ($schema)"
+    }
 }
 
 internal fun encryptLegacyDatabaseFile(
@@ -29,7 +40,15 @@ internal fun encryptLegacyDatabaseFile(
     encryptedTarget: File,
     passphrase: ByteArray
 ) {
-    encryptedTarget.delete()
+    require(sourceFile.isFile && sourceFile.length() > 0L) {
+        "ไม่พบฐานข้อมูลเดิมหรือไฟล์ฐานข้อมูลว่างเปล่า จึงยกเลิกการเข้ารหัส"
+    }
+    encryptedTarget.parentFile?.let { parent ->
+        check(parent.isDirectory || parent.mkdirs()) { "ไม่สามารถสร้างโฟลเดอร์ฐานข้อมูลปลายทางได้" }
+    }
+    if (encryptedTarget.exists()) {
+        check(encryptedTarget.delete()) { "ไม่สามารถลบไฟล์เข้ารหัสชั่วคราวเดิมได้" }
+    }
     val legacy = CipherDatabase.openDatabase(
         sourceFile.absolutePath,
         ByteArray(0),
@@ -44,7 +63,7 @@ internal fun encryptLegacyDatabaseFile(
             encryptedTarget.absolutePath,
             passphrase
         )
-        checkAttachedDatabase(legacy, "encrypted")
+        checkAttachedDatabase(legacy, "encrypted", encryptedTarget)
         try {
             legacy.rawExecSQL("SELECT sqlcipher_export('encrypted')")
         } finally {
@@ -52,6 +71,9 @@ internal fun encryptLegacyDatabaseFile(
         }
     } finally {
         legacy.close()
+    }
+    check(encryptedTarget.isFile && encryptedTarget.length() > 0L) {
+        "การส่งออกฐานข้อมูลเข้ารหัสไม่สร้างไฟล์ปลายทาง"
     }
     setEncryptedDatabaseVersion(encryptedTarget, passphrase, schemaVersion)
 }
