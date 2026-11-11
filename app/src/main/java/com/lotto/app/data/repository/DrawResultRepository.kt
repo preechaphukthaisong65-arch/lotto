@@ -16,6 +16,12 @@ interface DrawResultRepository {
     suspend fun markWinningBillPaid(drawDate: String, saleId: Long, recipientName: String)
     suspend fun cleanupExpiredPaidWinningBills(): Int
     suspend fun cleanupExpiredProfitSummaries(): Int
-    suspend fun saveResult(drawDate: String, threeDigit: String, twoDigitTop: String, twoDigitBottom: String): Int
-    suspend fun correctResult(drawDate: String, threeDigit: String, twoDigitTop: String, twoDigitBottom: String, reason: String): Int
+    suspend fun saveBotVerifiedResult(
+        drawDate: String,
+        threeDigit: String,
+        twoDigitTop: String,
+        twoDigitBottom: String,
+        verificationRunId: String,
+        approvedAt: Long
+    ): Int
 }
