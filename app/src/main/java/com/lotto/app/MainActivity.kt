@@ -21,6 +21,7 @@ import com.lotto.app.domain.rules.FullNumberLimitPolicy
 import com.lotto.app.domain.rules.NoAcceptNumberPolicy
 import com.lotto.app.domain.rules.HalfPayoutNumberPolicy
 import com.lotto.app.data.repository.DrawCalendarRepository
+import com.lotto.app.data.repository.CalendarBotStatusRepository
 import androidx.compose.ui.Modifier
 import com.lotto.app.ui.HomeScreen
 import com.lotto.app.ui.credit.CreditAccountsScreen
@@ -69,6 +70,7 @@ class MainActivity : ComponentActivity() {
         val drawCalendarRepository = container.drawCalendarRepository
         val drawResultRepository = container.drawResultRepository
         val settingsRepository = container.settingsRepository
+        val calendarBotStatusRepository = CalendarBotStatusRepository()
 
         setContent {
             MaterialTheme {
@@ -76,6 +78,7 @@ class MainActivity : ComponentActivity() {
                 val drawDates by drawCalendarRepository.observeAllDrawDates().collectAsState(initial = emptyList())
                 val drawResults by drawResultRepository.observeAllResults().collectAsState(initial = emptyList())
                 var currentThailandTime by remember { mutableStateOf(DrawCalendarRepository.nowInThailand()) }
+                var calendarBotStatus by remember { mutableStateOf("กำลังโหลดสถานะบอทตรวจปฏิทิน...") }
                 val settingRows by settingsRepository.observeAll().collectAsState(initial = emptyList())
                 val currentFullLimits = FullNumberLimitPolicy.settingKeys.mapValues { (_, key) ->
                     settingRows.firstOrNull { it.key == key }?.value?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
@@ -91,6 +94,12 @@ class MainActivity : ComponentActivity() {
                 }
                 val activeSaleDrawDate = SaleWindowPolicy.activeDrawDate(drawDates, currentThailandTime).orEmpty()
                 var selectedResultDrawDate by rememberSaveable { mutableStateOf("") }
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        calendarBotStatus = calendarBotStatusRepository.fetchLatest().displayText()
+                        delay(15 * 60 * 1000L)
+                    }
+                }
                 LaunchedEffect(Unit) {
                     while (true) {
                         currentThailandTime = DrawCalendarRepository.nowInThailand()
@@ -240,6 +249,7 @@ class MainActivity : ComponentActivity() {
                             onOpenSettings = { currentScreen = AppScreen.Settings.name },
                             saleOpen = saleWindow.isOpen,
                             saleStatusMessage = saleWindow.message,
+                            calendarBotStatus = calendarBotStatus,
                             pendingResultDate = pendingResultDate,
                             onOpenDrawResult = {
                                 selectedResultDrawDate = pendingResultDate.orEmpty()
