@@ -36,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.lifecycle.lifecycleScope
 import com.lotto.app.domain.rules.SaleWindowPolicy
+import com.lotto.app.domain.rules.AppLockPolicy
 import com.lotto.app.domain.rules.PendingDrawResultPolicy
 import com.lotto.app.domain.rules.FullNumberLimitPolicy
 import com.lotto.app.domain.rules.NoAcceptNumberPolicy
@@ -66,10 +67,6 @@ class MainActivity : FragmentActivity() {
     private val isAuthenticated = mutableStateOf(false)
     private val authenticationError = mutableStateOf<String?>(null)
     @Volatile private var lastInteractionElapsedRealtime = 0L
-
-    private companion object {
-        const val INACTIVITY_LOCK_TIMEOUT_MS = 3 * 60 * 1000L
-    }
 
     override fun onUserInteraction() {
         super.onUserInteraction()
@@ -235,7 +232,7 @@ class MainActivity : FragmentActivity() {
                         currentThailandTime = DrawCalendarRepository.nowInThailand()
                         val elapsedNow = SystemClock.elapsedRealtime()
                         if (isAuthenticated.value &&
-                            elapsedNow - lastInteractionElapsedRealtime >= INACTIVITY_LOCK_TIMEOUT_MS
+                            AppLockPolicy.shouldLock(lastInteractionElapsedRealtime, elapsedNow)
                         ) {
                             authenticationError.value = "ล็อกอัตโนมัติเนื่องจากไม่มีการใช้งาน กรุณายืนยันตัวตนอีกครั้ง"
                             isAuthenticated.value = false
