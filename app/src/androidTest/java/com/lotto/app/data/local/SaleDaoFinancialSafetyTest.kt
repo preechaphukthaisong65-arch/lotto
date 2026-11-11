@@ -227,6 +227,46 @@ class SaleDaoFinancialSafetyTest {
         assertEquals("CONFIRMED", kotlinx.coroutines.runBlocking { saleDao.getSaleById(saleId) }?.status)
     }
 
+    @Test
+    fun categoryLimitIsSharedAcrossDifferentNumbersInSameDraw() {
+        putSetting("full_limit_${PrizeType.THREE_DIGIT_STRAIGHT.name}", "100")
+
+        saveSale(
+            at = saleTime,
+            firstName = "",
+            lastName = "",
+            total = 60,
+            cash = 60,
+            credit = 0,
+            number = "123"
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            kotlinx.coroutines.runBlocking {
+                saleDao.insertSaleWithItems(
+                    SaleEntity(
+                        totalAmount = 50,
+                        cashAmount = 50,
+                        creditAmount = 0,
+                        createdAt = saleTime + 1_000,
+                        drawDate = drawDate
+                    ),
+                    listOf(item(amount = 50, number = "456"))
+                )
+            }
+        }
+
+        assertEquals(
+            60L,
+            kotlinx.coroutines.runBlocking {
+                saleDao.getPrizeTypeStakeForDraw(
+                    drawDate,
+                    PrizeType.THREE_DIGIT_STRAIGHT.name
+                )
+            }
+        )
+    }
+
     private fun saveSale(
         at: Long,
         firstName: String,
@@ -234,7 +274,8 @@ class SaleDaoFinancialSafetyTest {
         total: Long,
         cash: Long,
         credit: Long,
-        newCustomerIdentityConfirmed: Boolean = false
+        newCustomerIdentityConfirmed: Boolean = false,
+        number: String = "123"
     ): Long = kotlinx.coroutines.runBlocking {
         saleDao.insertSaleWithItems(
             SaleEntity(
@@ -247,13 +288,13 @@ class SaleDaoFinancialSafetyTest {
                 createdAt = at,
                 drawDate = drawDate
             ),
-            listOf(item(amount = total))
+            listOf(item(amount = total, number = number))
         )
     }
 
-    private fun item(amount: Long) = SaleItemEntity(
+    private fun item(amount: Long, number: String = "123") = SaleItemEntity(
         saleId = 0,
-        number = "123",
+        number = number,
         prizeType = PrizeType.THREE_DIGIT_STRAIGHT.name,
         amount = amount,
         payoutMultiplier = PrizeType.THREE_DIGIT_STRAIGHT.fullPayoutMultiplier
