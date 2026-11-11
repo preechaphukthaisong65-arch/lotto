@@ -18,15 +18,24 @@ class DrawCalendarRepository(
     fun observeBotVerifiedDrawDates(): Flow<List<DrawDateEntity>> = dao.observeBotVerifiedDrawDates()
 
     /** Imports a draw date from a bot-generated verification export. */
-    suspend fun importBotVerifiedDrawDate(date: LocalDate, evidenceReference: String, verifiedAt: Long) {
+    suspend fun importBotVerifiedDrawDate(
+        date: LocalDate,
+        evidenceReference: String,
+        verificationDecision: String,
+        verifiedAt: Long
+    ) {
         require(evidenceReference.isNotBlank()) { "ต้องมีรหัสหลักฐานจากบอท" }
+        require(verificationDecision == "APPROVED_3_OF_4" ||
+            verificationDecision == "MANUAL_REVIEW_APPROVED") {
+            "วันงวดยังไม่ผ่านการอนุมัติจากการตรวจสอบของบอท"
+        }
         require(verifiedAt > 0L) { "เวลาอนุมัติจากบอทไม่ถูกต้อง" }
         dao.upsertBotVerifiedDrawDate(
             DrawDateEntity(
                 drawDate = date.toString(),
                 referenceDate = date.toString(),
                 source = "BOT_VERIFIED",
-                note = "verification=$evidenceReference",
+                note = "verification=$evidenceReference;decision=$verificationDecision",
                 updatedAt = verifiedAt
             )
         )
