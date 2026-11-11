@@ -30,6 +30,20 @@ class RoomSettingsRepository(
         )
     }
 
+    override suspend fun saveMany(values: Map<String, String>) {
+        require(values.isNotEmpty()) { "ไม่มีค่าการตั้งค่าที่ต้องบันทึก" }
+        val changedAt = System.currentTimeMillis()
+        appSettingDao.saveManyWithAudit(
+            values.map { (key, value) ->
+                AppSettingEntity(
+                    key = key,
+                    value = value,
+                    updatedAt = changedAt
+                )
+            }
+        )
+    }
+
     override suspend fun delete(key: String) {
         appSettingDao.deleteWithAudit(key, System.currentTimeMillis())
     }
