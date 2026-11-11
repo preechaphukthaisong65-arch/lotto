@@ -34,33 +34,28 @@ class RoomDrawResultRepository(private val dao: DrawResultDao) : DrawResultRepos
         return dao.deleteExpiredProfitSummaries(cutoffDate)
     }
 
-    override suspend fun saveResult(
-        drawDate: String,
-        threeDigit: String,
-        twoDigitTop: String,
-        twoDigitBottom: String
-    ): Int = dao.saveResultAndFindWinners(
-        DrawResultEntity(
-            drawDate = drawDate,
-            threeDigit = threeDigit,
-            twoDigitTop = twoDigitTop,
-            twoDigitBottom = twoDigitBottom,
-            recordedAt = System.currentTimeMillis()
-        )
-    )
-
-    override suspend fun correctResult(
+    override suspend fun saveBotVerifiedResult(
         drawDate: String,
         threeDigit: String,
         twoDigitTop: String,
         twoDigitBottom: String,
-        reason: String
-    ): Int = dao.correctResultAndRebuildWinners(
-        drawDate = drawDate,
-        threeDigit = threeDigit,
-        twoDigitTop = twoDigitTop,
-        twoDigitBottom = twoDigitBottom,
-        reason = reason,
-        correctedAt = System.currentTimeMillis()
-    )
+        verificationRunId: String,
+        approvedAt: Long
+    ): Int {
+        require(verificationRunId.isNotBlank()) { "ต้องมีรหัสรอบตรวจสอบจากบอท" }
+        require(approvedAt > 0L) { "เวลาอนุมัติจากบอทไม่ถูกต้อง" }
+        return dao.saveResultAndFindWinners(
+            DrawResultEntity(
+                drawDate = drawDate,
+                threeDigit = threeDigit,
+                twoDigitTop = twoDigitTop,
+                twoDigitBottom = twoDigitBottom,
+                recordedAt = maxOf(System.currentTimeMillis(), approvedAt),
+                source = "BOT_VERIFIED",
+                verificationRunId = verificationRunId,
+                approvedAt = approvedAt
+            )
+        )
+    }
+
 }
