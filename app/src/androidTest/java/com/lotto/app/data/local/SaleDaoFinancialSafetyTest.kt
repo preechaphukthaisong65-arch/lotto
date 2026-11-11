@@ -152,6 +152,25 @@ class SaleDaoFinancialSafetyTest {
             }
         }
 
+        assertThrows(IllegalArgumentException::class.java) {
+            kotlinx.coroutines.runBlocking {
+                saleDao.insertSaleWithItems(
+                    SaleEntity(
+                        customerFirstName = "สมชาย",
+                        customerLastName = "ใจดี",
+                        totalAmount = 60,
+                        cashAmount = 0,
+                        creditAmount = 60,
+                        createdAt = saleTime + 2_000,
+                        drawDate = drawDate,
+                        legacyDebtReviewed = true,
+                        newCustomerIdentityConfirmed = true
+                    ),
+                    listOf(item(amount = 60))
+                )
+            }
+        }
+
         val acceptedId = kotlinx.coroutines.runBlocking {
             saleDao.insertSaleWithItems(
                 SaleEntity(
