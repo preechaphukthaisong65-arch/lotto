@@ -218,7 +218,7 @@ class EncryptedBackupManager(
             file.absolutePath,
             passphrase,
             null,
-            CipherDatabase.OPEN_READWRITE or CipherDatabase.CREATE_IF_NECESSARY,
+            CipherDatabase.OPEN_READWRITE,
             null
         )
         try {
@@ -233,7 +233,7 @@ class EncryptedBackupManager(
             encryptedFile.absolutePath,
             databasePassphrase,
             null,
-            CipherDatabase.OPEN_READWRITE,
+            CipherDatabase.OPEN_READWRITE or CipherDatabase.CREATE_IF_NECESSARY,
             null
         )
         try {
@@ -260,7 +260,7 @@ class EncryptedBackupManager(
             plaintextFile.absolutePath,
             ByteArray(0),
             null,
-            CipherDatabase.OPEN_READWRITE,
+            CipherDatabase.OPEN_READWRITE or CipherDatabase.CREATE_IF_NECESSARY,
             null
         )
         try {
