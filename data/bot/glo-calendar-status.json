@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "checker": "LottoCalendarMonitor/1.0",
+  "checked_at_utc": "2026-11-11T23:45:56.866084+00:00",
+  "checked_at_thailand": "2026-11-12T06:45:56.866084+07:00",
+  "source_url": "https://www.glo.or.th/service/faq/award",
+  "source_name": "สำนักงานสลากกินแบ่งรัฐบาล (GLO) - FAQ ภารกิจการออกรางวัล",
+  "access_status": "SKIPPED_ROBOTS_OR_POLICY_UNAVAILABLE",
+  "verification_status": "NOT_VERIFIED",
+  "published_calendar_detected": false,
+  "latest_explicit_draw_date": null,
+  "explicit_draw_dates": [],
+  "official_rule_text": null,
+  "source_sha256": null,
+  "message_th": "ข้ามการตรวจ เพราะ robots.txt ไม่อนุญาตหรือไม่สามารถตรวจสอบนโยบายการเข้าถึงได้",
+  "robots_policy": "could not verify robots.txt: HTTP 503"
+}
