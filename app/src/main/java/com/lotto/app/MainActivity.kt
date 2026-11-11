@@ -254,7 +254,7 @@ class MainActivity : FragmentActivity() {
                                     DrawCalendarRepository.nowInThailand()
                                 )
                                 check(latestStatus.isOpen) { "หมดเวลารับขายแล้ว ไม่สามารถบันทึกบิลได้" }
-                                val targetDrawDate = SaleWindowPolicy.activeDrawDate(drawDates, DrawCalendarRepository.nowInThailand())
+                                val targetDrawDate = SaleWindowPolicy.activeDrawDate(botDrawDates, DrawCalendarRepository.nowInThailand())
                                     ?: error("ไม่พบงวดหวยที่เปิดรับขาย")
                                 val fullLimits = FullNumberLimitPolicy.load(settingsRepository)
                                 val noAcceptNumbers = NoAcceptNumberPolicy.load(settingsRepository)
