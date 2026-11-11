@@ -51,7 +51,6 @@ import com.lotto.app.ui.reports.PerformanceReportScreen
 import com.lotto.app.ui.sale.SaleScreen
 import com.lotto.app.ui.settings.SettingsScreen
 import com.lotto.app.ui.results.PayoutScreen
-import java.time.LocalDate
 
 private enum class AppScreen {
     Home, Sale, History, CreditAccounts, PayDebt, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance, Payout
@@ -193,7 +192,6 @@ class MainActivity : FragmentActivity() {
                 var currentScreen by rememberSaveable { mutableStateOf(AppScreen.Home.name) }
                 val drawDates by drawCalendarRepository.observeAllDrawDates().collectAsState(initial = emptyList())
                 val botDrawDates by drawCalendarRepository.observeBotVerifiedDrawDates().collectAsState(initial = emptyList())
-                val drawResults by drawResultRepository.observeAllResults().collectAsState(initial = emptyList())
                 var currentThailandTime by remember { mutableStateOf(DrawCalendarRepository.nowInThailand()) }
                 val settingRows by settingsRepository.observeAll().collectAsState(initial = emptyList())
                 val currentFullLimits = FullNumberLimitPolicy.settingKeys.mapValues { (_, key) ->
