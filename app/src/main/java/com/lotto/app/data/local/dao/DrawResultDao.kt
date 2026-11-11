@@ -108,15 +108,6 @@ abstract class DrawResultDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     protected abstract suspend fun insertWinners(items: List<WinningSaleItemEntity>)
 
-    @Insert
-    protected abstract suspend fun insertCorrection(correction: com.lotto.app.data.local.entity.DrawResultCorrectionEntity)
-
-    @Query("UPDATE draw_results SET threeDigit = :threeDigit, twoDigitTop = :twoDigitTop, twoDigitBottom = :twoDigitBottom, recordedAt = :recordedAt WHERE drawDate = :drawDate")
-    protected abstract suspend fun updateResult(drawDate: String, threeDigit: String, twoDigitTop: String, twoDigitBottom: String, recordedAt: Long)
-
-    @Query("DELETE FROM winning_sale_items WHERE drawDate = :drawDate")
-    protected abstract suspend fun deleteWinnersForDraw(drawDate: String): Int
-
     @Query("UPDATE draw_results SET payoutLocked = 1 WHERE drawDate = :drawDate")
     protected abstract suspend fun lockResultAfterPayout(drawDate: String)
 
