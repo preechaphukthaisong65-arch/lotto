@@ -156,10 +156,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.setFlags(
-            android.view.WindowManager.LayoutParams.FLAG_SECURE,
-            android.view.WindowManager.LayoutParams.FLAG_SECURE
-        )
+        // TEMPORARY QA: FLAG_SECURE is disabled so screenshots and screen recordings
+        // can be captured while debugging. Re-enable protection before production use.
         hideSystemBars()
         val container = (application as LottoApplication).container
         val saleRepository = container.saleRepository
