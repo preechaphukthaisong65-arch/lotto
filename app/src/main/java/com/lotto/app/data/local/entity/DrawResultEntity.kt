@@ -12,5 +12,9 @@ data class DrawResultEntity(
     val twoDigitBottom: String,
     val recordedAt: Long,
     @ColumnInfo(defaultValue = "0")
-    val payoutLocked: Boolean = false
+    val payoutLocked: Boolean = false,
+    @ColumnInfo(defaultValue = "'LEGACY_MANUAL'")
+    val source: String = "LEGACY_MANUAL",
+    val verificationRunId: String? = null,
+    val approvedAt: Long? = null
 )
