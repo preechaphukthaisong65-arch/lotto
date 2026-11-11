@@ -179,6 +179,10 @@ abstract class DrawResultDao {
         require(result.source == "BOT_VERIFIED") {
             "ปฏิเสธผลรางวัลที่ไม่ได้มาจากบอทตรวจสอบ"
         }
+        require(result.verificationDecision == "APPROVED_3_OF_4" ||
+            result.verificationDecision == "MANUAL_REVIEW_APPROVED") {
+            "ผลรางวัลยังไม่ผ่านการอนุมัติจากการตรวจสอบของบอท"
+        }
         require(!result.verificationRunId.isNullOrBlank()) {
             "ผลรางวัลจากบอทต้องมีรหัสรอบตรวจสอบ"
         }
@@ -192,6 +196,13 @@ abstract class DrawResultDao {
                 .atZone(java.time.ZoneId.of("Asia/Bangkok"))
                 .toLocalDate().toString() == result.drawDate
         ) { "วันที่อนุมัติผลรางวัลไม่ตรงกับวันออกรางวัล" }
+        val approvedThailandTime = java.time.Instant.ofEpochMilli(approvedAt)
+            .atZone(java.time.ZoneId.of("Asia/Bangkok"))
+            .toLocalTime()
+        require(
+            !approvedThailandTime.isBefore(java.time.LocalTime.of(15, 0)) &&
+                !approvedThailandTime.isAfter(java.time.LocalTime.of(17, 0))
+        ) { "ผลรางวัลต้องผ่านการตรวจสอบในช่วงเวลา 15:00–17:00 น. เวลาไทย" }
 
         validateAndAdvanceClock(result.recordedAt)
         require(LottoRules.isValidThreeDigitNumber(result.threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
