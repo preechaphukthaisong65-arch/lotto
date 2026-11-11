@@ -3,7 +3,7 @@ package com.lotto.app.domain.rules
 import com.lotto.app.data.repository.SettingsRepository
 
 /**
- * Per-number purchase caps. A value of 0 means unlimited.
+ * Per-prize-category purchase caps shared by all numbers in that category. Limits reset per draw.
  * Limits are global per prize type and are evaluated independently for each draw.
  */
 object FullNumberLimitPolicy {
