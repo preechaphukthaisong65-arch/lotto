@@ -14,6 +14,52 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+internal fun encryptLegacyDatabaseFile(
+    sourceFile: File,
+    encryptedTarget: File,
+    passphrase: ByteArray
+) {
+    encryptedTarget.delete()
+    val legacy = CipherDatabase.openDatabase(
+        sourceFile.absolutePath,
+        ByteArray(0),
+        null,
+        CipherDatabase.OPEN_READWRITE,
+        null
+    )
+    val schemaVersion = legacy.version
+    try {
+        legacy.rawExecSQL(
+            "ATTACH DATABASE ? AS encrypted KEY ?",
+            encryptedTarget.absolutePath,
+            passphrase
+        )
+        try {
+            legacy.rawExecSQL("SELECT sqlcipher_export('encrypted')")
+        } finally {
+            legacy.rawExecSQL("DETACH DATABASE encrypted")
+        }
+    } finally {
+        legacy.close()
+    }
+    setEncryptedDatabaseVersion(encryptedTarget, passphrase, schemaVersion)
+}
+
+private fun setEncryptedDatabaseVersion(file: File, passphrase: ByteArray, version: Int) {
+    val db = CipherDatabase.openDatabase(
+        file.absolutePath,
+        passphrase,
+        null,
+        CipherDatabase.OPEN_READWRITE,
+        null
+    )
+    try {
+        db.version = version
+    } finally {
+        db.close()
+    }
+}
+
 /**
  * Keeps a random SQLCipher passphrase wrapped by an Android Keystore AES key.
  * Existing plaintext databases are converted in place only after a verified encrypted
@@ -35,21 +81,6 @@ class DatabaseKeyManager private constructor(context: Context) {
             "ไม่สามารถบันทึกกุญแจเข้ารหัสฐานข้อมูลลงในพื้นที่ปลอดภัยได้"
         }
         return raw
-    }
-
-    private fun setUserVersion(file: File, passphrase: ByteArray, version: Int) {
-        val db = CipherDatabase.openDatabase(
-            file.absolutePath,
-            passphrase,
-            null,
-            CipherDatabase.OPEN_READWRITE,
-            null
-        )
-        try {
-            db.version = version
-        } finally {
-            db.close()
-        }
     }
 
     fun ensureEncryptedDatabase(): ByteArray {
@@ -84,30 +115,7 @@ class DatabaseKeyManager private constructor(context: Context) {
         requirePlainDatabaseIsValid(database) // Never overwrite an unknown or corrupt database.
         encryptedTemp.delete()
         plaintextBackup.delete()
-
-        val legacy = CipherDatabase.openDatabase(
-            database.absolutePath,
-            ByteArray(0),
-            null,
-            CipherDatabase.OPEN_READWRITE,
-            null
-        )
-        val schemaVersion = legacy.version
-        try {
-            legacy.rawExecSQL(
-                "ATTACH DATABASE ? AS encrypted KEY ?",
-                encryptedTemp.absolutePath,
-                passphrase
-            )
-            try {
-                legacy.rawExecSQL("SELECT sqlcipher_export('encrypted')")
-            } finally {
-                legacy.rawExecSQL("DETACH DATABASE encrypted")
-            }
-        } finally {
-            legacy.close()
-        }
-        setUserVersion(encryptedTemp, passphrase, schemaVersion)
+        encryptLegacyDatabaseFile(database, encryptedTemp, passphrase)
 
         check(encryptedTemp.exists() && isEncryptedAndValid(encryptedTemp, passphrase)) {
             "ไม่สามารถตรวจสอบฐานข้อมูลที่เข้ารหัสใหม่ได้ จึงเก็บฐานข้อมูลเดิมไว้และยกเลิกการเปลี่ยน"
