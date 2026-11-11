@@ -264,6 +264,8 @@ class SaleDaoFinancialSafetyTest {
             kotlinx.coroutines.runBlocking {
                 saleDao.insertSaleWithItems(
                     SaleEntity(
+                        customerFirstName = "",
+                        customerLastName = "",
                         totalAmount = 50,
                         cashAmount = 50,
                         creditAmount = 0,
