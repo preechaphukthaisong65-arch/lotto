@@ -260,6 +260,7 @@ abstract class LottoDatabase : RoomDatabase() {
         val MIGRATION_16_17 = object : Migration(16, 17) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE draw_results ADD COLUMN source TEXT NOT NULL DEFAULT 'LEGACY_MANUAL'")
+                db.execSQL("ALTER TABLE draw_results ADD COLUMN verificationDecision TEXT NOT NULL DEFAULT 'UNRESOLVED'")
                 db.execSQL("ALTER TABLE draw_results ADD COLUMN verificationRunId TEXT")
                 db.execSQL("ALTER TABLE draw_results ADD COLUMN approvedAt INTEGER")
                 // Historical dates remain available for old sales/reporting, but are no longer operational.
