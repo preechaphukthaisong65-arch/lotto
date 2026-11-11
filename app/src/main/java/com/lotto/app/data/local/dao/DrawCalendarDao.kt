@@ -4,8 +4,6 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Transaction
-import com.lotto.app.data.local.entity.DrawDateChangeEntity
 import com.lotto.app.data.local.entity.DrawDateEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -19,30 +17,6 @@ abstract class DrawCalendarDao {
 
     @Query("SELECT * FROM draw_dates ORDER BY drawDate DESC")
     abstract fun observeAllDrawDates(): Flow<List<DrawDateEntity>>
-
-    @Query("SELECT * FROM draw_dates WHERE drawDate = :date LIMIT 1")
-    abstract suspend fun getByDate(date: String): DrawDateEntity?
-
-    @Query("SELECT COUNT(*) FROM sales WHERE drawDate = :date")
-    protected abstract suspend fun countSalesForDraw(date: String): Int
-
-    @Query("SELECT COUNT(*) FROM draw_results WHERE drawDate = :date")
-    protected abstract suspend fun countResultsForDraw(date: String): Int
-
-    @Query("SELECT COUNT(*) FROM winning_sale_items WHERE drawDate = :date")
-    protected abstract suspend fun countWinningItemsForDraw(date: String): Int
-
-    @Query("SELECT COUNT(*) FROM draw_profit_summaries WHERE drawDate = :date")
-    protected abstract suspend fun countProfitSummariesForDraw(date: String): Int
-
-    @Query("SELECT COUNT(*) FROM draw_result_corrections WHERE drawDate = :date")
-    protected abstract suspend fun countCorrectionsForDraw(date: String): Int
-
-    @Query("SELECT * FROM draw_date_changes ORDER BY changedAt DESC")
-    abstract fun observeAllChanges(): Flow<List<DrawDateChangeEntity>>
-
-    @Insert(onConflict = OnConflictStrategy.ABORT)
-    abstract suspend fun insertDrawDate(entity: DrawDateEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun upsertBotVerifiedDrawDate(entity: DrawDateEntity)
