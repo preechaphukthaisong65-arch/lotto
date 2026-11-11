@@ -126,7 +126,8 @@ class SaleDaoFinancialSafetyTest {
             lastName = "ใจดี",
             total = 100,
             cash = 0,
-            credit = 100
+            credit = 100,
+            newCustomerIdentityConfirmed = true
         )
         database.openHelper.writableDatabase.execSQL(
             "UPDATE credit_documents SET customerId = NULL WHERE sourceSaleId = ?",
@@ -178,7 +179,8 @@ class SaleDaoFinancialSafetyTest {
             lastName = "ใจดี",
             total = 100,
             cash = 0,
-            credit = 100
+            credit = 100,
+            newCustomerIdentityConfirmed = true
         )
         val secondSaleId = saveSale(
             at = saleTime + 1_000,
