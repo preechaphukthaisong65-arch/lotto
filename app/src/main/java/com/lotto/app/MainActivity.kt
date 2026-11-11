@@ -34,7 +34,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.lifecycle.lifecycleScope
 import com.lotto.app.domain.rules.SaleWindowPolicy
-import com.lotto.app.domain.rules.PendingDrawResultPolicy
 import com.lotto.app.domain.rules.FullNumberLimitPolicy
 import com.lotto.app.domain.rules.NoAcceptNumberPolicy
 import com.lotto.app.domain.rules.HalfPayoutNumberPolicy
@@ -51,13 +50,12 @@ import com.lotto.app.ui.reports.CurrentSalesReportScreen
 import com.lotto.app.ui.reports.PerformanceReportScreen
 import com.lotto.app.ui.sale.SaleScreen
 import com.lotto.app.ui.settings.SettingsScreen
-import com.lotto.app.ui.results.DrawResultScreen
 import com.lotto.app.ui.results.WinningResultsScreen
 import com.lotto.app.ui.results.PayoutScreen
 import java.time.LocalDate
 
 private enum class AppScreen {
-    Home, Sale, History, CreditAccounts, PayDebt, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance, DrawResult, Winners, Payout
+    Home, Sale, History, CreditAccounts, PayDebt, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance, Payout
 }
 
 class MainActivity : FragmentActivity() {
@@ -164,10 +162,6 @@ class MainActivity : FragmentActivity() {
         val creditAccountRepository = container.creditAccountRepository
         val customerRepository = container.customerRepository
         val drawCalendarRepository = container.drawCalendarRepository
-        lifecycleScope.launch(Dispatchers.IO) {
-            runCatching { drawCalendarRepository.ensureBaselineCalendar() }
-                .onFailure { android.util.Log.e("LottoCalendar", "Unable to seed baseline draw calendar", it) }
-        }
         val drawResultRepository = container.drawResultRepository
         val settingsRepository = container.settingsRepository
 
@@ -199,6 +193,7 @@ class MainActivity : FragmentActivity() {
                 MaterialTheme {
                 var currentScreen by rememberSaveable { mutableStateOf(AppScreen.Home.name) }
                 val drawDates by drawCalendarRepository.observeAllDrawDates().collectAsState(initial = emptyList())
+                val botDrawDates by drawCalendarRepository.observeBotVerifiedDrawDates().collectAsState(initial = emptyList())
                 val drawResults by drawResultRepository.observeAllResults().collectAsState(initial = emptyList())
                 var currentThailandTime by remember { mutableStateOf(DrawCalendarRepository.nowInThailand()) }
                 val settingRows by settingsRepository.observeAll().collectAsState(initial = emptyList())
@@ -214,8 +209,7 @@ class MainActivity : FragmentActivity() {
                 val currentHalfPayoutNumbers = HalfPayoutNumberPolicy.settingKeys.mapValues { (type, key) ->
                     HalfPayoutNumberPolicy.parse(settingRows.firstOrNull { it.key == key }?.value.orEmpty(), com.lotto.app.domain.rules.PrizeType.valueOf(type))
                 }
-                val activeSaleDrawDate = SaleWindowPolicy.activeDrawDate(drawDates, currentThailandTime).orEmpty()
-                var selectedResultDrawDate by rememberSaveable { mutableStateOf("") }
+                val activeSaleDrawDate = SaleWindowPolicy.activeDrawDate(botDrawDates, currentThailandTime).orEmpty()
                 LaunchedEffect(Unit) {
                     var lastClockPersistAt = 0L
                     while (true) {
@@ -232,12 +226,7 @@ class MainActivity : FragmentActivity() {
                         delay(1_000L)
                     }
                 }
-                val saleWindow = SaleWindowPolicy.evaluate(drawDates, currentThailandTime)
-                val pendingResultDate = PendingDrawResultPolicy.nextPendingDrawDate(
-                    drawDates = drawDates,
-                    completedDrawDates = drawResults.mapTo(mutableSetOf()) { it.drawDate },
-                    nowThailand = currentThailandTime
-                )
+                val saleWindow = SaleWindowPolicy.evaluate(botDrawDates, currentThailandTime)
                 LaunchedEffect(currentScreen, saleWindow.isOpen) {
                     if (currentScreen == AppScreen.Sale.name && !saleWindow.isOpen) {
                         Toast.makeText(this@MainActivity, "ปิดรับขายแล้ว", Toast.LENGTH_SHORT).show()
@@ -261,7 +250,7 @@ class MainActivity : FragmentActivity() {
                             },
                             onSave = { draft ->
                                 val latestStatus = SaleWindowPolicy.evaluate(
-                                    drawDates,
+                                    botDrawDates,
                                     DrawCalendarRepository.nowInThailand()
                                 )
                                 check(latestStatus.isOpen) { "หมดเวลารับขายแล้ว ไม่สามารถบันทึกบิลได้" }
@@ -287,33 +276,6 @@ class MainActivity : FragmentActivity() {
                             creditRepository = creditAccountRepository,
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
-                        AppScreen.Winners.name -> WinningResultsScreen(
-                            drawDate = selectedResultDrawDate,
-                            repository = drawResultRepository,
-                            onBack = { currentScreen = AppScreen.Home.name },
-                            onEditResult = { currentScreen = AppScreen.DrawResult.name }
-                        )
-                        AppScreen.DrawResult.name -> DrawResultScreen(
-                            drawDate = selectedResultDrawDate,
-                            onBack = {
-                                currentScreen = if (drawResults.any { it.drawDate == selectedResultDrawDate }) {
-                                    AppScreen.Winners.name
-                                } else {
-                                    AppScreen.Home.name
-                                }
-                            },
-                            existingResult = drawResults.firstOrNull { it.drawDate == selectedResultDrawDate },
-                            onSave = { three, top, bottom, reason ->
-                                val existing = drawResults.firstOrNull { it.drawDate == selectedResultDrawDate }
-                                val count = if (existing == null) {
-                                    drawResultRepository.saveResult(selectedResultDrawDate, three, top, bottom)
-                                } else {
-                                    drawResultRepository.correctResult(selectedResultDrawDate, three, top, bottom, reason)
-                                }
-                                currentScreen = AppScreen.Winners.name
-                                count
-                            }
-                        )
                         AppScreen.History.name -> HistoryScreen(
                             saleRepository = saleRepository,
                             creditAccountRepository = creditAccountRepository,
@@ -334,7 +296,6 @@ class MainActivity : FragmentActivity() {
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
                         AppScreen.Settings.name -> SettingsScreen(
-                            repository = drawCalendarRepository,
                             settingsRepository = settingsRepository,
                             backupManager = container.encryptedBackupManager,
                             onBack = { currentScreen = AppScreen.Home.name }
@@ -381,11 +342,8 @@ class MainActivity : FragmentActivity() {
                             onOpenSettings = { currentScreen = AppScreen.Settings.name },
                             saleOpen = saleWindow.isOpen,
                             saleStatusMessage = saleWindow.message,
-                            pendingResultDate = pendingResultDate,
-                            onOpenDrawResult = {
-                                selectedResultDrawDate = pendingResultDate.orEmpty()
-                                currentScreen = AppScreen.DrawResult.name
-                            }
+                            pendingResultDate = null,
+                            onOpenDrawResult = { }
                         )
                     }
                 }
