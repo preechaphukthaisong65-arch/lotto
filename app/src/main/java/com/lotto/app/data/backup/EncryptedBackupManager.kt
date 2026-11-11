@@ -236,8 +236,8 @@ class EncryptedBackupManager(
             CipherDatabase.OPEN_READWRITE or CipherDatabase.CREATE_IF_NECESSARY,
             null
         )
-        try {
-            val schemaVersion = source.version
+        val schemaVersion = try {
+            val version = source.version
             source.rawExecSQL(
                 "ATTACH DATABASE ? AS plaintext KEY ''",
                 plaintextTarget.absolutePath
@@ -248,6 +248,7 @@ class EncryptedBackupManager(
             } finally {
                 source.rawExecSQL("DETACH DATABASE plaintext")
             }
+            version
         } finally {
             source.close()
         }
@@ -263,8 +264,8 @@ class EncryptedBackupManager(
             CipherDatabase.OPEN_READWRITE or CipherDatabase.CREATE_IF_NECESSARY,
             null
         )
-        try {
-            val schemaVersion = source.version
+        val schemaVersion = try {
+            val version = source.version
             source.rawExecSQL(
                 "ATTACH DATABASE ? AS encrypted KEY ?",
                 encryptedTarget.absolutePath,
@@ -276,6 +277,7 @@ class EncryptedBackupManager(
             } finally {
                 source.rawExecSQL("DETACH DATABASE encrypted")
             }
+            version
         } finally {
             source.close()
         }
