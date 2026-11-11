@@ -16,7 +16,6 @@ import com.lotto.app.data.local.model.WinningBillSummary
 import com.lotto.app.domain.rules.LottoRules
 import com.lotto.app.domain.rules.PrizeType
 import kotlinx.coroutines.flow.Flow
-import com.lotto.app.domain.rules.DrawResultEntryPolicy
 
 @Dao
 abstract class DrawResultDao {
@@ -60,7 +59,7 @@ abstract class DrawResultDao {
     @Query("SELECT * FROM draw_results WHERE drawDate = :drawDate LIMIT 1")
     abstract suspend fun getResult(drawDate: String): DrawResultEntity?
 
-    @Query("SELECT COUNT(*) FROM draw_dates WHERE drawDate = :drawDate")
+    @Query("SELECT COUNT(*) FROM draw_dates WHERE drawDate = :drawDate AND source = 'BOT_VERIFIED'")
     protected abstract suspend fun countScheduledDrawDate(drawDate: String): Int
 
     @Query("SELECT value FROM app_settings WHERE key = :key LIMIT 1")
@@ -186,9 +185,22 @@ abstract class DrawResultDao {
     open suspend fun saveResultAndFindWinners(result: DrawResultEntity): Int {
         require(countScheduledDrawDate(result.drawDate) == 1) { "ไม่พบวันที่ออกรางวัลนี้ในปฏิทินหวย กรุณาตรวจสอบงวดก่อนบันทึกผล" }
 
-        require(DrawResultEntryPolicy.canEnter(result.drawDate, result.recordedAt)) {
-            "ยังไม่ถึงเวลา 16:00 น. ของวันออกรางวัล จึงยังบันทึกผลรางวัลไม่ได้ หรือวันที่งวดไม่ถูกต้อง"
+        require(result.source == "BOT_VERIFIED") {
+            "ปฏิเสธผลรางวัลที่ไม่ได้มาจากบอทตรวจสอบ"
         }
+        require(!result.verificationRunId.isNullOrBlank()) {
+            "ผลรางวัลจากบอทต้องมีรหัสรอบตรวจสอบ"
+        }
+        val approvedAt = result.approvedAt
+            ?: throw IllegalArgumentException("ผลรางวัลจากบอทไม่มีเวลาอนุมัติ")
+        require(approvedAt > 0L && approvedAt <= result.recordedAt) {
+            "เวลาอนุมัติผลรางวัลจากบอทไม่ถูกต้อง"
+        }
+        require(
+            java.time.Instant.ofEpochMilli(approvedAt)
+                .atZone(java.time.ZoneId.of("Asia/Bangkok"))
+                .toLocalDate().toString() == result.drawDate
+        ) { "วันที่อนุมัติผลรางวัลไม่ตรงกับวันออกรางวัล" }
 
         validateAndAdvanceClock(result.recordedAt)
         require(LottoRules.isValidThreeDigitNumber(result.threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
@@ -200,56 +212,6 @@ abstract class DrawResultDao {
         insertResult(result)
         if (winningItems.isNotEmpty()) insertWinners(winningItems)
         saveDrawProfitSummary(result.drawDate, result.recordedAt, winningItems)
-        return winningItems.size
-    }
-
-    @Transaction
-    open suspend fun correctResultAndRebuildWinners(
-        drawDate: String,
-        threeDigit: String,
-        twoDigitTop: String,
-        twoDigitBottom: String,
-        reason: String,
-        correctedAt: Long
-    ): Int {
-        require(LottoRules.isValidThreeDigitNumber(threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
-        require(LottoRules.isValidTwoDigitNumber(twoDigitTop)) { "กรุณากรอกผล 2 ตัวบนให้ครบ 2 หลัก" }
-        require(LottoRules.isValidTwoDigitNumber(twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
-        require(countScheduledDrawDate(drawDate) == 1) { "ไม่พบวันที่ออกรางวัลนี้ในปฏิทิน" }
-        require(DrawResultEntryPolicy.canEnter(drawDate, correctedAt)) {
-            "ยังไม่ถึงเวลา 16:00 น. ของวันออกรางวัล จึงยังแก้ไขผลรางวัลไม่ได้"
-        }
-        validateAndAdvanceClock(correctedAt)
-        require(reason.isNotBlank()) { "กรุณาระบุเหตุผลที่แก้ไขผลรางวัล" }
-        val previous = getResult(drawDate) ?: throw IllegalArgumentException("ไม่พบผลรางวัลของงวดนี้")
-        require(!previous.payoutLocked) {
-            "งวดนี้มีการจ่ายรางวัลแล้ว ไม่อนุญาตให้แก้ผลเพื่อป้องกันยอดจ่ายเดิมคลาดเคลื่อน"
-        }
-
-        insertCorrection(
-            com.lotto.app.data.local.entity.DrawResultCorrectionEntity(
-                drawDate = drawDate,
-                previousThreeDigit = previous.threeDigit,
-                previousTwoDigitTop = previous.twoDigitTop,
-                previousTwoDigitBottom = previous.twoDigitBottom,
-                newThreeDigit = threeDigit,
-                newTwoDigitTop = twoDigitTop,
-                newTwoDigitBottom = twoDigitBottom,
-                reason = reason.trim(),
-                correctedAt = correctedAt
-            )
-        )
-        deleteWinnersForDraw(drawDate)
-        updateResult(drawDate, threeDigit, twoDigitTop, twoDigitBottom, correctedAt)
-        val corrected = previous.copy(
-            threeDigit = threeDigit,
-            twoDigitTop = twoDigitTop,
-            twoDigitBottom = twoDigitBottom,
-            recordedAt = correctedAt
-        )
-        val winningItems = calculateWinningItems(corrected)
-        if (winningItems.isNotEmpty()) insertWinners(winningItems)
-        saveDrawProfitSummary(drawDate, correctedAt, winningItems)
         return winningItems.size
     }
 
