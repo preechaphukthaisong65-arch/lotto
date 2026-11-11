@@ -755,7 +755,7 @@ fun SaleScreen(
                         Text("กำลังตรวจสอบยอดเชื่อจากบิลเดิม...", style = MaterialTheme.typography.bodySmall)
                     } else if (creditSelected && (legacyDebtAmount ?: 0L) > 0L) {
                         Text(
-                            "พบยอดเชื่อค้างจากข้อมูลเดิมที่ยังไม่มีรหัสลูกค้า ${legacyDebtAmount} บาท ระบบจะไม่รวมยอดนี้อัตโนมัติเพราะอาจเป็นคนละคน",
+                            "พบยอดเชื่อค้างจากข้อมูลเดิมที่ยังไม่มีรหัสลูกค้า ${legacyDebtAmount} บาท เพื่อป้องกันการให้เครดิตเกินวงเงิน ระบบจะนำยอดนี้ไปรวมกับหนี้ของลูกค้ารายนี้เมื่อยืนยัน",
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -764,7 +764,7 @@ fun SaleScreen(
                                 checked = legacyDebtReviewed,
                                 onCheckedChange = { legacyDebtReviewed = it }
                             )
-                            Text("ตรวจสอบแล้วว่าเป็นลูกค้ารายเดียวกัน/คนละคน และยืนยันการขายเชื่อ")
+                            Text("ยืนยันว่าหนี้เดิมเป็นของลูกค้ารายนี้ และยินยอมให้นำยอดเดิมไปรวมคำนวณวงเงินเครดิต")
                         }
                     }
                     if (creditSelected && !customerValid) {
