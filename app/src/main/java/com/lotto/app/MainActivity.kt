@@ -340,9 +340,7 @@ class MainActivity : FragmentActivity() {
                             onOpenCalendar = { currentScreen = AppScreen.Calendar.name },
                             onOpenSettings = { currentScreen = AppScreen.Settings.name },
                             saleOpen = saleWindow.isOpen,
-                            saleStatusMessage = saleWindow.message,
-                            pendingResultDate = null,
-                            onOpenDrawResult = { }
+                            saleStatusMessage = saleWindow.message
                         )
                     }
                 }
