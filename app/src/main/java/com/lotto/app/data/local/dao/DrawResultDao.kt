@@ -173,7 +173,7 @@ abstract class DrawResultDao {
     }
 
     @Transaction
-    open suspend fun saveResultAndFindWinners(result: DrawResultEntity): Int {
+    open suspend fun saveBotVerifiedResultAndFindWinners(result: DrawResultEntity): Int {
         require(countScheduledDrawDate(result.drawDate) == 1) { "ไม่พบวันที่ออกรางวัลนี้ในปฏิทินหวย กรุณาตรวจสอบงวดก่อนบันทึกผล" }
 
         require(result.source == "BOT_VERIFIED") {
