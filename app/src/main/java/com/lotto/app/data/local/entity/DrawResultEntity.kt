@@ -15,6 +15,8 @@ data class DrawResultEntity(
     val payoutLocked: Boolean = false,
     @ColumnInfo(defaultValue = "'LEGACY_MANUAL'")
     val source: String = "LEGACY_MANUAL",
+    @ColumnInfo(defaultValue = "'UNRESOLVED'")
+    val verificationDecision: String = "UNRESOLVED",
     val verificationRunId: String? = null,
     val approvedAt: Long? = null
 )
