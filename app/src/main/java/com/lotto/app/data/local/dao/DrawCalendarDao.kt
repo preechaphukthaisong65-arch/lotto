@@ -11,8 +11,11 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 abstract class DrawCalendarDao {
-    @Query("SELECT * FROM draw_dates WHERE drawDate BETWEEN :startDate AND :endDate ORDER BY drawDate")
+    @Query("SELECT * FROM draw_dates WHERE source = 'BOT_VERIFIED' AND drawDate BETWEEN :startDate AND :endDate ORDER BY drawDate")
     abstract fun observeDrawDates(startDate: String, endDate: String): Flow<List<DrawDateEntity>>
+
+    @Query("SELECT * FROM draw_dates WHERE source = 'BOT_VERIFIED' ORDER BY drawDate")
+    abstract fun observeBotVerifiedDrawDates(): Flow<List<DrawDateEntity>>
 
     @Query("SELECT * FROM draw_dates ORDER BY drawDate DESC")
     abstract fun observeAllDrawDates(): Flow<List<DrawDateEntity>>
