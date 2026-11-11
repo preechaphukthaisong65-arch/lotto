@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - main
+      - security-hardening
   pull_request:
     branches:
       - main
@@ -18,8 +19,8 @@ permissions:
 
 jobs:
   build-debug:
-    name: Unit tests and build debug APK
-    runs-on: ubuntu-24.04
+    name: Unit tests and debug APK
+    runs-on: ubuntu-latest
     timeout-minutes: 35
 
     steps:
@@ -56,11 +57,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  instrumentation:
-    name: Android instrumentation tests (Linux KVM)
-    runs-on: ubuntu-24.04
+  instrumentation-tests:
+    name: Android instrumentation tests (Linux x86_64)
+    runs-on: ubuntu-latest
     needs: build-debug
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: Checkout source
@@ -80,7 +81,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools platforms;android-36 build-tools;35.0.0
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
 
       - name: Verify KVM availability
         run: |
@@ -100,19 +101,17 @@ jobs:
           arch: x86_64
           profile: pixel_2
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data -gpu swiftshader_indirect
-          emulator-boot-timeout: 300
+          emulator-boot-timeout: 600
           disable-animations: true
           script: |
             set -euo pipefail
             DEVICE="${ANDROID_SERIAL:-emulator-5554}"
-            echo "Connected emulator:"
-            adb devices -l
             adb -s "$DEVICE" wait-for-device
 
-            echo "Waiting for Android framework and package/activity services..."
+            echo "Waiting for Android framework services..."
             ready=0
             for attempt in $(seq 1 120); do
-              booted="$(adb -s "$DEVICE" shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r' || true)"
+              booted="$(adb -s "$DEVICE" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
               package_ready="$(adb -s "$DEVICE" shell service check package 2>/dev/null | grep -c 'found' || true)"
               activity_ready="$(adb -s "$DEVICE" shell service check activity 2>/dev/null | grep -c 'found' || true)"
               if [ "$booted" = "1" ] && [ "$package_ready" -gt 0 ] && [ "$activity_ready" -gt 0 ]; then
@@ -124,6 +123,7 @@ jobs:
 
             if [ "$ready" -ne 1 ]; then
               echo "::error::Android framework did not become ready in time."
+              adb devices -l || true
               adb -s "$DEVICE" shell getprop | grep -E 'boot|init.svc' || true
               adb -s "$DEVICE" shell service list || true
               exit 1
@@ -133,27 +133,20 @@ jobs:
             echo "Android package and activity services are ready."
             gradle --no-daemon :app:connectedDebugAndroidTest
 
-      - name: Capture emulator diagnostics on failure
+      - name: Collect emulator diagnostics on failure
         if: failure()
         run: |
-          mkdir -p "$RUNNER_TEMP/lotto-emulator-diagnostics"
-          adb devices -l > "$RUNNER_TEMP/lotto-emulator-diagnostics/adb-devices.txt" 2>&1 || true
-          adb logcat -d > "$RUNNER_TEMP/lotto-emulator-diagnostics/logcat.txt" 2>&1 || true
-          ps aux | grep -E '[e]mulator|[a]db' > "$RUNNER_TEMP/lotto-emulator-diagnostics/processes.txt" || true
-
-      - name: Upload emulator diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lotto-emulator-diagnostics
-          path: ${{ runner.temp }}/lotto-emulator-diagnostics/
-          if-no-files-found: ignore
-          retention-days: 7
+          adb devices -l || true
+          adb -s emulator-5554 logcat -d -t 3000 || true
+          ps aux | grep -E '[e]mulator|[a]db' || true
+          ls -la "$ANDROID_AVD_HOME" || true
 
   release-build:
-    name: Build release APK and App Bundle
-    runs-on: ubuntu-24.04
-    needs: instrumentation
+    name: Release APK and App Bundle (test-gated)
+    runs-on: ubuntu-latest
+    needs:
+      - build-debug
+      - instrumentation-tests
     timeout-minutes: 45
 
     steps:
@@ -194,18 +187,18 @@ jobs:
           gradle --no-daemon :app:assembleRelease
           gradle --no-daemon :app:bundleRelease
 
-      - name: Upload release APK
+      - name: Upload release APK candidate
         uses: actions/upload-artifact@v4
         with:
-          name: lotto-release-apk
+          name: lotto-release-apk-test-gated
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload release App Bundle
+      - name: Upload release App Bundle candidate
         uses: actions/upload-artifact@v4
         with:
-          name: lotto-release-aab
+          name: lotto-release-aab-test-gated
           path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 14
