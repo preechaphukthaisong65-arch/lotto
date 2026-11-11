@@ -70,13 +70,27 @@ class MainActivity : FragmentActivity() {
             authenticationError.value = "กรุณาตั้ง PIN, รหัสผ่าน หรือรูปแบบล็อกหน้าจอของเครื่องก่อนใช้งาน Lotto"
             return
         }
-        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
-            BiometricManager.Authenticators.DEVICE_CREDENTIAL
-        val availability = BiometricManager.from(this).canAuthenticate(authenticators)
-        if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
-            authenticationError.value = "อุปกรณ์ยังไม่พร้อมสำหรับการยืนยันตัวตน กรุณาตรวจสอบการล็อกหน้าจอ"
-            return
+        val promptInfoBuilder = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("ยืนยันตัวตนเพื่อเข้าใช้งาน Lotto")
+            .setSubtitle("ใช้ลายนิ้วมือ ใบหน้า หรือ PIN/รหัสล็อกหน้าจอของอุปกรณ์")
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            // Android 11+ supports the combined strong biometric + device credential mode.
+            val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            val availability = BiometricManager.from(this).canAuthenticate(authenticators)
+            if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+                authenticationError.value =
+                    "อุปกรณ์ยังไม่พร้อมสำหรับการยืนยันตัวตน กรุณาตรวจสอบการล็อกหน้าจอ"
+                return
+            }
+            promptInfoBuilder.setAllowedAuthenticators(authenticators)
+        } else {
+            // Android 8–10 cannot use the combined authenticator bitmask.
+            // The legacy flag lets the system offer the device credential fallback.
+            promptInfoBuilder.setDeviceCredentialAllowed(true)
         }
+
         val prompt = BiometricPrompt(
             this,
             ContextCompat.getMainExecutor(this),
@@ -97,12 +111,7 @@ class MainActivity : FragmentActivity() {
                 }
             }
         )
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("ยืนยันตัวตนเพื่อเข้าใช้งาน Lotto")
-            .setSubtitle("ใช้ลายนิ้วมือ ใบหน้า หรือ PIN/รหัสล็อกหน้าจอของอุปกรณ์")
-            .setAllowedAuthenticators(authenticators)
-            .build()
-        prompt.authenticate(promptInfo)
+        prompt.authenticate(promptInfoBuilder.build())
     }
 
     override fun onStart() {
@@ -147,6 +156,10 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_SECURE,
+            android.view.WindowManager.LayoutParams.FLAG_SECURE
+        )
         hideSystemBars()
         val container = (application as LottoApplication).container
         val saleRepository = container.saleRepository
