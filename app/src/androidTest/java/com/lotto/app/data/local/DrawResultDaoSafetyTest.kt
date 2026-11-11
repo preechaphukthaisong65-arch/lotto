@@ -64,6 +64,7 @@ class DrawResultDaoSafetyTest {
                     twoDigitBottom = "45",
                     recordedAt = approvedAt,
                     source = "BOT_VERIFIED",
+                    verificationDecision = "APPROVED_3_OF_4",
                     verificationRunId = "run-test-001",
                     approvedAt = approvedAt
                 )
