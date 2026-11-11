@@ -69,7 +69,7 @@ fun SaleScreen(
     fullLimitsByPrizeType: Map<String, Long>,
     noAcceptNumbersByPrizeType: Map<String, Set<String>>,
     halfPayoutNumbersByPrizeType: Map<String, Set<String>>,
-    onGetNumberStake: suspend (String, String, String) -> Long,
+    onGetPrizeTypeStake: suspend (String, String) -> Long,
     onSave: suspend (SaleDraft) -> Long
 ) {
     val threeDigitEntries = remember { mutableStateListOf(ThreeDigitEntry(id = 1L)) }
@@ -149,13 +149,13 @@ fun SaleScreen(
             return
         }
         coroutineScope.launch {
-            runCatching { onGetNumberStake(drawDate, prizeType, number) }
+            runCatching { onGetPrizeTypeStake(drawDate, prizeType) }
                 .onSuccess { used ->
                     if (quotaRequestVersions[key] == version) {
                         quotaHints[key] = when {
-                            used >= limit -> "เลข $number เต็มแล้ว · เหลือโควตา 0 บาท"
+                            used >= limit -> "หมวด $prizeType เต็มแล้ว · เหลือโควตา 0 บาท"
                             used.toDouble() / limit.toDouble() >= 0.90 ->
-                                "เลข $number ใกล้เต็ม · ซื้อได้อีก ${limit - used} บาท"
+                                "หมวด $prizeType ใกล้เต็ม · ซื้อได้อีก ${limit - used} บาท"
                             else -> ""
                         }
                         if (quotaHints[key].isNullOrEmpty()) quotaHints.remove(key)
@@ -169,19 +169,22 @@ fun SaleScreen(
         digitCount: Int
     ): List<QuotaAdjustment> {
         val adjustments = mutableListOf<QuotaAdjustment>()
-        val prizeTypes = entries.flatMap { it.third.keys }.distinct()
-        for (number in entries.map { it.second }.filter { it.length == digitCount }.distinct()) {
-            for (prizeType in prizeTypes) {
-                val limit = fullLimitsByPrizeType[prizeType] ?: 0L
-                if (limit <= 0L) continue
-                var remaining = (limit - onGetNumberStake(drawDate, prizeType, number)).coerceAtLeast(0L)
-                entries.filter { it.second == number }.forEach { entry ->
-                    val requestedAmount = entry.third[prizeType] ?: 0L
-                    if (requestedAmount > remaining) {
-                        adjustments += QuotaAdjustment(entry.first, prizeType, remaining)
-                    }
-                    remaining = (remaining - requestedAmount.coerceAtMost(remaining)).coerceAtLeast(0L)
+        val eligibleEntries = entries.filter { it.second.length == digitCount }
+        val prizeTypes = eligibleEntries.flatMap { it.third.keys }.distinct()
+        for (prizeType in prizeTypes) {
+            val limit = fullLimitsByPrizeType[prizeType] ?: 0L
+            if (limit <= 0L) continue
+            var remaining = (
+                limit - onGetPrizeTypeStake(drawDate, prizeType)
+            ).coerceAtLeast(0L)
+            eligibleEntries.forEach { entry ->
+                val requestedAmount = entry.third[prizeType] ?: 0L
+                if (requestedAmount > remaining) {
+                    adjustments += QuotaAdjustment(entry.first, prizeType, remaining)
                 }
+                remaining = (
+                    remaining - requestedAmount.coerceAtMost(remaining)
+                ).coerceAtLeast(0L)
             }
         }
         return adjustments
