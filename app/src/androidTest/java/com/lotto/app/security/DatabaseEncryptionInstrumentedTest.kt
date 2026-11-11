@@ -1,9 +1,12 @@
 package com.lotto.app.security
 
 import android.content.Context
+import android.view.WindowManager
 import android.net.Uri
 import android.database.sqlite.SQLiteDatabase as PlatformSQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.core.app.ActivityScenario
+import com.lotto.app.MainActivity
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lotto.app.LottoApplication
 import com.lotto.app.core.di.AppContainer
@@ -23,6 +26,18 @@ import java.nio.charset.StandardCharsets
 
 @RunWith(AndroidJUnit4::class)
 class DatabaseEncryptionInstrumentedTest {
+    @Test
+    fun mainActivityEnablesSecureWindowFlag() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                assertTrue(
+                    "Screenshots and non-secure displays must be blocked",
+                    activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
+                )
+            }
+        }
+    }
+
     @Test
     fun legacyPlainDatabaseConversionPreservesVersionAndData() {
         val context = ApplicationProvider.getApplicationContext<Context>()
