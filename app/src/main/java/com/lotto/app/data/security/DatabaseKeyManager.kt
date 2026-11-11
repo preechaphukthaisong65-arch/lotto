@@ -92,8 +92,8 @@ class DatabaseKeyManager private constructor(context: Context) {
             CipherDatabase.OPEN_READWRITE,
             null
         )
+        val schemaVersion = legacy.version
         try {
-            val schemaVersion = legacy.version
             legacy.rawExecSQL(
                 "ATTACH DATABASE ? AS encrypted KEY ?",
                 encryptedTemp.absolutePath,
@@ -107,7 +107,7 @@ class DatabaseKeyManager private constructor(context: Context) {
         } finally {
             legacy.close()
         }
-        setUserVersion(encryptedTemp, passphrase, legacy.version)
+        setUserVersion(encryptedTemp, passphrase, schemaVersion)
 
         check(encryptedTemp.exists() && isEncryptedAndValid(encryptedTemp, passphrase)) {
             "ไม่สามารถตรวจสอบฐานข้อมูลที่เข้ารหัสใหม่ได้ จึงเก็บฐานข้อมูลเดิมไว้และยกเลิกการเปลี่ยน"
