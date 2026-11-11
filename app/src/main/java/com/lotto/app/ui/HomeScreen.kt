@@ -43,6 +43,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     saleOpen: Boolean,
     saleStatusMessage: String,
+    calendarBotStatus: String,
     pendingResultDate: String?,
     onOpenDrawResult: () -> Unit
 ) {
@@ -62,14 +63,17 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "LOTTO",
-                style = androidx.compose.material3.MaterialTheme.typography.headlineMedium
-            )
+            Text(text = "LOTTO", style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
             Text(
                 text = saleStatusMessage,
                 style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
                 color = if (saleOpen) androidx.compose.material3.MaterialTheme.colorScheme.primary else androidx.compose.material3.MaterialTheme.colorScheme.error
+            )
+            Text(text = "สถานะบอทตรวจปฏิทินกองสลาก", style = androidx.compose.material3.MaterialTheme.typography.titleSmall)
+            Text(
+                text = calendarBotStatus,
+                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.secondary
             )
             LazyColumn(
                 contentPadding = PaddingValues(bottom = 16.dp),
