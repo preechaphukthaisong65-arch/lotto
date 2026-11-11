@@ -32,6 +32,18 @@ abstract class AppSettingDao {
 
     @Transaction
     open suspend fun saveWithAudit(setting: AppSettingEntity) {
+        saveWithAuditInternal(setting)
+    }
+
+    @Transaction
+    open suspend fun saveManyWithAudit(settings: List<AppSettingEntity>) {
+        require(settings.map { it.key }.distinct().size == settings.size) {
+            "พบคีย์การตั้งค่าซ้ำในชุดข้อมูล"
+        }
+        settings.forEach { saveWithAuditInternal(it) }
+    }
+
+    private suspend fun saveWithAuditInternal(setting: AppSettingEntity) {
         val previous = getByKey(setting.key)
         val highWaterRaw = getByKey("clock_high_water_epoch_ms")?.value
         val highWater = highWaterRaw?.toLongOrNull()
