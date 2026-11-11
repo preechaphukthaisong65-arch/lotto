@@ -47,7 +47,6 @@ fun DrawCalendarScreen(
         visibleMonth.atDay(1),
         visibleMonth.atEndOfMonth()
     ).collectAsState(initial = emptyList())
-    val history by repository.observeAllChanges().collectAsState(initial = emptyList())
     val locale = remember { Locale("th", "TH") }
     val monthLabel = visibleMonth.atDay(1).format(DateTimeFormatter.ofPattern("MMMM yyyy", locale))
     val drawDateSet = remember(drawDates) { drawDates.map { it.drawDate }.toSet() }
@@ -123,7 +122,7 @@ fun DrawCalendarScreen(
             }
             Text("งวดในเดือนนี้", style = MaterialTheme.typography.titleMedium)
             if (drawDates.isEmpty()) {
-                Text("ยังไม่มีข้อมูลอ้างอิงงวดในเดือนนี้", style = MaterialTheme.typography.bodySmall)
+                Text("บอทยังไม่มีวันงวดที่ผ่านการตรวจสอบในเดือนนี้", style = MaterialTheme.typography.bodySmall)
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f, fill = false),
@@ -138,9 +137,8 @@ fun DrawCalendarScreen(
                                 Text(draw.drawDate, style = MaterialTheme.typography.titleMedium)
                                 Text(
                                     when (draw.source) {
-                                        "GLO_10_YEAR_REFERENCE" -> "ข้อมูลอ้างอิงกองสลาก"
-                                        "USER_EDITED" -> "ผู้ใช้แก้ไขวันแล้ว"
-                                        else -> "วันที่ผู้ใช้เพิ่ม"
+                                        "BOT_VERIFIED" -> "บอทตรวจสอบแล้ว"
+                                        else -> "ไม่ใช่ข้อมูลที่ผ่านการยืนยัน"
                                     },
                                     style = MaterialTheme.typography.bodySmall
                                 )
@@ -149,27 +147,8 @@ fun DrawCalendarScreen(
                     }
                 }
             }
-            Text("ประวัติการเปลี่ยนวันล่าสุด", style = MaterialTheme.typography.titleMedium)
-            if (history.isEmpty()) {
-                Text("ยังไม่มีประวัติการแก้ไข", style = MaterialTheme.typography.bodySmall)
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f, fill = false),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    items(history.take(5), key = { it.changeId }) { item ->
-                        val timestamp = java.time.Instant.ofEpochMilli(item.changedAt)
-                            .atZone(DrawCalendarRepository.THAILAND_ZONE)
-                            .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", locale))
-                        Text(
-                            (item.previousDate ?: "—") + " → " + item.newDate + " · " + timestamp,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-            }
             Text(
-                "หากต้องการเพิ่มหรือเปลี่ยนวันออกรางวัล ให้ไปที่เมนูตั้งค่า",
+                "ปฏิทินนี้แสดงเฉพาะวันงวดที่บอทตรวจสอบและอนุมัติแล้วเท่านั้น",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.secondary
             )
