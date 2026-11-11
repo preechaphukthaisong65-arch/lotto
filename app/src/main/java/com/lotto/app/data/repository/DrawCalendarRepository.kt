@@ -14,32 +14,8 @@ class DrawCalendarRepository(
 
     fun observeAllDrawDates(): Flow<List<DrawDateEntity>> = dao.observeAllDrawDates()
 
-    fun observeAllChanges(): Flow<List<com.lotto.app.data.local.entity.DrawDateChangeEntity>> =
-        dao.observeAllChanges()
-
-    /** Seeds missing regular draw dates without overwriting user edits or existing records. */
-    suspend fun ensureBaselineCalendar(today: LocalDate = todayInThailand()) {
-        dao.insertDefaultDrawDates(OfficialDrawCalendarDefaults.generate(today))
-    }
-
-    suspend fun addDrawDate(date: LocalDate, note: String? = null) {
-        require(dao.getByDate(date.toString()) == null) { "มีงวดออกรางวัลในวันที่เลือกแล้ว" }
-        val now = System.currentTimeMillis()
-        dao.insertDrawDate(
-            DrawDateEntity(
-                drawDate = date.toString(),
-                referenceDate = null,
-                source = "USER_ADDED",
-                note = note,
-                updatedAt = now
-            )
-        )
-    }
-
-    suspend fun moveDrawDate(oldDate: LocalDate, newDate: LocalDate) {
-        val changedAt = System.currentTimeMillis()
-        dao.moveDrawDate(oldDate.toString(), newDate.toString(), changedAt)
-    }
+    /** Only dates accepted by the verification bot may drive sales or the app calendar. */
+    fun observeBotVerifiedDrawDates(): Flow<List<DrawDateEntity>> = dao.observeBotVerifiedDrawDates()
 
     companion object {
         val THAILAND_ZONE: ZoneId = ZoneId.of("Asia/Bangkok")
