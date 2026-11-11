@@ -241,8 +241,8 @@ class MainActivity : FragmentActivity() {
                             fullLimitsByPrizeType = currentFullLimits,
                             noAcceptNumbersByPrizeType = currentNoAcceptNumbers,
                             halfPayoutNumbersByPrizeType = currentHalfPayoutNumbers,
-                            onGetNumberStake = { drawDate, prizeType, number ->
-                                saleRepository.getNumberStakeForDraw(drawDate, prizeType, number)
+                            onGetPrizeTypeStake = { drawDate, prizeType ->
+                                saleRepository.getPrizeTypeStakeForDraw(drawDate, prizeType)
                             },
                             onSave = { draft ->
                                 val latestStatus = SaleWindowPolicy.evaluate(
