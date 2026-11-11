@@ -229,14 +229,25 @@ class EncryptedBackupManager(
         }
     }
 
-    private fun checkAttachedDatabase(database: CipherDatabase, schema: String) {
-        var attached = false
+    private fun checkAttachedDatabase(
+        database: CipherDatabase,
+        schema: String,
+        expectedFile: File
+    ) {
+        var attachedPath: String? = null
         database.rawQuery("PRAGMA database_list", null).use { cursor ->
             while (cursor.moveToNext()) {
-                if (cursor.getString(1) == schema) attached = true
+                if (cursor.getString(1) == schema) {
+                    attachedPath = cursor.getString(2)
+                    break
+                }
             }
         }
-        check(attached) { "ไม่สามารถแนบฐานข้อมูลปลายทาง ($schema) ได้" }
+        val actualPath = attachedPath
+            ?: throw IllegalStateException("ไม่สามารถแนบฐานข้อมูลปลายทาง ($schema) ได้")
+        check(File(actualPath).canonicalFile == expectedFile.canonicalFile) {
+            "ตำแหน่งฐานข้อมูลที่แนบไม่ตรงกับไฟล์ปลายทางที่กำหนด ($schema)"
+        }
     }
 
     private fun setUserVersion(file: File, passphrase: ByteArray, version: Int) {
@@ -263,12 +274,15 @@ class EncryptedBackupManager(
             null
         )
         val schemaVersion = try {
+            require(encryptedFile.isFile && encryptedFile.length() > 0L) {
+                "ไม่พบฐานข้อมูลเข้ารหัสต้นทางสำหรับสำรอง"
+            }
             val version = source.version
             source.rawExecSQL(
                 "ATTACH DATABASE ? AS plaintext KEY ''",
                 plaintextTarget.absolutePath
             )
-            checkAttachedDatabase(source, "plaintext")
+            checkAttachedDatabase(source, "plaintext", plaintextTarget)
             try {
                 source.rawExecSQL("SELECT sqlcipher_export('plaintext')")
             } finally {
@@ -292,12 +306,15 @@ class EncryptedBackupManager(
         )
         val schemaVersion = try {
             val version = source.version
+            require(plaintextFile.isFile && plaintextFile.length() > 0L) {
+                "ไม่พบฐานข้อมูลต้นทางสำหรับเข้ารหัส"
+            }
             source.rawExecSQL(
                 "ATTACH DATABASE ? AS encrypted KEY ?",
                 encryptedTarget.absolutePath,
                 databasePassphrase
             )
-            checkAttachedDatabase(source, "encrypted")
+            checkAttachedDatabase(source, "encrypted", encryptedTarget)
             try {
                 source.rawExecSQL("SELECT sqlcipher_export('encrypted')")
             } finally {
@@ -306,6 +323,9 @@ class EncryptedBackupManager(
             version
         } finally {
             source.close()
+        }
+        check(encryptedTarget.isFile && encryptedTarget.length() > 0L) {
+            "การเข้ารหัส Snapshot ไม่สร้างไฟล์ฐานข้อมูลปลายทาง"
         }
         setUserVersion(encryptedTarget, databasePassphrase, schemaVersion)
     }
