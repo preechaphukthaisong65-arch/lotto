@@ -203,6 +203,21 @@ class EncryptedBackupManager(
         }
     }
 
+    private fun setUserVersion(file: File, passphrase: ByteArray, version: Int) {
+        val db = CipherDatabase.openDatabase(
+            file.absolutePath,
+            passphrase,
+            null,
+            CipherDatabase.OPEN_READWRITE,
+            null
+        )
+        try {
+            db.version = version
+        } finally {
+            db.close()
+        }
+    }
+
     private fun exportPlaintextSnapshot(encryptedFile: File, plaintextTarget: File) {
         val source = CipherDatabase.openDatabase(
             encryptedFile.absolutePath,
@@ -219,13 +234,13 @@ class EncryptedBackupManager(
             )
             try {
                 source.rawExecSQL("SELECT sqlcipher_export('plaintext')")
-                source.rawExecSQL("PRAGMA plaintext.user_version = $schemaVersion")
             } finally {
                 source.rawExecSQL("DETACH DATABASE plaintext")
             }
         } finally {
             source.close()
         }
+        setUserVersion(plaintextTarget, ByteArray(0), schemaVersion)
     }
 
     private fun encryptPlaintextDatabase(plaintextFile: File, encryptedTarget: File) {
@@ -246,13 +261,13 @@ class EncryptedBackupManager(
             )
             try {
                 source.rawExecSQL("SELECT sqlcipher_export('encrypted')")
-                source.rawExecSQL("PRAGMA encrypted.user_version = $schemaVersion")
             } finally {
                 source.rawExecSQL("DETACH DATABASE encrypted")
             }
         } finally {
             source.close()
         }
+        setUserVersion(encryptedTarget, databasePassphrase, schemaVersion)
     }
 
     private fun migratePlainBackupToCurrent(file: File) {
