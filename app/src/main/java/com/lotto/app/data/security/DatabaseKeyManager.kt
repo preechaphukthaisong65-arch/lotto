@@ -14,6 +14,16 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+private fun checkAttachedDatabase(database: CipherDatabase, schema: String) {
+    var attached = false
+    database.rawQuery("PRAGMA database_list", null).use { cursor ->
+        while (cursor.moveToNext()) {
+            if (cursor.getString(1) == schema) attached = true
+        }
+    }
+    check(attached) { "ไม่สามารถแนบฐานข้อมูลปลายทาง ($schema) ได้" }
+}
+
 internal fun encryptLegacyDatabaseFile(
     sourceFile: File,
     encryptedTarget: File,
@@ -24,7 +34,7 @@ internal fun encryptLegacyDatabaseFile(
         sourceFile.absolutePath,
         ByteArray(0),
         null,
-        CipherDatabase.OPEN_READWRITE,
+        CipherDatabase.OPEN_READWRITE or CipherDatabase.CREATE_IF_NECESSARY,
         null
     )
     val schemaVersion = legacy.version
@@ -34,6 +44,7 @@ internal fun encryptLegacyDatabaseFile(
             encryptedTarget.absolutePath,
             passphrase
         )
+        checkAttachedDatabase(legacy, "encrypted")
         try {
             legacy.rawExecSQL("SELECT sqlcipher_export('encrypted')")
         } finally {
