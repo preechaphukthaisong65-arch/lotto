@@ -203,12 +203,22 @@ class EncryptedBackupManager(
         }
     }
 
+    private fun checkAttachedDatabase(database: CipherDatabase, schema: String) {
+        var attached = false
+        database.rawQuery("PRAGMA database_list", null).use { cursor ->
+            while (cursor.moveToNext()) {
+                if (cursor.getString(1) == schema) attached = true
+            }
+        }
+        check(attached) { "ไม่สามารถแนบฐานข้อมูลปลายทาง ($schema) ได้" }
+    }
+
     private fun setUserVersion(file: File, passphrase: ByteArray, version: Int) {
         val db = CipherDatabase.openDatabase(
             file.absolutePath,
             passphrase,
             null,
-            CipherDatabase.OPEN_READWRITE,
+            CipherDatabase.OPEN_READWRITE or CipherDatabase.CREATE_IF_NECESSARY,
             null
         )
         try {
@@ -232,6 +242,7 @@ class EncryptedBackupManager(
                 "ATTACH DATABASE ? AS plaintext KEY ''",
                 plaintextTarget.absolutePath
             )
+            checkAttachedDatabase(source, "plaintext")
             try {
                 source.rawExecSQL("SELECT sqlcipher_export('plaintext')")
             } finally {
@@ -259,6 +270,7 @@ class EncryptedBackupManager(
                 encryptedTarget.absolutePath,
                 databasePassphrase
             )
+            checkAttachedDatabase(source, "encrypted")
             try {
                 source.rawExecSQL("SELECT sqlcipher_export('encrypted')")
             } finally {
