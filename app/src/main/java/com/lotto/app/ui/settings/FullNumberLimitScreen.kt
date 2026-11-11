@@ -57,9 +57,15 @@ fun FullNumberLimitScreen(
                 ConfirmButton(
                     onConfirm = {
                         scope.launch {
-                            FullNumberLimitPolicy.settingKeys.forEach { (type, key) ->
-                                repository.save(key, values[type].orEmpty().toLongOrNull()?.toString() ?: error("ค่าลิมิตไม่ถูกต้อง"))
-                            }
+                            val settingsToSave = FullNumberLimitPolicy.settingKeys.map { (type, key) ->
+                                key to (
+                                    values[type].orEmpty().toLongOrNull()
+                                        ?.takeIf { it > 0L }
+                                        ?.toString()
+                                        ?: error("ค่าลิมิตไม่ถูกต้อง")
+                                )
+                            }.toMap()
+                            repository.saveMany(settingsToSave)
                         }
                     },
                     label = "ยืนยัน / บันทึก",
