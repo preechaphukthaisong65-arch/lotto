@@ -37,6 +37,21 @@ class DatabaseKeyManager private constructor(context: Context) {
         return raw
     }
 
+    private fun setUserVersion(file: File, passphrase: ByteArray, version: Int) {
+        val db = CipherDatabase.openDatabase(
+            file.absolutePath,
+            passphrase,
+            null,
+            CipherDatabase.OPEN_READWRITE,
+            null
+        )
+        try {
+            db.version = version
+        } finally {
+            db.close()
+        }
+    }
+
     fun ensureEncryptedDatabase(): ByteArray {
         val passphrase = getOrCreatePassphrase()
         val database = appContext.getDatabasePath(DATABASE_NAME)
@@ -86,13 +101,13 @@ class DatabaseKeyManager private constructor(context: Context) {
             )
             try {
                 legacy.rawExecSQL("SELECT sqlcipher_export('encrypted')")
-                legacy.rawExecSQL("PRAGMA encrypted.user_version = $schemaVersion")
             } finally {
                 legacy.rawExecSQL("DETACH DATABASE encrypted")
             }
         } finally {
             legacy.close()
         }
+        setUserVersion(encryptedTemp, passphrase, legacy.version)
 
         check(encryptedTemp.exists() && isEncryptedAndValid(encryptedTemp, passphrase)) {
             "ไม่สามารถตรวจสอบฐานข้อมูลที่เข้ารหัสใหม่ได้ จึงเก็บฐานข้อมูลเดิมไว้และยกเลิกการเปลี่ยน"
