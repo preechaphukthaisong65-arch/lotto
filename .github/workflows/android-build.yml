@@ -20,6 +20,7 @@ jobs:
   build:
     name: Build debug APK
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
       - name: Checkout source
@@ -56,13 +57,41 @@ jobs:
       - name: Run Android instrumentation tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: 35
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data -gpu swiftshader_indirect
+          emulator-boot-timeout: 900
           disable-animations: false
-          script: gradle --no-daemon :app:connectedDebugAndroidTest
+          script: |
+            set -euo pipefail
+            DEVICE="${ANDROID_SERIAL:-emulator-5554}"
+            adb -s "$DEVICE" wait-for-device
+
+            echo "Waiting for Android framework and package/activity services..."
+            ready=0
+            for attempt in $(seq 1 180); do
+              booted="$(adb -s "$DEVICE" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+              package_ready="$(adb -s "$DEVICE" shell service check package 2>/dev/null | grep -c 'found' || true)"
+              activity_ready="$(adb -s "$DEVICE" shell service check activity 2>/dev/null | grep -c 'found' || true)"
+              if [ "$booted" = "1" ] && [ "$package_ready" -gt 0 ] && [ "$activity_ready" -gt 0 ]; then
+                ready=1
+                break
+              fi
+              sleep 2
+            done
+
+            if [ "$ready" -ne 1 ]; then
+              echo "Android framework did not become ready in time."
+              adb -s "$DEVICE" shell getprop | grep -E 'boot|init.svc' || true
+              adb -s "$DEVICE" shell service list || true
+              exit 1
+            fi
+
+            adb -s "$DEVICE" shell pm list packages >/dev/null
+            echo "Android package and activity services are ready."
+            gradle --no-daemon :app:connectedDebugAndroidTest
 
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
