@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets
 @RunWith(AndroidJUnit4::class)
 class DatabaseEncryptionInstrumentedTest {
     @Test
-    fun liveDatabaseIsEncryptedAndPasswordBackupRestoresWithoutDataLoss() = runBlocking {
+    fun liveDatabaseIsEncryptedAndPasswordBackupRestoresWithoutDataLoss() = runBlocking<Unit> {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val application = context.applicationContext as LottoApplication
         val testKey = "instrumented_backup_roundtrip"
