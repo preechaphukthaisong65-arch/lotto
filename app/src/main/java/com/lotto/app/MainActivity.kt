@@ -276,7 +276,6 @@ class MainActivity : FragmentActivity() {
                         AppScreen.History.name -> HistoryScreen(
                             saleRepository = saleRepository,
                             creditAccountRepository = creditAccountRepository,
-                            drawCalendarRepository = drawCalendarRepository,
                             drawResultRepository = drawResultRepository,
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
