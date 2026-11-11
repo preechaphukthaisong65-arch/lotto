@@ -22,6 +22,11 @@ jobs:
     name: Unit tests and debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    permissions:
+      contents: write
+    concurrency:
+      group: lotto-ci-results-publish
+      cancel-in-progress: false
 
     steps:
       - name: Checkout source
@@ -104,15 +109,43 @@ jobs:
           emulator-boot-timeout: 600
           disable-animations: true
           script: |
-            bash .github/scripts/wait-for-android.sh && gradle --no-daemon :app:connectedDebugAndroidTest
+            bash .github/scripts/run-tests.sh
 
-      - name: Collect emulator diagnostics on failure
-        if: failure()
+      - name: Ensure CI result files exist
+        if: always()
         run: |
-          adb devices -l || true
-          adb -s emulator-5554 logcat -d -t 3000 || true
-          ps aux | grep -E '[e]mulator|[a]db' || true
-          ls -la "$ANDROID_AVD_HOME" || true
+          mkdir -p ci-out
+          if [ ! -f ci-out/summary.md ]; then
+            printf '# Android instrumentation test result\n\n- **Result:** NOT RUN / SETUP FAILED\n- **Run:** %s/%s/actions/runs/%s\n- **Commit:** %s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_SHA" > ci-out/summary.md
+          fi
+          [ -f ci-out/gradle-tail.log ] || printf 'No Gradle output was captured.\n' > ci-out/gradle-tail.log
+          [ -f ci-out/logcat-filtered.txt ] || printf 'No filtered logcat was captured.\n' > ci-out/logcat-filtered.txt
+          [ -f ci-out/RUN.txt ] || printf 'run_id=%s\nrun_attempt=%s\nrepository=%s\nref=%s\nsha=%s\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_REPOSITORY" "$GITHUB_REF" "$GITHUB_SHA" > ci-out/RUN.txt
+
+      - name: Upload full diagnostics (Actions artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumentation-diagnostics
+          path: |
+            ci-out/logcat-full.txt
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Publish sanitized CI results to ci-results branch
+        if: always() && github.repository == 'preechaphukthaisong65-arch/lotto' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --orphan ci-results
+          mkdir -p latest
+          cp ci-out/summary.md ci-out/gradle-tail.log ci-out/logcat-filtered.txt ci-out/RUN.txt latest/
+          git add latest/summary.md latest/gradle-tail.log latest/logcat-filtered.txt latest/RUN.txt
+          git commit -m "Publish sanitized instrumentation diagnostics for run $GITHUB_RUN_ID"
+          git push --force origin HEAD:refs/heads/ci-results
 
   release-build:
     name: Release APK and App Bundle (test-gated)
