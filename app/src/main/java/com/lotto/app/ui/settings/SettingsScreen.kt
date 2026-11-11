@@ -27,19 +27,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import com.lotto.app.domain.rules.PrizeType
 import com.lotto.app.domain.rules.NoAcceptNumberPolicy
 import kotlinx.coroutines.launch
-import com.lotto.app.data.repository.DrawCalendarRepository
 import com.lotto.app.data.backup.EncryptedBackupManager
 import com.lotto.app.data.repository.SettingsRepository
 import com.lotto.app.ui.components.buttons.BackButton
 
 private enum class SettingsSection {
-    MENU, FULL_LIMIT, NO_ACCEPT, HALF_PAYOUT, DRAW_CALENDAR, BACKUP, AUDIT, RISK_LIMITS
+    MENU, FULL_LIMIT, NO_ACCEPT, HALF_PAYOUT, BACKUP, AUDIT, RISK_LIMITS
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    repository: DrawCalendarRepository,
     settingsRepository: SettingsRepository,
     backupManager: EncryptedBackupManager,
     onBack: () -> Unit
@@ -49,10 +47,6 @@ fun SettingsScreen(
     when (section) {
         SettingsSection.FULL_LIMIT -> FullNumberLimitScreen(
             repository = settingsRepository,
-            onBack = { section = SettingsSection.MENU }
-        )
-        SettingsSection.DRAW_CALENDAR -> DrawCalendarSettingsScreen(
-            repository = repository,
             onBack = { section = SettingsSection.MENU }
         )
         SettingsSection.NO_ACCEPT -> NoAcceptNumberScreen(
@@ -96,9 +90,6 @@ fun SettingsScreen(
                     }
                     SettingsMenuCard("ตั้งค่าหวยจ่ายครึ่งราคา", "กำหนดเลขที่จ่ายรางวัลครึ่งอัตรา") {
                         section = SettingsSection.HALF_PAYOUT
-                    }
-                    SettingsMenuCard("จัดการวันออกรางวัล", "เพิ่มหรือแก้ไขวันออกรางวัลและประวัติการเปลี่ยนแปลง") {
-                        section = SettingsSection.DRAW_CALENDAR
                     }
                     SettingsMenuCard("สำรองและกู้คืนข้อมูล", "ส่งออกและนำเข้าฐานข้อมูลด้วยไฟล์เข้ารหัสและรหัสผ่าน") {
                         section = SettingsSection.BACKUP
