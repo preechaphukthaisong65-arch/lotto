@@ -61,9 +61,13 @@ fun RiskLimitsScreen(repository: SettingsRepository, onBack: () -> Unit) {
                     enabled = keys.all { (values[it]?.toLongOrNull() ?: 0L) > 0L },
                     onConfirm = {
                         scope.launch {
-                            keys.forEach { key ->
-                                repository.save(key, values[key]?.toLongOrNull()?.toString() ?: error("ค่าความเสี่ยงไม่ถูกต้อง"))
+                            val settingsToSave = keys.associateWith { key ->
+                                values[key]?.toLongOrNull()
+                                    ?.takeIf { it > 0L }
+                                    ?.toString()
+                                    ?: error("ค่าความเสี่ยงไม่ถูกต้อง")
                             }
+                            repository.saveMany(settingsToSave)
                         }
                     }
                 )
