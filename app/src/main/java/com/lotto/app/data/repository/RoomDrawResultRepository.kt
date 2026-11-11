@@ -44,7 +44,7 @@ class RoomDrawResultRepository(private val dao: DrawResultDao) : DrawResultRepos
     ): Int {
         require(verificationRunId.isNotBlank()) { "ต้องมีรหัสรอบตรวจสอบจากบอท" }
         require(approvedAt > 0L) { "เวลาอนุมัติจากบอทไม่ถูกต้อง" }
-        return dao.saveResultAndFindWinners(
+        return dao.saveBotVerifiedResultAndFindWinners(
             DrawResultEntity(
                 drawDate = drawDate,
                 threeDigit = threeDigit,
