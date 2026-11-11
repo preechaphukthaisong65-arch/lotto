@@ -72,6 +72,12 @@ def robots_allows() -> tuple[bool, str]:
         parser.parse(content.splitlines())
         allowed = parser.can_fetch(USER_AGENT, SOURCE_URL)
         return allowed, "robots.txt permits access" if allowed else "robots.txt disallows access"
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            # RFC 9309: a missing robots.txt means no crawling restrictions are published.
+            return True, "robots.txt returned 404; no published restrictions"
+        # Fail closed on authorization errors and server failures.
+        return False, f"could not verify robots.txt: HTTP {exc.code}"
     except Exception as exc:
         # Fail closed: do not scrape if the site's access policy cannot be checked.
         return False, f"could not verify robots.txt: {type(exc).__name__}: {exc}"
