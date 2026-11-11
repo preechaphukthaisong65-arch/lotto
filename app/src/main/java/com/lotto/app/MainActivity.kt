@@ -50,7 +50,6 @@ import com.lotto.app.ui.reports.CurrentSalesReportScreen
 import com.lotto.app.ui.reports.PerformanceReportScreen
 import com.lotto.app.ui.sale.SaleScreen
 import com.lotto.app.ui.settings.SettingsScreen
-import com.lotto.app.ui.results.WinningResultsScreen
 import com.lotto.app.ui.results.PayoutScreen
 import java.time.LocalDate
 
