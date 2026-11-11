@@ -67,7 +67,7 @@ class DatabaseEncryptionInstrumentedTest {
     }
 
     @Test
-    fun liveDatabaseIsEncryptedAndPasswordBackupRestoresWithoutDataLoss()) = runBlocking<Unit> {
+    fun liveDatabaseIsEncryptedAndPasswordBackupRestoresWithoutDataLoss() = runBlocking<Unit> {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val application = context.applicationContext as LottoApplication
         val testKey = "instrumented_backup_roundtrip"
