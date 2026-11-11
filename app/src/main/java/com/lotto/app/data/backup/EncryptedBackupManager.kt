@@ -58,6 +58,7 @@ class EncryptedBackupManager(
         private const val IV_BYTES = 12
         private const val TAG_BITS = 128
         private const val MIN_PASSWORD_LENGTH = 12
+        private const val MAX_BACKUP_BYTES = 256L * 1024L * 1024L
     }
 
     fun exportEncrypted(uri: Uri, password: CharArray) {
@@ -89,6 +90,9 @@ class EncryptedBackupManager(
                 }
             }
             exportPlaintextSnapshot(dbFile, snapshot)
+            require(snapshot.length() in 1..MAX_BACKUP_BYTES) {
+                "ฐานข้อมูลมีขนาดเกินขีดจำกัดการสำรองข้อมูล 256 MiB"
+            }
             validatePlainDatabase(snapshot)
             val salt = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes)
             val iv = ByteArray(IV_BYTES).also(SecureRandom()::nextBytes)
@@ -102,7 +106,9 @@ class EncryptedBackupManager(
                     header.write(iv)
                     header.flush()
                     CipherOutputStream(header, cipher).use { encrypted ->
-                        FileInputStream(snapshot).use { input -> input.copyTo(encrypted) }
+                        FileInputStream(snapshot).use { input ->
+                            copyWithLimit(input, encrypted)
+                        }
                     }
                 }
             } ?: throw IllegalStateException("ไม่สามารถสร้างไฟล์สำรองได้")
@@ -130,7 +136,9 @@ class EncryptedBackupManager(
                     val cipher = createCipher(Cipher.DECRYPT_MODE, password, salt, iv, iterations)
                     try {
                         CipherInputStream(input, cipher).use { encrypted ->
-                            FileOutputStream(decrypted, false).use { output -> encrypted.copyTo(output) }
+                            FileOutputStream(decrypted, false).use { output ->
+                                copyWithLimit(encrypted, output)
+                            }
                         }
                     } catch (_: Exception) {
                         throw IllegalArgumentException("ถอดรหัสไม่สำเร็จ รหัสผ่านไม่ถูกต้องหรือไฟล์เสียหาย")
@@ -182,6 +190,24 @@ class EncryptedBackupManager(
             password.fill('\u0000')
             decrypted.delete()
         }
+    }
+
+    private fun copyWithLimit(
+        input: java.io.InputStream,
+        output: java.io.OutputStream
+    ) {
+        val buffer = ByteArray(8 * 1024)
+        var totalBytes = 0L
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            totalBytes = Math.addExact(totalBytes, read.toLong())
+            require(totalBytes <= MAX_BACKUP_BYTES) {
+                "ไฟล์สำรองมีขนาดเกินขีดจำกัด 256 MiB"
+            }
+            output.write(buffer, 0, read)
+        }
+        output.flush()
     }
 
     private fun createCipher(
