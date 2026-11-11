@@ -157,8 +157,13 @@ fun HistoryScreen(
                     id = "result-${result.drawDate}",
                     category = "ผลรางวัล",
                     timestamp = result.recordedAt,
-                    title = "ผลรางวัล งวด ${result.drawDate}",
-                    detail = "3 ตัว ${result.threeDigit} · 2 ตัวบน ${result.twoDigitTop} · 2 ตัวล่าง ${result.twoDigitBottom}",
+                    title = if (result.source == "BOT_VERIFIED") {
+                        "ผลรางวัลจากบอท งวด ${result.drawDate}"
+                    } else {
+                        "ผลรางวัลเดิม (เก็บประวัติ) งวด ${result.drawDate}"
+                    },
+                    detail = "3 ตัว ${result.threeDigit} · 2 ตัวบน ${result.twoDigitTop} · 2 ตัวล่าง ${result.twoDigitBottom}" +
+                        if (result.source == "BOT_VERIFIED") " · ${result.verificationDecision} · ${result.verificationRunId}" else " · ไม่ใช้เป็นผลรางวัลใหม่",
                     searchText = "${result.drawDate} ${result.threeDigit} ${result.twoDigitTop} ${result.twoDigitBottom}"
                 ))
             }
