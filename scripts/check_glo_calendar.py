@@ -30,9 +30,9 @@ THAI_MONTHS = {
     "กันยายน": 9, "ตุลาคม": 10, "พฤศจิกายน": 11, "ธันวาคม": 12,
 }
 DATE_RE = re.compile(
-    r"(?:วันที่|งวดวันที่|งวดประจำวันที่)\\s*(\\d{1,2})\\s*"
+    r"(?:วันที่|งวดวันที่|งวดประจำวันที่)\s*(\d{1,2})\s*"
     r"(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)"
-    r"(?:\\s*(?:พ\\.ศ\\.?\\s*)?(\\d{4}))?"
+    r"(?:\s*(?:พ\.ศ\.?\s*)?(\d{4}))?"
 )
 
 class TextExtractor(HTMLParser):
@@ -145,7 +145,7 @@ def main() -> int:
         report["source_sha256"] = hashlib.sha256(body).hexdigest()
 
         rule_match = re.search(
-            r"สำนักงานฯ\\s*ออกรางวัลเดือนละ 2 ครั้ง.*?(?=เริ่มถ่ายทอด|เริ่มออกรางวัลเวลา|$)",
+            r"สำนักงานฯ\s*ออกรางวัลเดือนละ 2 ครั้ง.*?(?=เริ่มถ่ายทอด|เริ่มออกรางวัลเวลา|$)",
             text,
         )
         if rule_match:
@@ -180,7 +180,7 @@ def main() -> int:
 
 def write_report(report: dict[str, object], exit_code: int) -> int:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+    OUTPUT.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return exit_code
 
