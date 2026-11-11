@@ -11,6 +11,7 @@ interface SettingsRepository {
     fun observeAuditLog(): Flow<List<SettingAuditEntity>>
 
     suspend fun save(key: String, value: String)
+    suspend fun saveMany(values: Map<String, String>)
 
     suspend fun delete(key: String)
 }
