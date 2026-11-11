@@ -16,6 +16,7 @@ import com.lotto.app.data.local.model.WinningBillSummary
 import com.lotto.app.domain.rules.LottoRules
 import com.lotto.app.domain.rules.PrizeType
 import kotlinx.coroutines.flow.Flow
+import com.lotto.app.domain.rules.DrawResultEntryPolicy
 
 @Dao
 abstract class DrawResultDao {
@@ -61,6 +62,25 @@ abstract class DrawResultDao {
 
     @Query("SELECT COUNT(*) FROM draw_dates WHERE drawDate = :drawDate")
     protected abstract suspend fun countScheduledDrawDate(drawDate: String): Int
+
+    @Query("SELECT value FROM app_settings WHERE key = :key LIMIT 1")
+    protected abstract suspend fun getSettingValue(key: String): String?
+
+    @Query("""
+        INSERT INTO app_settings (key, value, updatedAt)
+        VALUES (:key, :value, :updatedAt)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt
+    """)
+    protected abstract suspend fun upsertSettingValue(key: String, value: String, updatedAt: Long)
+
+    private suspend fun validateAndAdvanceClock(timestamp: Long) {
+        require(timestamp > 0L) { "เวลาอุปกรณ์ไม่ถูกต้อง ไม่สามารถบันทึกธุรกรรมได้" }
+        val raw = getSettingValue("clock_high_water_epoch_ms")
+        val lastSeen = raw?.toLongOrNull()
+            ?: if (raw == null) 0L else throw IllegalStateException("ข้อมูลตรวจสอบเวลาของระบบเสียหาย")
+        require(timestamp >= lastSeen) { "ตรวจพบว่านาฬิกาเครื่องเดินย้อนเวลา ไม่สามารถบันทึกธุรกรรมได้" }
+        upsertSettingValue("clock_high_water_epoch_ms", timestamp.toString(), timestamp)
+    }
 
     @Query("""
         SELECT wi.drawDate AS drawDate, wi.saleId AS saleId,
@@ -165,6 +185,12 @@ abstract class DrawResultDao {
     @Transaction
     open suspend fun saveResultAndFindWinners(result: DrawResultEntity): Int {
         require(countScheduledDrawDate(result.drawDate) == 1) { "ไม่พบวันที่ออกรางวัลนี้ในปฏิทินหวย กรุณาตรวจสอบงวดก่อนบันทึกผล" }
+
+        require(DrawResultEntryPolicy.canEnter(result.drawDate, result.recordedAt)) {
+            "ยังไม่ถึงเวลา 16:00 น. ของวันออกรางวัล จึงยังบันทึกผลรางวัลไม่ได้ หรือวันที่งวดไม่ถูกต้อง"
+        }
+
+        validateAndAdvanceClock(result.recordedAt)
         require(LottoRules.isValidThreeDigitNumber(result.threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(result.twoDigitTop)) { "กรุณากรอกผล 2 ตัวบนให้ครบ 2 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(result.twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
@@ -189,6 +215,11 @@ abstract class DrawResultDao {
         require(LottoRules.isValidThreeDigitNumber(threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(twoDigitTop)) { "กรุณากรอกผล 2 ตัวบนให้ครบ 2 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
+        require(countScheduledDrawDate(drawDate) == 1) { "ไม่พบวันที่ออกรางวัลนี้ในปฏิทิน" }
+        require(DrawResultEntryPolicy.canEnter(drawDate, correctedAt)) {
+            "ยังไม่ถึงเวลา 16:00 น. ของวันออกรางวัล จึงยังแก้ไขผลรางวัลไม่ได้"
+        }
+        validateAndAdvanceClock(correctedAt)
         require(reason.isNotBlank()) { "กรุณาระบุเหตุผลที่แก้ไขผลรางวัล" }
         val previous = getResult(drawDate) ?: throw IllegalArgumentException("ไม่พบผลรางวัลของงวดนี้")
         require(!previous.payoutLocked) {
@@ -225,6 +256,7 @@ abstract class DrawResultDao {
     @Query("""
         SELECT wi.drawDate AS drawDate, wi.saleId AS saleId,
                s.customerFirstName AS customerFirstName, s.customerLastName AS customerLastName,
+               s.customerId AS customerId,
                SUM(wi.prizeAmount) AS totalPrize, MAX(wi.payoutStatus) AS payoutStatus,
                MAX(wi.recipientName) AS recipientName, MAX(wi.paidAt) AS paidAt,
                s.createdAt AS saleCreatedAt,
@@ -241,7 +273,7 @@ abstract class DrawResultDao {
                ) AS itemDetails
         FROM winning_sale_items wi INNER JOIN sales s ON s.saleId = wi.saleId
         WHERE wi.payoutStatus = :status
-        GROUP BY wi.drawDate, wi.saleId, s.customerFirstName, s.customerLastName, s.createdAt
+        GROUP BY wi.drawDate, wi.saleId, s.customerFirstName, s.customerLastName, s.customerId, s.createdAt
         ORDER BY COALESCE(MAX(wi.paidAt), s.createdAt) DESC, wi.saleId DESC
     """)
     abstract fun observeWinningBills(status: String): Flow<List<WinningBillSummary>>
@@ -258,6 +290,7 @@ abstract class DrawResultDao {
     @Transaction
     open suspend fun markWinningBillPaid(drawDate: String, saleId: Long, recipientName: String, paidAt: Long) {
         require(recipientName.isNotBlank()) { "กรุณากรอกชื่อผู้รับรางวัล" }
+        validateAndAdvanceClock(paidAt)
         require(getWinningBillStatus(drawDate, saleId) == "UNPAID") { "บิลนี้จ่ายรางวัลแล้วหรือไม่พบข้อมูล" }
         require(updateWinningBillPaid(drawDate, saleId, recipientName.trim(), paidAt) > 0) { "บันทึกการจ่ายรางวัลไม่สำเร็จ" }
         lockResultAfterPayout(drawDate)

@@ -57,16 +57,22 @@ fun FullNumberLimitScreen(
                 ConfirmButton(
                     onConfirm = {
                         scope.launch {
-                            FullNumberLimitPolicy.settingKeys.forEach { (type, key) ->
-                                repository.save(key, values[type].orEmpty().toLongOrNull()?.coerceAtLeast(0L)?.toString() ?: "0")
-                            }
+                            val settingsToSave = FullNumberLimitPolicy.settingKeys.map { (type, key) ->
+                                key to (
+                                    values[type].orEmpty().toLongOrNull()
+                                        ?.takeIf { it > 0L }
+                                        ?.toString()
+                                        ?: error("ค่าลิมิตไม่ถูกต้อง")
+                                )
+                            }.toMap()
+                            repository.saveMany(settingsToSave)
                         }
                     },
                     label = "ยืนยัน / บันทึก",
                     confirmationTitle = "ยืนยันการตั้งค่าหวยเต็ม",
                     confirmationMessage = "ระบบจะใช้วงเงินใหม่นี้กับการขายในงวดปัจจุบันและงวดถัดไป",
                     enabled = FullNumberLimitPolicy.settingKeys.keys.all { type ->
-                        values[type].orEmpty().isNotBlank() && values[type].orEmpty().toLongOrNull() != null
+                        values[type].orEmpty().isNotBlank() && (values[type].orEmpty().toLongOrNull() ?: 0L) > 0L
                     }
                 )
             }
@@ -77,7 +83,7 @@ fun FullNumberLimitScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                "กำหนดวงเงินรับซื้อสูงสุดต่อตัว โดยเลขทุกตัวในประเภทเดียวกันใช้วงเงินเท่ากัน",
+                "กำหนดวงเงินรับซื้อสูงสุดรวมต่อหมวด โดยทุกเลขในหมวดเดียวกันใช้วงเงินก้อนเดียวกันต่อหนึ่งงวด",
                 style = MaterialTheme.typography.bodyMedium
             )
             FullNumberLimitPolicy.settingKeys.forEach { (type, _) ->
@@ -86,18 +92,18 @@ fun FullNumberLimitScreen(
                     onValueChange = { input -> values[type] = input.filter(Char::isDigit) },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(FullNumberLimitPolicy.labels[type].orEmpty()) },
-                    suffix = { Text("บาท / เลข") },
+                    suffix = { Text("บาท / หมวด / งวด") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true
                 )
             }
             Text(
-                "ตัวอย่าง: ตั้ง 3 ตัวตรง 100 บาท หมายถึงเลข 000–999 ทุกเลขมีเพดาน 100 บาทต่อเลขในงวดนั้น หากตั้ง 0 บาท จะถือว่าไม่จำกัดวงเงิน",
+                "ตัวอย่าง: ตั้ง 3 ตัวตรง 100 บาท หมายถึงยอดซื้อเลข 000–999 ในหมวด 3 ตัวตรงรวมกันได้ไม่เกิน 100 บาทต่องวด ไม่ใช่ 100 บาทต่อเลข ต้องกำหนดวงเงินมากกว่า 0 บาททุกประเภท ระบบจะไม่อนุญาตให้ขายหากยังไม่ได้กำหนดวงเงิน",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                "ยอดสะสมและสถานะเต็มแยกตามงวด เมื่อเริ่มงวดใหม่ระบบเริ่มนับใหม่โดยอัตโนมัติ ส่วนค่าวงเงินที่ตั้งไว้ยังคงเดิม",
+                "ยอดสะสมและสถานะเต็มนับรวมทั้งหมวดแยกตามงวด เมื่อเริ่มงวดใหม่ระบบเริ่มนับใหม่โดยอัตโนมัติ ส่วนค่าวงเงินที่ตั้งไว้ยังคงเดิม",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -17,6 +17,11 @@ class DrawCalendarRepository(
     fun observeAllChanges(): Flow<List<com.lotto.app.data.local.entity.DrawDateChangeEntity>> =
         dao.observeAllChanges()
 
+    /** Seeds missing regular draw dates without overwriting user edits or existing records. */
+    suspend fun ensureBaselineCalendar(today: LocalDate = todayInThailand()) {
+        dao.insertDefaultDrawDates(OfficialDrawCalendarDefaults.generate(today))
+    }
+
     suspend fun addDrawDate(date: LocalDate, note: String? = null) {
         require(dao.getByDate(date.toString()) == null) { "มีงวดออกรางวัลในวันที่เลือกแล้ว" }
         val now = System.currentTimeMillis()

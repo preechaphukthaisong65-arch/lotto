@@ -28,11 +28,12 @@ import com.lotto.app.domain.rules.PrizeType
 import com.lotto.app.domain.rules.NoAcceptNumberPolicy
 import kotlinx.coroutines.launch
 import com.lotto.app.data.repository.DrawCalendarRepository
+import com.lotto.app.data.backup.EncryptedBackupManager
 import com.lotto.app.data.repository.SettingsRepository
 import com.lotto.app.ui.components.buttons.BackButton
 
 private enum class SettingsSection {
-    MENU, FULL_LIMIT, NO_ACCEPT, HALF_PAYOUT, DRAW_CALENDAR
+    MENU, FULL_LIMIT, NO_ACCEPT, HALF_PAYOUT, DRAW_CALENDAR, BACKUP, AUDIT, RISK_LIMITS
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -40,6 +41,7 @@ private enum class SettingsSection {
 fun SettingsScreen(
     repository: DrawCalendarRepository,
     settingsRepository: SettingsRepository,
+    backupManager: EncryptedBackupManager,
     onBack: () -> Unit
 ) {
     var section by remember { mutableStateOf(SettingsSection.MENU) }
@@ -58,6 +60,18 @@ fun SettingsScreen(
             onBack = { section = SettingsSection.MENU }
         )
         SettingsSection.HALF_PAYOUT -> HalfPayoutNumberScreen(repository = settingsRepository, onBack = { section = SettingsSection.MENU })
+        SettingsSection.BACKUP -> BackupRestoreScreen(
+            manager = backupManager,
+            onBack = { section = SettingsSection.MENU }
+        )
+        SettingsSection.AUDIT -> SettingsAuditScreen(
+            repository = settingsRepository,
+            onBack = { section = SettingsSection.MENU }
+        )
+        SettingsSection.RISK_LIMITS -> RiskLimitsScreen(
+            repository = settingsRepository,
+            onBack = { section = SettingsSection.MENU }
+        )
         SettingsSection.MENU -> {
             Scaffold(
                 topBar = { TopAppBar(title = { Text("ตั้งค่า") }) },
@@ -74,6 +88,9 @@ fun SettingsScreen(
                     SettingsMenuCard("ตั้งค่าหวยเต็ม", "กำหนดวงเงินรับซื้อสูงสุดต่อตัว แยกตามประเภทหวย") {
                         section = SettingsSection.FULL_LIMIT
                     }
+                    SettingsMenuCard("ตั้งค่าเพดานความเสี่ยง", "กำหนดเพดานเงินรางวัลสูงสุดต่องวดและเพดานเครดิตต่อลูกค้า") {
+                        section = SettingsSection.RISK_LIMITS
+                    }
                     SettingsMenuCard("ตั้งค่าหวยไม่รับ", "กำหนดเลขที่ไม่เปิดรับซื้อ") {
                         section = SettingsSection.NO_ACCEPT
                     }
@@ -82,6 +99,12 @@ fun SettingsScreen(
                     }
                     SettingsMenuCard("จัดการวันออกรางวัล", "เพิ่มหรือแก้ไขวันออกรางวัลและประวัติการเปลี่ยนแปลง") {
                         section = SettingsSection.DRAW_CALENDAR
+                    }
+                    SettingsMenuCard("สำรองและกู้คืนข้อมูล", "ส่งออกและนำเข้าฐานข้อมูลด้วยไฟล์เข้ารหัสและรหัสผ่าน") {
+                        section = SettingsSection.BACKUP
+                    }
+                    SettingsMenuCard("ประวัติการเปลี่ยนการตั้งค่า", "ตรวจสอบค่าก่อนหน้า ค่าใหม่ และเวลาที่มีการแก้ไข") {
+                        section = SettingsSection.AUDIT
                     }
                 }
             }

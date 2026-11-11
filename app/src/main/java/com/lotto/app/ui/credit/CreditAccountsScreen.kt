@@ -92,8 +92,7 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
         else -> trackingBills
     }
     fun customerKey(bill: CreditDocumentEntity): String =
-        "${bill.customerFirstName.trim()} ${bill.customerLastName.trim()}".trim()
-            .ifBlank { "ไม่ระบุชื่อลูกค้า" }.lowercase(Locale.ROOT)
+        bill.customerId?.let { "customer-$it" } ?: "legacy-bill-${bill.creditDocumentId}"
 
     val customerTotals = sourceBills.groupBy(::customerKey).mapValues { (_, customerBills) ->
         val balance = customerBills.sumOf { remainingFor(it) }
@@ -203,6 +202,8 @@ fun CreditAccountsScreen(repository: CreditAccountRepository, onBack: () -> Unit
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text("เลขที่บิล #${bill.creditDocumentId}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                Text("รหัสลูกค้า: ${bill.customerId?.toString() ?: "ข้อมูลเดิมไม่มีรหัส · แยกบัญชีตามบิลเพื่อป้องกันชื่อซ้ำ"}", style = MaterialTheme.typography.bodySmall)
+                                bill.customerPhone?.let { Text("โทรศัพท์: $it", style = MaterialTheme.typography.bodySmall) }
                                 Text(
                                     "${bill.customerFirstName} ${bill.customerLastName}".trim().ifBlank { "ไม่ระบุชื่อลูกค้า" },
                                     style = MaterialTheme.typography.titleMedium,

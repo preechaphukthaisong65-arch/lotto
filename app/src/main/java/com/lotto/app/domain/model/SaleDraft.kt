@@ -3,6 +3,10 @@ package com.lotto.app.domain.model
 data class SaleDraft(
     val customerFirstName: String,
     val customerLastName: String,
+    val customerId: Long? = null,
+    val customerPhone: String? = null,
+    val legacyDebtReviewed: Boolean = false,
+    val newCustomerIdentityConfirmed: Boolean = false,
     val totalAmount: Long,
     val cashAmount: Long,
     val creditAmount: Long,

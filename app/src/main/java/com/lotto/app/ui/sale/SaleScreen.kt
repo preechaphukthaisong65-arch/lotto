@@ -26,6 +26,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +35,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
@@ -41,6 +44,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.lotto.app.domain.model.SaleDraft
 import com.lotto.app.domain.model.SaleDraftItem
+import com.lotto.app.data.repository.CustomerRepository
 import com.lotto.app.domain.rules.LottoRules
 import com.lotto.app.domain.rules.PayoutMode
 import com.lotto.app.domain.rules.PrizeType
@@ -60,10 +64,12 @@ private data class HalfPayoutPrompt(val isThreeDigit: Boolean, val entryId: Long
 fun SaleScreen(
     onBack: () -> Unit,
     drawDate: String,
+    customerRepository: CustomerRepository,
+    onGetLegacyOutstandingCredit: suspend (String, String) -> Long,
     fullLimitsByPrizeType: Map<String, Long>,
     noAcceptNumbersByPrizeType: Map<String, Set<String>>,
     halfPayoutNumbersByPrizeType: Map<String, Set<String>>,
-    onGetNumberStake: suspend (String, String, String) -> Long,
+    onGetPrizeTypeStake: suspend (String, String) -> Long,
     onSave: suspend (SaleDraft) -> Long
 ) {
     val threeDigitEntries = remember { mutableStateListOf(ThreeDigitEntry(id = 1L)) }
@@ -72,6 +78,25 @@ fun SaleScreen(
     var nextTwoId by remember { mutableStateOf(2L) }
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
+    var selectedCustomerId by remember { mutableStateOf<Long?>(null) }
+    var customerPhone by remember { mutableStateOf("") }
+    var legacyDebtAmount by remember { mutableStateOf<Long?>(0L) }
+    var legacyDebtReviewed by remember { mutableStateOf(false) }
+    var legacyDebtCheckError by remember { mutableStateOf<String?>(null) }
+    var newCustomerIdentityConfirmed by remember { mutableStateOf(false) }
+    val customers by customerRepository.observeAll().collectAsState(initial = emptyList())
+    val matchingCustomers = customers.filter { customer ->
+        (firstName.isBlank() || customer.firstName.contains(firstName.trim(), ignoreCase = true)) &&
+            (lastName.isBlank() || customer.lastName.contains(lastName.trim(), ignoreCase = true)) &&
+            (customerPhone.isBlank() || customer.phone.orEmpty().contains(customerPhone.trim())) &&
+            (firstName.isNotBlank() || lastName.isNotBlank() || customerPhone.isNotBlank())
+    }.take(20)
+    val exactNameCustomers = if (firstName.isNotBlank() && lastName.isNotBlank()) {
+        customers.filter {
+            it.firstName.trim().equals(firstName.trim(), ignoreCase = true) &&
+                it.lastName.trim().equals(lastName.trim(), ignoreCase = true)
+        }
+    } else emptyList()
     var cashSelected by remember { mutableStateOf(true) }
     var creditSelected by remember { mutableStateOf(false) }
     var cashAmount by remember { mutableStateOf("") }
@@ -80,6 +105,26 @@ fun SaleScreen(
     var saveError by remember { mutableStateOf<String?>(null) }
     var savedReceipt by remember { mutableStateOf<Pair<Long, SaleDraft>?>(null) }
     val quotaHints = remember { mutableStateMapOf<String, String>() }
+
+    androidx.compose.runtime.LaunchedEffect(
+        creditSelected,
+        firstName.trim(),
+        lastName.trim(),
+        selectedCustomerId
+    ) {
+        legacyDebtReviewed = false
+        legacyDebtCheckError = null
+        if (!creditSelected || firstName.isBlank() || lastName.isBlank()) {
+            legacyDebtAmount = 0L
+        } else {
+            legacyDebtAmount = null
+            try {
+                legacyDebtAmount = onGetLegacyOutstandingCredit(firstName.trim(), lastName.trim())
+            } catch (error: Exception) {
+                legacyDebtCheckError = error.message ?: "ตรวจสอบหนี้จากข้อมูลเดิมไม่สำเร็จ"
+            }
+        }
+    }
     val quotaRequestVersions = remember { mutableStateMapOf<String, Int>() }
     var pendingQuotaAdjustments by remember { mutableStateOf<List<QuotaAdjustment>>(emptyList()) }
     var pendingAddThree by remember { mutableStateOf(false) }
@@ -90,6 +135,7 @@ fun SaleScreen(
     var pendingHalfAddThree by remember { mutableStateOf(false) }
     var pendingHalfAddTwo by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     fun halfKey(prizeType: String, number: String) = "$prizeType|$number"
     fun isHalfAccepted(prizeType: String, number: String) = acceptedHalfPayoutKeys[halfKey(prizeType, number)] == true
@@ -103,13 +149,13 @@ fun SaleScreen(
             return
         }
         coroutineScope.launch {
-            runCatching { onGetNumberStake(drawDate, prizeType, number) }
+            runCatching { onGetPrizeTypeStake(drawDate, prizeType) }
                 .onSuccess { used ->
                     if (quotaRequestVersions[key] == version) {
                         quotaHints[key] = when {
-                            used >= limit -> "เลข $number เต็มแล้ว · เหลือโควตา 0 บาท"
+                            used >= limit -> "หมวด $prizeType เต็มแล้ว · เหลือโควตา 0 บาท"
                             used.toDouble() / limit.toDouble() >= 0.90 ->
-                                "เลข $number ใกล้เต็ม · ซื้อได้อีก ${limit - used} บาท"
+                                "หมวด $prizeType ใกล้เต็ม · ซื้อได้อีก ${limit - used} บาท"
                             else -> ""
                         }
                         if (quotaHints[key].isNullOrEmpty()) quotaHints.remove(key)
@@ -123,19 +169,22 @@ fun SaleScreen(
         digitCount: Int
     ): List<QuotaAdjustment> {
         val adjustments = mutableListOf<QuotaAdjustment>()
-        val prizeTypes = entries.flatMap { it.third.keys }.distinct()
-        for (number in entries.map { it.second }.filter { it.length == digitCount }.distinct()) {
-            for (prizeType in prizeTypes) {
-                val limit = fullLimitsByPrizeType[prizeType] ?: 0L
-                if (limit <= 0L) continue
-                var remaining = (limit - onGetNumberStake(drawDate, prizeType, number)).coerceAtLeast(0L)
-                entries.filter { it.second == number }.forEach { entry ->
-                    val requestedAmount = entry.third[prizeType] ?: 0L
-                    if (requestedAmount > remaining) {
-                        adjustments += QuotaAdjustment(entry.first, prizeType, remaining)
-                    }
-                    remaining = (remaining - requestedAmount.coerceAtMost(remaining)).coerceAtLeast(0L)
+        val eligibleEntries = entries.filter { it.second.length == digitCount }
+        val prizeTypes = eligibleEntries.flatMap { it.third.keys }.distinct()
+        for (prizeType in prizeTypes) {
+            val limit = fullLimitsByPrizeType[prizeType] ?: 0L
+            if (limit <= 0L) continue
+            var remaining = (
+                limit - onGetPrizeTypeStake(drawDate, prizeType)
+            ).coerceAtLeast(0L)
+            eligibleEntries.forEach { entry ->
+                val requestedAmount = entry.third[prizeType] ?: 0L
+                if (requestedAmount > remaining) {
+                    adjustments += QuotaAdjustment(entry.first, prizeType, remaining)
                 }
+                remaining = (
+                    remaining - requestedAmount.coerceAtMost(remaining)
+                ).coerceAtLeast(0L)
             }
         }
         return adjustments
@@ -345,7 +394,10 @@ fun SaleScreen(
     }
 
     val canSave = total > 0L && totalResult.isSuccess && amountInputsValid && paymentSelected && splitValid &&
-        customerValid && activeEntriesValid && !hasNoAcceptItems && !isSaving && savedReceipt == null
+        customerValid && activeEntriesValid && !hasNoAcceptItems && !isSaving && savedReceipt == null &&
+        legacyDebtCheckError == null && legacyDebtAmount != null &&
+        (legacyDebtAmount == 0L || legacyDebtReviewed) &&
+        (!creditSelected || selectedCustomerId != null || newCustomerIdentityConfirmed)
 
     fun createDraft(): SaleDraft {
         val items = buildList {
@@ -407,6 +459,10 @@ fun SaleScreen(
         return SaleDraft(
             customerFirstName = firstName.trim(),
             customerLastName = lastName.trim(),
+            customerId = selectedCustomerId,
+            customerPhone = customerPhone.trim().takeIf { it.isNotBlank() },
+            legacyDebtReviewed = legacyDebtReviewed,
+            newCustomerIdentityConfirmed = newCustomerIdentityConfirmed,
             totalAmount = total,
             cashAmount = cashValue,
             creditAmount = creditValue,
@@ -626,18 +682,90 @@ fun SaleScreen(
                     ) {
                         OutlinedTextField(
                             value = firstName,
-                            onValueChange = { firstName = it },
+                            onValueChange = { firstName = it; selectedCustomerId = null; customerPhone = ""; newCustomerIdentityConfirmed = false },
                             modifier = Modifier.weight(1f),
                             label = { Text("ชื่อ") },
                             singleLine = true
                         )
                         OutlinedTextField(
                             value = lastName,
-                            onValueChange = { lastName = it },
+                            onValueChange = { lastName = it; selectedCustomerId = null; customerPhone = ""; newCustomerIdentityConfirmed = false },
                             modifier = Modifier.weight(1f),
                             label = { Text("นามสกุล") },
                             singleLine = true
                         )
+                    }
+                    if (selectedCustomerId != null) {
+                        val selectedCustomer = customers.firstOrNull { it.customerId == selectedCustomerId }
+                        Text(
+                            "รหัสลูกค้าที่เลือก: ${selectedCustomer?.customerCode ?: selectedCustomerId} · ใช้รหัสนี้รวมยอดหนี้ของลูกค้ารายเดิม",
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else if (matchingCustomers.isNotEmpty()) {
+                        Text("พบลูกค้าที่อาจเป็นรายเดิม กรุณาเลือกรหัสให้ถูกคน หรือไม่เลือกเพื่อสร้างรหัสลูกค้าใหม่", style = MaterialTheme.typography.bodySmall)
+                        matchingCustomers.forEach { customer ->
+                            TextButton(
+                                onClick = {
+                                    selectedCustomerId = customer.customerId
+                                    firstName = customer.firstName
+                                    lastName = customer.lastName
+                                    customerPhone = customer.phone.orEmpty()
+                                    newCustomerIdentityConfirmed = false
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("${customer.firstName} ${customer.lastName} · ${customer.phone ?: "ไม่ระบุเบอร์"} · ${customer.customerCode}")
+                            }
+                        }
+                    }
+                    if (creditSelected && selectedCustomerId == null) {
+                        Text(
+                            if (exactNameCustomers.isNotEmpty()) {
+                                "พบรหัสลูกค้าเดิมที่ชื่อและนามสกุลตรงกัน หากเป็นคนเดิมให้เลือกรหัสเดิมเพื่อรวมวงเงินเครดิต หากเป็นคนละคนให้ยืนยันสร้างรหัสใหม่"
+                            } else {
+                                "หากเป็นลูกค้ารายเดิมให้เลือกรหัสจากรายชื่อด้านบน หากเป็นลูกค้าใหม่ให้ยืนยันสร้างรหัสใหม่ก่อนขายเงินเชื่อ"
+                            },
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = newCustomerIdentityConfirmed,
+                                onCheckedChange = { newCustomerIdentityConfirmed = it }
+                            )
+                            Text("ตรวจสอบรายชื่อลูกค้าเดิมแล้ว ยืนยันสร้างรหัสลูกค้าใหม่")
+                        }
+                    }
+                    OutlinedTextField(
+                        value = customerPhone,
+                        onValueChange = { customerPhone = it.filter { ch -> ch.isDigit() || ch == '+' || ch == '-' || ch == ' ' }; selectedCustomerId = null; newCustomerIdentityConfirmed = false },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("เบอร์โทรศัพท์ (ไม่บังคับ)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+                    )
+                    if (creditSelected && legacyDebtCheckError != null) {
+                        Text(
+                            legacyDebtCheckError.orEmpty(),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else if (creditSelected && legacyDebtAmount == null) {
+                        Text("กำลังตรวจสอบยอดเชื่อจากบิลเดิม...", style = MaterialTheme.typography.bodySmall)
+                    } else if (creditSelected && (legacyDebtAmount ?: 0L) > 0L) {
+                        Text(
+                            "พบยอดเชื่อค้างจากข้อมูลเดิมที่ยังไม่มีรหัสลูกค้า ${legacyDebtAmount} บาท เพื่อป้องกันการให้เครดิตเกินวงเงิน ระบบจะนำยอดนี้ไปรวมกับหนี้ของลูกค้ารายนี้เมื่อยืนยัน",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = legacyDebtReviewed,
+                                onCheckedChange = { legacyDebtReviewed = it }
+                            )
+                            Text("ยืนยันว่าหนี้เดิมเป็นของลูกค้ารายนี้ และยินยอมให้นำยอดเดิมไปรวมคำนวณวงเงินเครดิต")
+                        }
                     }
                     if (creditSelected && !customerValid) {
                         Text(
@@ -816,7 +944,44 @@ fun SaleScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        val paymentLabel = when {
+                            draft.cashAmount > 0L && draft.creditAmount > 0L ->
+                                "เงินสด ${draft.cashAmount} บาท / เงินเชื่อ ${draft.creditAmount} บาท"
+                            draft.cashAmount > 0L -> "เงินสด ${draft.cashAmount} บาท"
+                            else -> "เงินเชื่อ ${draft.creditAmount} บาท"
+                        }
+                        val receiptText = buildString {
+                            appendLine("ใบเสร็จ Lotto เลขที่ #$saleId")
+                            appendLine("งวดวันที่ $drawDate")
+                            appendLine("ลูกค้า: ${(draft.customerFirstName + " " + draft.customerLastName).trim().ifBlank { "ลูกค้าทั่วไป" }}")
+                            appendLine("------------------------------")
+                            draft.items.forEach { item ->
+                                val type = runCatching { PrizeType.valueOf(item.prizeType) }.getOrNull()
+                                val label = when (type) {
+                                    PrizeType.THREE_DIGIT_STRAIGHT -> "3 ตัวตรง"
+                                    PrizeType.THREE_DIGIT_TOD -> "3 ตัวโต๊ด"
+                                    PrizeType.TWO_DIGIT_TOP -> "2 ตัวบน"
+                                    PrizeType.TWO_DIGIT_BOTTOM -> "2 ตัวล่าง"
+                                    null -> item.prizeType
+                                }
+                                val half = type != null && item.payoutMultiplier < LottoRules.payoutMultiplier(type)
+                                appendLine("${item.number} $label · ${item.amount} บาท${if (half) " · จ่ายครึ่ง" else ""}")
+                            }
+                            appendLine("------------------------------")
+                            appendLine("ยอดรวม: ${draft.totalAmount} บาท")
+                            appendLine("การชำระ: $paymentLabel")
+                            appendLine("ขอบคุณที่ใช้บริการ")
+                        }
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "ใบเสร็จ Lotto #$saleId")
+                            putExtra(Intent.EXTRA_TEXT, receiptText)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "แชร์ใบเสร็จให้ลูกค้า"))
+                    }) { Text("แชร์ใบเสร็จ") }
+                    TextButton(onClick = {
                     threeDigitEntries.clear()
                     threeDigitEntries.add(ThreeDigitEntry(id = 1L))
                     twoDigitEntries.clear()
@@ -825,6 +990,10 @@ fun SaleScreen(
                     nextTwoId = 2L
                     firstName = ""
                     lastName = ""
+                    selectedCustomerId = null
+                    customerPhone = ""
+                    legacyDebtReviewed = false
+                    newCustomerIdentityConfirmed = false
                     cashSelected = true
                     creditSelected = false
                     cashAmount = ""
@@ -833,7 +1002,8 @@ fun SaleScreen(
                     quotaHints.clear()
                     saveError = null
                     savedReceipt = null
-                }) { Text("เริ่มขายรายการใหม่") }
+                    }) { Text("เริ่มขายรายการใหม่") }
+                }
             },
             dismissButton = {
                 TextButton(onClick = {

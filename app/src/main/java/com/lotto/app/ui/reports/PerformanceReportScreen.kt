@@ -36,6 +36,16 @@ fun PerformanceReportScreen(
     var selectedYear by remember { mutableIntStateOf(now.year) }
     var monthMenu by remember { mutableStateOf(false) }
     var yearMenu by remember { mutableStateOf(false) }
+    var retentionCleanupError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(drawResultRepository) {
+        try {
+            drawResultRepository.cleanupExpiredProfitSummaries()
+            retentionCleanupError = null
+        } catch (error: Exception) {
+            retentionCleanupError = error.message ?: "ไม่สามารถจัดการข้อมูลผลประกอบการที่เกิน 1 ปีได้"
+        }
+    }
 
     val oneYearAgo = now.toLocalDate().minusYears(1)
     val rows = remember(summaries, oneYearAgo, now) {
@@ -97,6 +107,13 @@ fun PerformanceReportScreen(
                         }
                     }
                 }
+            }
+            retentionCleanupError?.let { message ->
+                Text(
+                    "⚠ $message",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
             if (filtered.any { it.needsReview }) {
                 Text(

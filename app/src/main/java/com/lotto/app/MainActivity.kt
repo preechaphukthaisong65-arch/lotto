@@ -2,9 +2,26 @@ package com.lotto.app
 
 import android.os.Bundle
 import android.view.View
+import android.view.WindowManager
+import android.os.SystemClock
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import android.content.Intent
+import android.app.KeyguardManager
+import android.provider.Settings
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
@@ -15,7 +32,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
 import com.lotto.app.domain.rules.SaleWindowPolicy
+import com.lotto.app.domain.rules.AppLockPolicy
 import com.lotto.app.domain.rules.PendingDrawResultPolicy
 import com.lotto.app.domain.rules.FullNumberLimitPolicy
 import com.lotto.app.domain.rules.NoAcceptNumberPolicy
@@ -42,7 +63,90 @@ private enum class AppScreen {
     Home, Sale, History, CreditAccounts, PayDebt, Calendar, Settings, Reports, TotalSales, CurrentSales, SalesHistory, Performance, DrawResult, Winners, Payout
 }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+    private val isAuthenticated = mutableStateOf(false)
+    private val authenticationError = mutableStateOf<String?>(null)
+    @Volatile private var lastInteractionElapsedRealtime = 0L
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        lastInteractionElapsedRealtime = SystemClock.elapsedRealtime()
+    }
+
+    private fun requestDeviceAuthentication() {
+        val keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+        if (!keyguard.isDeviceSecure) {
+            authenticationError.value = "กรุณาตั้ง PIN, รหัสผ่าน หรือรูปแบบล็อกหน้าจอของเครื่องก่อนใช้งาน Lotto"
+            return
+        }
+        val promptInfoBuilder = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("ยืนยันตัวตนเพื่อเข้าใช้งาน Lotto")
+            .setSubtitle("ใช้ลายนิ้วมือ ใบหน้า หรือ PIN/รหัสล็อกหน้าจอของอุปกรณ์")
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            // Android 11+ supports the combined strong biometric + device credential mode.
+            val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            val availability = BiometricManager.from(this).canAuthenticate(authenticators)
+            if (availability != BiometricManager.BIOMETRIC_SUCCESS) {
+                authenticationError.value =
+                    "อุปกรณ์ยังไม่พร้อมสำหรับการยืนยันตัวตน กรุณาตรวจสอบการล็อกหน้าจอ"
+                return
+            }
+            promptInfoBuilder.setAllowedAuthenticators(authenticators)
+        } else {
+            // Android 8–10 cannot use the combined authenticator bitmask.
+            // The legacy flag lets the system offer the device credential fallback.
+            promptInfoBuilder.setDeviceCredentialAllowed(true)
+        }
+
+        val prompt = BiometricPrompt(
+            this,
+            ContextCompat.getMainExecutor(this),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    authenticationError.value = null
+                    lastInteractionElapsedRealtime = SystemClock.elapsedRealtime()
+                    isAuthenticated.value = true
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    isAuthenticated.value = false
+                    authenticationError.value = errString.toString()
+                }
+
+                override fun onAuthenticationFailed() {
+                    isAuthenticated.value = false
+                    authenticationError.value = "ยืนยันตัวตนไม่สำเร็จ กรุณาลองอีกครั้ง"
+                }
+            }
+        )
+        prompt.authenticate(promptInfoBuilder.build())
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (!isAuthenticated.value) requestDeviceAuthentication()
+    }
+
+    override fun onPause() {
+        val settings = (application as LottoApplication).container.settingsRepository
+        val observedNow = System.currentTimeMillis()
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching {
+                val stored = settings.get("clock_high_water_epoch_ms")?.toLongOrNull() ?: 0L
+                if (observedNow > stored) {
+                    settings.save("clock_high_water_epoch_ms", observedNow.toString())
+                }
+            }
+        }
+        super.onPause()
+    }
+
+    override fun onStop() {
+        isAuthenticated.value = false
+        super.onStop()
+    }
     @Suppress("DEPRECATION")
     private fun hideSystemBars() {
         window.decorView.systemUiVisibility = (
@@ -62,16 +166,47 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        lastInteractionElapsedRealtime = SystemClock.elapsedRealtime()
         hideSystemBars()
         val container = (application as LottoApplication).container
         val saleRepository = container.saleRepository
         val creditAccountRepository = container.creditAccountRepository
+        val customerRepository = container.customerRepository
         val drawCalendarRepository = container.drawCalendarRepository
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching { drawCalendarRepository.ensureBaselineCalendar() }
+                .onFailure { android.util.Log.e("LottoCalendar", "Unable to seed baseline draw calendar", it) }
+        }
         val drawResultRepository = container.drawResultRepository
         val settingsRepository = container.settingsRepository
 
         setContent {
             MaterialTheme {
+            if (!isAuthenticated.value) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Lotto ถูกล็อกเพื่อป้องกันการเข้าถึงข้อมูลลูกค้าและรายการเงิน")
+                    authenticationError.value?.let { Text(it, modifier = Modifier.padding(top = 12.dp)) }
+                    Button(
+                        onClick = {
+                            val keyguard = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+                            if (!keyguard.isDeviceSecure) {
+                                startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+                            } else {
+                                requestDeviceAuthentication()
+                            }
+                        },
+                        modifier = Modifier.padding(top = 16.dp)
+                    ) {
+                        Text(if ((getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isDeviceSecure) "ยืนยันตัวตนอีกครั้ง" else "ตั้งค่าล็อกหน้าจอ")
+                    }
+                }
+            } else {
+                MaterialTheme {
                 var currentScreen by rememberSaveable { mutableStateOf(AppScreen.Home.name) }
                 val drawDates by drawCalendarRepository.observeAllDrawDates().collectAsState(initial = emptyList())
                 val drawResults by drawResultRepository.observeAllResults().collectAsState(initial = emptyList())
@@ -92,9 +227,26 @@ class MainActivity : ComponentActivity() {
                 val activeSaleDrawDate = SaleWindowPolicy.activeDrawDate(drawDates, currentThailandTime).orEmpty()
                 var selectedResultDrawDate by rememberSaveable { mutableStateOf("") }
                 LaunchedEffect(Unit) {
+                    var lastClockPersistAt = 0L
                     while (true) {
                         currentThailandTime = DrawCalendarRepository.nowInThailand()
-                        delay(1000L)
+                        val elapsedNow = SystemClock.elapsedRealtime()
+                        if (isAuthenticated.value &&
+                            AppLockPolicy.shouldLock(lastInteractionElapsedRealtime, elapsedNow)
+                        ) {
+                            authenticationError.value = "ล็อกอัตโนมัติเนื่องจากไม่มีการใช้งาน กรุณายืนยันตัวตนอีกครั้ง"
+                            isAuthenticated.value = false
+                        }
+                        val wallClock = System.currentTimeMillis()
+                        if (wallClock - lastClockPersistAt >= 30_000L) {
+                            val lastSeenRaw = settingsRepository.get("clock_high_water_epoch_ms")
+                            val lastSeen = lastSeenRaw?.toLongOrNull()
+                            if (lastSeenRaw == null || (lastSeen != null && wallClock >= lastSeen)) {
+                                settingsRepository.save("clock_high_water_epoch_ms", wallClock.toString())
+                                lastClockPersistAt = wallClock
+                            }
+                        }
+                        delay(1_000L)
                     }
                 }
                 val saleWindow = SaleWindowPolicy.evaluate(drawDates, currentThailandTime)
@@ -114,11 +266,15 @@ class MainActivity : ComponentActivity() {
                         AppScreen.Sale.name -> SaleScreen(
                             onBack = { currentScreen = AppScreen.Home.name },
                             drawDate = activeSaleDrawDate,
+                            customerRepository = customerRepository,
+                            onGetLegacyOutstandingCredit = { firstName, lastName ->
+                                creditAccountRepository.getOutstandingCreditByCustomer(firstName, lastName)
+                            },
                             fullLimitsByPrizeType = currentFullLimits,
                             noAcceptNumbersByPrizeType = currentNoAcceptNumbers,
                             halfPayoutNumbersByPrizeType = currentHalfPayoutNumbers,
-                            onGetNumberStake = { drawDate, prizeType, number ->
-                                saleRepository.getNumberStakeForDraw(drawDate, prizeType, number)
+                            onGetPrizeTypeStake = { drawDate, prizeType ->
+                                saleRepository.getPrizeTypeStakeForDraw(drawDate, prizeType)
                             },
                             onSave = { draft ->
                                 val latestStatus = SaleWindowPolicy.evaluate(
@@ -145,6 +301,7 @@ class MainActivity : ComponentActivity() {
                         )
                         AppScreen.Payout.name -> PayoutScreen(
                             repository = drawResultRepository,
+                            creditRepository = creditAccountRepository,
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
                         AppScreen.Winners.name -> WinningResultsScreen(
@@ -196,6 +353,7 @@ class MainActivity : ComponentActivity() {
                         AppScreen.Settings.name -> SettingsScreen(
                             repository = drawCalendarRepository,
                             settingsRepository = settingsRepository,
+                            backupManager = container.encryptedBackupManager,
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
                         AppScreen.Reports.name -> ReportsScreen(
@@ -248,6 +406,8 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 }
+                }
+            }
             }
         }
     }

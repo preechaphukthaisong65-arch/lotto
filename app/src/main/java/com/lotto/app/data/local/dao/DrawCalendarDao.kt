@@ -41,6 +41,9 @@ abstract class DrawCalendarDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insertDrawDate(entity: DrawDateEntity)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    abstract suspend fun insertDefaultDrawDates(entities: List<DrawDateEntity>)
+
     @Insert
     abstract suspend fun insertChange(entity: DrawDateChangeEntity)
 

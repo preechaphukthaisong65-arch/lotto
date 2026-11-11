@@ -127,6 +127,8 @@ fun PayDebtScreen(repository: CreditAccountRepository, onBack: () -> Unit) {
                                     verticalArrangement = Arrangement.spacedBy(7.dp)
                                 ) {
                                     Text("บิล #${bill.creditDocumentId}", fontWeight = FontWeight.Bold)
+                                    Text("รหัสลูกค้า: ${bill.customerId?.toString() ?: "ข้อมูลเดิมไม่มีรหัส"}")
+                                    bill.customerPhone?.let { Text("โทรศัพท์: $it") }
                                     Text("วันที่ขาย: ${dateFormat.format(Date(bill.createdAt))}")
                                     Text("ยอดเงินเชื่อเริ่มต้น: ${bill.creditAmount} บาท")
                                     Text("รับชำระแล้ว: $alreadyPaid บาท")

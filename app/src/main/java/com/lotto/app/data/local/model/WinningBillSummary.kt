@@ -5,6 +5,7 @@ data class WinningBillSummary(
     val saleId: Long,
     val customerFirstName: String,
     val customerLastName: String,
+    val customerId: Long?,
     val totalPrize: Long,
     val payoutStatus: String,
     val recipientName: String?,

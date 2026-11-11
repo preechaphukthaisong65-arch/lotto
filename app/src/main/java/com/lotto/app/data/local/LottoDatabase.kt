@@ -5,6 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.lotto.app.data.local.dao.AppSettingDao
+import com.lotto.app.data.local.dao.CustomerDao
 import com.lotto.app.data.local.dao.DrawCalendarDao
 import com.lotto.app.data.local.dao.DrawResultDao
 import com.lotto.app.data.local.dao.SaleDao
@@ -19,6 +20,9 @@ import com.lotto.app.data.local.entity.WinningSaleItemEntity
 import com.lotto.app.data.local.entity.DrawProfitSummaryEntity
 import com.lotto.app.data.local.entity.SaleEntity
 import com.lotto.app.data.local.entity.SaleItemEntity
+import com.lotto.app.data.local.entity.SettingAuditEntity
+import com.lotto.app.data.local.entity.SaleVoidEventEntity
+import com.lotto.app.data.local.entity.CustomerEntity
 
 @Database(
     entities = [
@@ -34,19 +38,24 @@ import com.lotto.app.data.local.entity.SaleItemEntity
         WinningSaleItemEntity::class,
         DrawProfitSummaryEntity::class,
         com.lotto.app.data.local.entity.DrawResultCorrectionEntity::class,
-        com.lotto.app.data.local.entity.ExpiredSaleRetentionEntity::class
+        com.lotto.app.data.local.entity.ExpiredSaleRetentionEntity::class,
+        SettingAuditEntity::class,
+        SaleVoidEventEntity::class,
+        CustomerEntity::class
     ],
-    version = 11,
+    version = 16,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
     abstract fun appSettingDao(): AppSettingDao
+    abstract fun customerDao(): CustomerDao
     abstract fun saleDao(): SaleDao
     abstract fun drawCalendarDao(): DrawCalendarDao
     abstract fun drawResultDao(): DrawResultDao
 
     companion object {
         const val DATABASE_NAME = "lotto_database"
+        const val DATABASE_VERSION = 16
         const val PAID_DOCUMENT_RETENTION_DAYS = 180L
         const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 
@@ -91,6 +100,62 @@ abstract class LottoDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS expired_sale_retention (saleId INTEGER NOT NULL PRIMARY KEY, eligibleAt INTEGER NOT NULL)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_expired_sale_retention_eligibleAt ON expired_sale_retention(eligibleAt)")
+            }
+        }
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS setting_audit_log (
+                        auditId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        settingKey TEXT NOT NULL,
+                        previousValue TEXT,
+                        newValue TEXT,
+                        changedAt INTEGER NOT NULL
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_setting_audit_log_settingKey ON setting_audit_log(settingKey)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_setting_audit_log_changedAt ON setting_audit_log(changedAt)")
+            }
+        }
+
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS sale_void_events (
+                        voidId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        saleId INTEGER NOT NULL,
+                        drawDate TEXT NOT NULL,
+                        reason TEXT NOT NULL,
+                        cashRefundAmount INTEGER NOT NULL,
+                        cancelledCreditAmount INTEGER NOT NULL,
+                        voidedAt INTEGER NOT NULL,
+                        FOREIGN KEY(saleId) REFERENCES sales(saleId) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """)
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sale_void_events_saleId ON sale_void_events(saleId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_sale_void_events_voidedAt ON sale_void_events(voidedAt)")
+            }
+        }
+
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS customers (
+                        customerId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        customerCode TEXT NOT NULL,
+                        firstName TEXT NOT NULL,
+                        lastName TEXT NOT NULL,
+                        phone TEXT,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL
+                    )
+                """)
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_customers_customerCode ON customers(customerCode)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_customers_firstName_lastName ON customers(firstName, lastName)")
+                db.execSQL("ALTER TABLE sales ADD COLUMN customerId INTEGER")
+                db.execSQL("ALTER TABLE sales ADD COLUMN customerPhone TEXT")
+                db.execSQL("ALTER TABLE credit_documents ADD COLUMN customerId INTEGER")
+                db.execSQL("ALTER TABLE credit_documents ADD COLUMN customerPhone TEXT")
             }
         }
         val MIGRATION_9_10 = object : Migration(9, 10) {
@@ -179,5 +244,35 @@ abstract class LottoDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_winning_sale_items_saleId ON winning_sale_items(saleId)")
             }
         }
+
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sales ADD COLUMN legacyDebtReviewed INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sales ADD COLUMN newCustomerIdentityConfirmed INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val ALL_MIGRATIONS = arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+            MIGRATION_7_8,
+            MIGRATION_8_9,
+            MIGRATION_9_10,
+            MIGRATION_10_11,
+            MIGRATION_11_12,
+            MIGRATION_12_13,
+            MIGRATION_13_14,
+            MIGRATION_14_15,
+            MIGRATION_15_16
+        )
     }
 }

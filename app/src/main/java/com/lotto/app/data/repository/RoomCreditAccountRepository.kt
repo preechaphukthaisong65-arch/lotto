@@ -7,6 +7,11 @@ import com.lotto.app.data.local.entity.CreditPaymentEntity
 
 class RoomCreditAccountRepository(private val saleDao: SaleDao) : CreditAccountRepository {
     override suspend fun getOpenBills(): List<CreditDocumentEntity> = saleDao.getOpenCreditDocuments()
+    override suspend fun getOutstandingCreditByCustomer(firstName: String, lastName: String): Long =
+        saleDao.getOutstandingCreditByLegacyName(firstName, lastName)
+
+    override suspend fun getOutstandingCreditByCustomerId(customerId: Long): Long =
+        saleDao.getOutstandingCreditByCustomer(customerId)
     override suspend fun getPaidBills(): List<CreditDocumentEntity> = saleDao.getPaidDocuments()
     override suspend fun getPayments(creditDocumentId: Long): List<CreditPaymentEntity> =
         saleDao.getPaymentsForCreditDocument(creditDocumentId)

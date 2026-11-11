@@ -1,16 +1,51 @@
 # Lotto
 
-Android application project.
+Android application for recording lottery sales, credit accounts, draw results, prize liabilities and payouts.
 
-## Current scope
-
-- Main screen UI only.
-- Main menu: ขายหวย, รายงานยอด, ประวัติ, บัญชีเชื่อ, ตั้งค่า.
-- UI components are separated by responsibility.
-- No database, API, network integration, or business logic has been added.
-
-## Android project
+## Technology
 
 - Kotlin
-- Jetpack Compose
-- Material 3
+- Jetpack Compose / Material 3
+- Room / SQLite local database
+- Offline-first; no Internet permission is declared
+- GitHub Actions builds debug and release variants
+
+## Data protection
+
+- App access requires the device's secure screen credential or a strong biometric.
+- Confirmed sales remain immutable; corrections are recorded as separate auditable actions rather than deleting the original sale.
+- Lottery setting changes are recorded in a local audit history.
+- New sales are blocked until every per-number limit, per-draw maximum prize liability, and per-customer credit cap has a positive configured value.
+- Result entry is blocked before 16:00 Thailand time on the scheduled draw date.
+- Sale and result writes maintain a local clock high-water mark and reject timestamps earlier than the last recorded time.
+- Android automatic cloud backup is disabled because the database contains customer and financial records.
+- The live Room database uses SQLCipher AES-256 encryption. A random database passphrase is wrapped by an Android Keystore AES-GCM key; the raw database passphrase is not stored in plaintext preferences.
+- On upgrade from an existing plaintext SQLite installation, the app verifies the original database, exports it to an encrypted temporary database, verifies the encrypted copy, and only then replaces the live file. It retains recovery files until the replacement has passed validation. It never uses destructive Room migration.
+- Owners can create and restore password-encrypted portable backups from Settings. The backup wraps a plaintext snapshot in AES-256-GCM using PBKDF2-HMAC-SHA256 (310,000 iterations); the live database remains encrypted with SQLCipher. Backup passwords must be at least 12 characters and are not recoverable by the app.
+- Restore validates the decrypted database integrity, applies supported Room migrations forward to the current schema, re-encrypts it with the current device's SQLCipher key, replaces the database with recovery safeguards, and restarts the app.
+- New sales can select an existing customer or create a separate customer ID. Similar names are never automatically merged; credit caps and new prize-debt checks use the stable customer ID. If a new credit sale matches legacy unlinked debt by name, the operator must explicitly review and acknowledge it; that legacy balance is not silently merged. Legacy winning bills also require manual debt review before payout.
+- Confirmed sales can be voided only before result entry, with a reason and explicit cash-refund confirmation. The original sale remains in the database with VOIDED status and an immutable refund/credit-cancellation event.
+
+## Build outputs
+
+- `lotto-debug-apk`: installable debug build for testing.
+- `lotto-release-apk` and `lotto-release-aab`: optimized release outputs. They are signed only when the owner configures the four protected GitHub Actions secrets below; otherwise they remain unsigned test artifacts.
+
+## Important operational limitations
+
+- The local clock guard detects backward movement relative to timestamps already checkpointed by the app. An offline-only app cannot prove trusted real-world time against a user who controls the device, changes the clock between checkpoints, or reinstalls/clears app data. Production-grade time enforcement requires a trusted external time source or server.
+- Existing pre-upgrade customer records have no stable identity; they are not auto-merged. Legacy winning bills require manual debt review before payout.
+- Prize payout warnings show outstanding debt for the same customer ID and require acknowledgement when debt exists. Debt is not automatically offset against prizes; the operator must verify the customer and settle amounts explicitly.
+- Voiding is prohibited after a draw result is recorded and for credit bills with any payment history. Such cases require a separately reviewed manual correction/refund so existing financial history is not silently rewritten.
+- A successful CI build does not replace real-device testing, backup/restore rehearsal, or review of all financial workflows before live use.
+
+## Release signing setup
+
+To produce an installable production release, create and securely retain an Android upload/release keystore outside this repository. Add these repository Actions secrets:
+
+- `ANDROID_KEYSTORE_BASE64`: Base64 encoding of the keystore file
+- `ANDROID_KEYSTORE_PASSWORD`: keystore password
+- `ANDROID_KEY_ALIAS`: key alias
+- `ANDROID_KEY_PASSWORD`: key password
+
+The workflow detects the key at build time and signs the release APK/AAB when the secrets are present. Never commit the keystore or passwords to Git. Keep a secure offline copy of the keystore; losing it can prevent future updates to an app published under that signing identity.

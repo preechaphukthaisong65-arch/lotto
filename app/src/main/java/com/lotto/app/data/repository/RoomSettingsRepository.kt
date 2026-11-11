@@ -2,6 +2,7 @@ package com.lotto.app.data.repository
 
 import com.lotto.app.data.local.dao.AppSettingDao
 import com.lotto.app.data.local.entity.AppSettingEntity
+import com.lotto.app.data.local.entity.SettingAuditEntity
 import kotlinx.coroutines.flow.Flow
 
 class RoomSettingsRepository(
@@ -16,8 +17,11 @@ class RoomSettingsRepository(
         return appSettingDao.observeAll()
     }
 
+    override fun observeAuditLog(): Flow<List<SettingAuditEntity>> =
+        appSettingDao.observeAuditLog()
+
     override suspend fun save(key: String, value: String) {
-        appSettingDao.upsert(
+        appSettingDao.saveWithAudit(
             AppSettingEntity(
                 key = key,
                 value = value,
@@ -26,7 +30,21 @@ class RoomSettingsRepository(
         )
     }
 
+    override suspend fun saveMany(values: Map<String, String>) {
+        require(values.isNotEmpty()) { "ไม่มีค่าการตั้งค่าที่ต้องบันทึก" }
+        val changedAt = System.currentTimeMillis()
+        appSettingDao.saveManyWithAudit(
+            values.map { (key, value) ->
+                AppSettingEntity(
+                    key = key,
+                    value = value,
+                    updatedAt = changedAt
+                )
+            }
+        )
+    }
+
     override suspend fun delete(key: String) {
-        appSettingDao.deleteByKey(key)
+        appSettingDao.deleteWithAudit(key, System.currentTimeMillis())
     }
 }
