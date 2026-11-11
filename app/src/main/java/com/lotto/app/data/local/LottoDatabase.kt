@@ -43,7 +43,7 @@ import com.lotto.app.data.local.entity.CustomerEntity
         SaleVoidEventEntity::class,
         CustomerEntity::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -55,7 +55,7 @@ abstract class LottoDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "lotto_database"
-        const val DATABASE_VERSION = 16
+        const val DATABASE_VERSION = 17
         const val PAID_DOCUMENT_RETENTION_DAYS = 180L
         const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
 
@@ -257,6 +257,16 @@ abstract class LottoDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE draw_results ADD COLUMN source TEXT NOT NULL DEFAULT 'LEGACY_MANUAL'")
+                db.execSQL("ALTER TABLE draw_results ADD COLUMN verificationRunId TEXT")
+                db.execSQL("ALTER TABLE draw_results ADD COLUMN approvedAt INTEGER")
+                // Historical dates remain available for old sales/reporting, but are no longer operational.
+                db.execSQL("UPDATE draw_dates SET source = 'LEGACY_ARCHIVE' WHERE source IN ('GLO_STANDARD_RULE', 'GLO_10_YEAR_REFERENCE', 'USER_ADDED', 'USER_EDITED')")
+            }
+        }
+
         val ALL_MIGRATIONS = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -272,7 +282,8 @@ abstract class LottoDatabase : RoomDatabase() {
             MIGRATION_12_13,
             MIGRATION_13_14,
             MIGRATION_14_15,
-            MIGRATION_15_16
+            MIGRATION_15_16,
+            MIGRATION_16_17
         )
     }
 }
