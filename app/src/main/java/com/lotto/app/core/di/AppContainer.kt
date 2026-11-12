@@ -33,7 +33,8 @@ class AppContainer(context: Context) {
             LottoDatabase.MIGRATION_7_8,
             LottoDatabase.MIGRATION_8_9,
             LottoDatabase.MIGRATION_9_10,
-            LottoDatabase.MIGRATION_10_11
+            LottoDatabase.MIGRATION_10_11,
+            LottoDatabase.MIGRATION_11_12
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onOpen(db: SupportSQLiteDatabase) {
