@@ -15,6 +15,17 @@ class LottoRulesTest {
     }
 
     @Test
+    fun twoDigitTopIsDerivedFromLastTwoDigitsAndKeepsLeadingZero() {
+        assertEquals("07", LottoRules.twoDigitTopFromThreeDigit("007"))
+        assertEquals("00", LottoRules.twoDigitTopFromThreeDigit("100"))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun rejectsInvalidThreeDigitResultWhenDerivingTopTwo() {
+        LottoRules.twoDigitTopFromThreeDigit("07")
+    }
+
+    @Test
     fun straightMatchIsPositional() {
         assertTrue(LottoRules.isThreeDigitStraightMatch("007", "007"))
         assertFalse(LottoRules.isThreeDigitStraightMatch("070", "007"))
