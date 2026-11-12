@@ -60,7 +60,7 @@ fun DrawCalendarSettingsScreen(
         ) {
             Text("จัดการวันออกรางวัล", style = MaterialTheme.typography.titleLarge)
             Text(
-                "เพิ่มหรือเปลี่ยนวันออกรางวัลได้ที่หน้านี้ ระบบจะเก็บประวัติวันเดิมทุกครั้งที่มีการเปลี่ยนแปลง",
+                "ปฏิทินหลักเริ่มต้นใช้วันที่ 1 และ 16 ของเดือน พร้อมวันที่พิเศษตามชุดปี 2570 วันที่ตั้งต้นที่ยังไม่ประกาศอย่างเป็นทางการสามารถแก้ไขได้ที่หน้านี้",
                 style = MaterialTheme.typography.bodySmall
             )
             Button(onClick = {
@@ -94,6 +94,7 @@ fun DrawCalendarSettingsScreen(
                                     Text(
                                         when (draw.source) {
                                             "GLO_10_YEAR_REFERENCE" -> "ข้อมูลอ้างอิงกองสลาก"
+                                            "APP_DEFAULT_SCHEDULE" -> "วันหลักตั้งต้นของแอป (รอตรวจประกาศ GLO)"
                                             "USER_EDITED" -> "ผู้ใช้แก้ไขวันแล้ว"
                                             else -> "วันที่ผู้ใช้เพิ่ม"
                                         },
