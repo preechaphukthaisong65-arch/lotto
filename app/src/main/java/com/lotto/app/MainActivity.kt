@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.lotto.app.domain.rules.SaleWindowPolicy
 import com.lotto.app.domain.rules.PendingDrawResultPolicy
 import com.lotto.app.domain.rules.FullNumberLimitPolicy
@@ -47,6 +48,10 @@ private enum class AppScreen {
 }
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        const val EXTRA_CONFIRM_DRAW_DATE = "com.lotto.app.EXTRA_CONFIRM_DRAW_DATE"
+    }
+
     @Suppress("DEPRECATION")
     private fun hideSystemBars() {
         window.decorView.systemUiVisibility = (
