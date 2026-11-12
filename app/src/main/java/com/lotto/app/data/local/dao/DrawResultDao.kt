@@ -166,7 +166,7 @@ abstract class DrawResultDao {
     open suspend fun saveResultAndFindWinners(result: DrawResultEntity): Int {
         require(countScheduledDrawDate(result.drawDate) == 1) { "ไม่พบวันที่ออกรางวัลนี้ในปฏิทินหวย กรุณาตรวจสอบงวดก่อนบันทึกผล" }
         require(LottoRules.isValidThreeDigitNumber(result.threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
-        require(result.twoDigitTop == result.threeDigit.takeLast(2)) { "เลข 2 ตัวบนต้องเป็นเลข 2 หลักท้ายของผล 3 ตัวตรง" }
+        require(result.twoDigitTop == LottoRules.twoDigitTopFromThreeDigit(result.threeDigit)) { "เลข 2 ตัวบนต้องเป็นเลข 2 หลักท้ายของผล 3 ตัวตรง" }
         require(LottoRules.isValidTwoDigitNumber(result.twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
         require(getResult(result.drawDate) == null) { "งวดนี้บันทึกผลรางวัลแล้ว" }
 
@@ -187,7 +187,7 @@ abstract class DrawResultDao {
     ): Int {
         require(LottoRules.isValidThreeDigitNumber(threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
-        val derivedTwoDigitTop = threeDigit.takeLast(2)
+        val derivedTwoDigitTop = LottoRules.twoDigitTopFromThreeDigit(threeDigit)
         require(reason.isNotBlank()) { "กรุณาระบุเหตุผลที่แก้ไขผลรางวัล" }
         val previous = getResult(drawDate) ?: throw IllegalArgumentException("ไม่พบผลรางวัลของงวดนี้")
         require(!previous.payoutLocked) {
