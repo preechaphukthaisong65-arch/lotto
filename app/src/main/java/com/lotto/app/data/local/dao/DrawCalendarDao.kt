@@ -20,6 +20,18 @@ abstract class DrawCalendarDao {
     @Query("SELECT * FROM draw_dates WHERE drawDate = :date LIMIT 1")
     abstract suspend fun getByDate(date: String): DrawDateEntity?
 
+    @Query("""SELECT d.drawDate FROM draw_dates d
+        LEFT JOIN draw_date_confirmations c ON c.drawDate = d.drawDate
+        WHERE d.drawDate BETWEEN :today AND :throughDate AND c.drawDate IS NULL
+        ORDER BY d.drawDate ASC""")
+    abstract suspend fun getUnconfirmedDrawDates(today: String, throughDate: String): List<String>
+
+    @Query("SELECT * FROM draw_date_confirmations WHERE drawDate = :drawDate LIMIT 1")
+    abstract suspend fun getConfirmation(drawDate: String): com.lotto.app.data.local.entity.DrawDateConfirmationEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun confirmDrawDate(entity: com.lotto.app.data.local.entity.DrawDateConfirmationEntity)
+
     @Query("SELECT COUNT(*) FROM sales WHERE drawDate = :date")
     protected abstract suspend fun countSalesForDraw(date: String): Int
 
