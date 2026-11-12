@@ -2,6 +2,7 @@ package com.lotto.app.data.repository
 
 import com.lotto.app.data.local.dao.DrawCalendarDao
 import com.lotto.app.data.local.entity.DrawDateEntity
+import com.lotto.app.data.local.entity.DrawDateConfirmationEntity
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import java.time.ZoneId
@@ -16,6 +17,17 @@ class DrawCalendarRepository(
 
     fun observeAllChanges(): Flow<List<com.lotto.app.data.local.entity.DrawDateChangeEntity>> =
         dao.observeAllChanges()
+
+    suspend fun getUnconfirmedDrawDates(today: LocalDate = todayInThailand()): List<String> =
+        dao.getUnconfirmedDrawDates(today.toString(), today.plusDays(7).toString())
+
+    suspend fun confirmDrawDate(drawDate: LocalDate) {
+        require(dao.getByDate(drawDate.toString()) != null) { "ไม่พบวันที่ในปฏิทินกลาง" }
+        dao.confirmDrawDate(DrawDateConfirmationEntity(drawDate.toString(), System.currentTimeMillis()))
+    }
+
+    suspend fun isDrawDateConfirmed(drawDate: LocalDate): Boolean =
+        dao.getConfirmation(drawDate.toString()) != null
 
     suspend fun addDrawDate(date: LocalDate, note: String? = null) {
         require(dao.getByDate(date.toString()) == null) { "มีงวดออกรางวัลในวันที่เลือกแล้ว" }
