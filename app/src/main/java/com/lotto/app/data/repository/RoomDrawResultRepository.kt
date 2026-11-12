@@ -37,13 +37,12 @@ class RoomDrawResultRepository(private val dao: DrawResultDao) : DrawResultRepos
     override suspend fun saveResult(
         drawDate: String,
         threeDigit: String,
-        twoDigitTop: String,
         twoDigitBottom: String
     ): Int = dao.saveResultAndFindWinners(
         DrawResultEntity(
             drawDate = drawDate,
             threeDigit = threeDigit,
-            twoDigitTop = twoDigitTop,
+            twoDigitTop = threeDigit.takeLast(2),
             twoDigitBottom = twoDigitBottom,
             recordedAt = System.currentTimeMillis()
         )
@@ -52,13 +51,11 @@ class RoomDrawResultRepository(private val dao: DrawResultDao) : DrawResultRepos
     override suspend fun correctResult(
         drawDate: String,
         threeDigit: String,
-        twoDigitTop: String,
         twoDigitBottom: String,
         reason: String
     ): Int = dao.correctResultAndRebuildWinners(
         drawDate = drawDate,
         threeDigit = threeDigit,
-        twoDigitTop = twoDigitTop,
         twoDigitBottom = twoDigitBottom,
         reason = reason,
         correctedAt = System.currentTimeMillis()
