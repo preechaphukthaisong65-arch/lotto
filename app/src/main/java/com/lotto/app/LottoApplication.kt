@@ -3,6 +3,7 @@ package com.lotto.app
 import android.app.Application
 import android.util.Log
 import com.lotto.app.core.di.AppContainer
+import com.lotto.app.work.DrawDateReminderScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,6 +16,7 @@ class LottoApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        DrawDateReminderScheduler.schedule(this)
 
         // Local retention cleanup at startup. OPEN credit bills are never eligible.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
