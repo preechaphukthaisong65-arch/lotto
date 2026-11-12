@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "checker": "LottoCalendarMonitor/1.0",
-  "checked_at_utc": "2026-11-12T00:17:09.273639+00:00",
-  "checked_at_thailand": "2026-11-12T07:17:09.273639+07:00",
+  "checked_at_utc": "2026-11-12T00:17:45.252713+00:00",
+  "checked_at_thailand": "2026-11-12T07:17:45.252713+07:00",
   "source_url": "https://www.glo.or.th/service/faq/award",
   "source_name": "สำนักงานสลากกินแบ่งรัฐบาล (GLO) - FAQ ภารกิจการออกรางวัล",
   "access_status": "SKIPPED_ROBOTS_OR_POLICY_UNAVAILABLE",
