@@ -45,8 +45,18 @@ fun HomeScreen(
     saleStatusMessage: String,
     calendarBotStatus: String,
     pendingResultDate: String?,
-    onOpenDrawResult: () -> Unit
+    onOpenDrawResult: () -> Unit,
+    pendingDrawConfirmationDate: String?,
+    onConfirmDrawDate: (String) -> Unit
 ) {
+    if (pendingDrawConfirmationDate != null) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("ยืนยันวันออกรางวัล") },
+            text = { Text("กรุณาตรวจสอบว่าวันออกรางวัล งวดวันที่ $pendingDrawConfirmationDate ถูกต้องหรือไม่ หากวันที่ไม่ถูกต้องให้แก้ไขในเมนูตั้งค่าก่อนยืนยัน") },
+            confirmButton = { Button(onClick = { onConfirmDrawDate(pendingDrawConfirmationDate) }) { Text("ยืนยันวันที่") } }
+        )
+    }
     if (pendingResultDate != null) {
         AlertDialog(
             onDismissRequest = { },
