@@ -166,7 +166,7 @@ abstract class DrawResultDao {
     open suspend fun saveResultAndFindWinners(result: DrawResultEntity): Int {
         require(countScheduledDrawDate(result.drawDate) == 1) { "ไม่พบวันที่ออกรางวัลนี้ในปฏิทินหวย กรุณาตรวจสอบงวดก่อนบันทึกผล" }
         require(LottoRules.isValidThreeDigitNumber(result.threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
-        require(LottoRules.isValidTwoDigitNumber(result.twoDigitTop)) { "กรุณากรอกผล 2 ตัวบนให้ครบ 2 หลัก" }
+        require(result.twoDigitTop == result.threeDigit.takeLast(2)) { "เลข 2 ตัวบนต้องเป็นเลข 2 หลักท้ายของผล 3 ตัวตรง" }
         require(LottoRules.isValidTwoDigitNumber(result.twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
         require(getResult(result.drawDate) == null) { "งวดนี้บันทึกผลรางวัลแล้ว" }
 
@@ -181,14 +181,13 @@ abstract class DrawResultDao {
     open suspend fun correctResultAndRebuildWinners(
         drawDate: String,
         threeDigit: String,
-        twoDigitTop: String,
         twoDigitBottom: String,
         reason: String,
         correctedAt: Long
     ): Int {
         require(LottoRules.isValidThreeDigitNumber(threeDigit)) { "กรุณากรอกผล 3 ตัวให้ครบ 3 หลัก" }
-        require(LottoRules.isValidTwoDigitNumber(twoDigitTop)) { "กรุณากรอกผล 2 ตัวบนให้ครบ 2 หลัก" }
         require(LottoRules.isValidTwoDigitNumber(twoDigitBottom)) { "กรุณากรอกผล 2 ตัวล่างให้ครบ 2 หลัก" }
+        val derivedTwoDigitTop = threeDigit.takeLast(2)
         require(reason.isNotBlank()) { "กรุณาระบุเหตุผลที่แก้ไขผลรางวัล" }
         val previous = getResult(drawDate) ?: throw IllegalArgumentException("ไม่พบผลรางวัลของงวดนี้")
         require(!previous.payoutLocked) {
@@ -202,17 +201,17 @@ abstract class DrawResultDao {
                 previousTwoDigitTop = previous.twoDigitTop,
                 previousTwoDigitBottom = previous.twoDigitBottom,
                 newThreeDigit = threeDigit,
-                newTwoDigitTop = twoDigitTop,
+                newTwoDigitTop = derivedTwoDigitTop,
                 newTwoDigitBottom = twoDigitBottom,
                 reason = reason.trim(),
                 correctedAt = correctedAt
             )
         )
         deleteWinnersForDraw(drawDate)
-        updateResult(drawDate, threeDigit, twoDigitTop, twoDigitBottom, correctedAt)
+        updateResult(drawDate, threeDigit, derivedTwoDigitTop, twoDigitBottom, correctedAt)
         val corrected = previous.copy(
             threeDigit = threeDigit,
-            twoDigitTop = twoDigitTop,
+            twoDigitTop = derivedTwoDigitTop,
             twoDigitBottom = twoDigitBottom,
             recordedAt = correctedAt
         )
