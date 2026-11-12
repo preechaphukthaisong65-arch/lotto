@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
 data class DrawResultEntity(
     @PrimaryKey val drawDate: String,
     val threeDigit: String,
+    // Persisted for backward-compatible Room storage; always derived from threeDigit.takeLast(2).
     val twoDigitTop: String,
     val twoDigitBottom: String,
     val recordedAt: Long,
