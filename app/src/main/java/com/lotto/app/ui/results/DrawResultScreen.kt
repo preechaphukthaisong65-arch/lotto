@@ -81,7 +81,7 @@ fun DrawResultScreen(
             Text("กรอกผลรางวัลตามประกาศ โดยระบบจะค้นหาบิลที่ถูกรางวัลให้อัตโนมัติ")
             OutlinedTextField(
                 value = threeDigit,
-                onValueChange = { threeDigit = it.filter(Char::isDigit).take(3) },
+                onValueChange = { threeDigit = it.filter { digit -> digit in '0'..'9' }.take(3) },
                 label = { Text("เลข 3 ตัว") },
                 supportingText = { Text("ใช้ตรวจ 3 ตัวตรง และ 3 ตัวโต๊ด") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -94,7 +94,7 @@ fun DrawResultScreen(
             )
             OutlinedTextField(
                 value = twoDigitBottom,
-                onValueChange = { twoDigitBottom = it.filter(Char::isDigit).take(2) },
+                onValueChange = { twoDigitBottom = it.filter { digit -> digit in '0'..'9' }.take(2) },
                 label = { Text("เลข 2 ตัวล่าง") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
