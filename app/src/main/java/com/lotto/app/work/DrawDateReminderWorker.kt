@@ -10,12 +10,10 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import androidx.room.Room
+import com.lotto.app.LottoApplication
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.lotto.app.MainActivity
-import com.lotto.app.R
-import com.lotto.app.data.local.LottoDatabase
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -25,23 +23,10 @@ class DrawDateReminderWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result = try {
-        val database = Room.databaseBuilder(
-            applicationContext,
-            LottoDatabase::class.java,
-            LottoDatabase.DATABASE_NAME
-        ).build()
-        try {
-            val today = LocalDate.now(ZoneId.of("Asia/Bangkok"))
-            val dueDates = database.drawCalendarDao().getUnconfirmedDrawDates(
-                today.toString(),
-                today.plusDays(7).toString()
-            )
-            if (dueDates.isNotEmpty()) {
-                postReminder(dueDates.first())
-            }
-        } finally {
-            database.close()
-        }
+        val repository = (applicationContext as LottoApplication).container.drawCalendarRepository
+        val today = LocalDate.now(ZoneId.of("Asia/Bangkok"))
+        val dueDates = repository.getUnconfirmedDrawDates(today)
+        dueDates.firstOrNull()?.let(::postReminder)
         Result.success()
     } catch (_: Exception) {
         Result.retry()
@@ -70,7 +55,7 @@ class DrawDateReminderWorker(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("ยืนยันวันออกรางวัล")
             .setContentText("ถึงกำหนดยืนยันวันออกรางวัล งวดวันที่ $drawDate กรุณาตรวจสอบและยืนยันวันที่ในแอป Lotto")
             .setStyle(NotificationCompat.BigTextStyle().bigText(
