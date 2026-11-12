@@ -40,6 +40,8 @@ private enum class SettingsSection {
 fun SettingsScreen(
     repository: DrawCalendarRepository,
     settingsRepository: SettingsRepository,
+    pendingResultDate: String?,
+    onOpenDrawResult: (String) -> Unit,
     onBack: () -> Unit
 ) {
     var section by remember { mutableStateOf(SettingsSection.MENU) }
@@ -79,6 +81,11 @@ fun SettingsScreen(
                     }
                     SettingsMenuCard("ตั้งค่าหวยจ่ายครึ่งราคา", "กำหนดเลขที่จ่ายรางวัลครึ่งอัตรา") {
                         section = SettingsSection.HALF_PAYOUT
+                    }
+                    if (pendingResultDate != null) {
+                        SettingsMenuCard("กรอกผลรางวัล", "กรอกเลข 3 ตัวตรงและ 2 ตัวล่าง ระบบคำนวณ 2 ตัวบนและค้นหาบิลถูกให้อัตโนมัติ") {
+                            onOpenDrawResult(pendingResultDate)
+                        }
                     }
                     SettingsMenuCard("จัดการวันออกรางวัล", "เพิ่มหรือแก้ไขวันออกรางวัลและประวัติการเปลี่ยนแปลง") {
                         section = SettingsSection.DRAW_CALENDAR
