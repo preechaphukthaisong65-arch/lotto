@@ -26,7 +26,7 @@ class DrawDateReminderWorker(
         val repository = (applicationContext as LottoApplication).container.drawCalendarRepository
         val today = LocalDate.now(ZoneId.of("Asia/Bangkok"))
         val dueDates = repository.getUnconfirmedDrawDates(today)
-        dueDates.firstOrNull()?.let(::postReminder)
+        dueDates.forEach(::postReminder)
         Result.success()
     } catch (_: Exception) {
         Result.retry()
