@@ -42,7 +42,7 @@ class RoomDrawResultRepository(private val dao: DrawResultDao) : DrawResultRepos
         DrawResultEntity(
             drawDate = drawDate,
             threeDigit = threeDigit,
-            twoDigitTop = threeDigit.takeLast(2),
+            twoDigitTop = com.lotto.app.domain.rules.LottoRules.twoDigitTopFromThreeDigit(threeDigit),
             twoDigitBottom = twoDigitBottom,
             recordedAt = System.currentTimeMillis()
         )
