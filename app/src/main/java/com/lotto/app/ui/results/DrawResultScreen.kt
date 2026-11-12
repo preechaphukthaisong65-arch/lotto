@@ -30,18 +30,17 @@ import kotlinx.coroutines.launch
 fun DrawResultScreen(
     drawDate: String,
     onBack: () -> Unit,
-    onSave: suspend (String, String, String, String) -> Int,
+    onSave: suspend (String, String, String) -> Int,
     existingResult: DrawResultEntity? = null
 ) {
     var threeDigit by remember(drawDate, existingResult) { mutableStateOf(existingResult?.threeDigit.orEmpty()) }
-    var twoDigitTop by remember(drawDate, existingResult) { mutableStateOf(existingResult?.twoDigitTop.orEmpty()) }
     var twoDigitBottom by remember(drawDate, existingResult) { mutableStateOf(existingResult?.twoDigitBottom.orEmpty()) }
     var correctionReason by remember(drawDate, existingResult) { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val isCorrection = existingResult != null
-    val valid = threeDigit.length == 3 && twoDigitTop.length == 2 && twoDigitBottom.length == 2 &&
+    val valid = threeDigit.length == 3 && twoDigitBottom.length == 2 &&
         (!isCorrection || correctionReason.isNotBlank())
 
     Scaffold(
@@ -61,7 +60,7 @@ fun DrawResultScreen(
                             saving = true
                             error = null
                             try {
-                                onSave(threeDigit, twoDigitTop, twoDigitBottom, correctionReason)
+                                onSave(threeDigit, twoDigitBottom, correctionReason)
                             } catch (e: Exception) {
                                 error = e.message ?: "บันทึกผลรางวัลไม่สำเร็จ"
                             } finally {
@@ -89,13 +88,9 @@ fun DrawResultScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-            OutlinedTextField(
-                value = twoDigitTop,
-                onValueChange = { twoDigitTop = it.filter(Char::isDigit).take(2) },
-                label = { Text("เลข 2 ตัวบน") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+            Text(
+                "เลข 2 ตัวบน (คำนวณจาก 2 หลักท้าย): ${if (threeDigit.length == 3) threeDigit.takeLast(2) else "--"}",
+                style = MaterialTheme.typography.bodyLarge
             )
             OutlinedTextField(
                 value = twoDigitBottom,
