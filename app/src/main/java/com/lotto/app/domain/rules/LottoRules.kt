@@ -52,6 +52,15 @@ object LottoRules {
         return Math.multiplyExact(stakeBaht, payoutMultiplier(prizeType, payoutMode))
     }
 
+    /**
+     * Derives the top-two result from the last two digits of the three-digit result.
+     * The result remains a string to preserve leading zeroes.
+     */
+    fun twoDigitTopFromThreeDigit(threeDigitResult: String): String {
+        require(isValidThreeDigitNumber(threeDigitResult)) { "Three-digit result must contain exactly three digits." }
+        return threeDigitResult.takeLast(2)
+    }
+
     /** True only when both values are exactly two ASCII digits. */
     fun isValidTwoDigitNumber(number: String): Boolean =
         number.length == 2 && number.all { it in '0'..'9' }
