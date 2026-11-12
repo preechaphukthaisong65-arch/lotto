@@ -14,6 +14,7 @@ import com.lotto.app.data.local.entity.CreditDocumentItemEntity
 import com.lotto.app.data.local.entity.CreditPaymentEntity
 import com.lotto.app.data.local.entity.DrawDateEntity
 import com.lotto.app.data.local.entity.DrawDateChangeEntity
+import com.lotto.app.data.local.entity.DrawDateConfirmationEntity
 import com.lotto.app.data.local.entity.DrawResultEntity
 import com.lotto.app.data.local.entity.WinningSaleItemEntity
 import com.lotto.app.data.local.entity.DrawProfitSummaryEntity
@@ -30,13 +31,14 @@ import com.lotto.app.data.local.entity.SaleItemEntity
         CreditPaymentEntity::class,
         DrawDateEntity::class,
         DrawDateChangeEntity::class,
+        DrawDateConfirmationEntity::class,
         DrawResultEntity::class,
         WinningSaleItemEntity::class,
         DrawProfitSummaryEntity::class,
         com.lotto.app.data.local.entity.DrawResultCorrectionEntity::class,
         com.lotto.app.data.local.entity.ExpiredSaleRetentionEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -49,6 +51,12 @@ abstract class LottoDatabase : RoomDatabase() {
         const val DATABASE_NAME = "lotto_database"
         const val PAID_DOCUMENT_RETENTION_DAYS = 180L
         const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
+
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS draw_date_confirmations (drawDate TEXT NOT NULL PRIMARY KEY, confirmedAt INTEGER NOT NULL)")
+            }
+        }
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
