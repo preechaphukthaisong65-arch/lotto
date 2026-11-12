@@ -38,7 +38,7 @@ import com.lotto.app.data.local.entity.SaleItemEntity
         com.lotto.app.data.local.entity.DrawResultCorrectionEntity::class,
         com.lotto.app.data.local.entity.ExpiredSaleRetentionEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
 abstract class LottoDatabase : RoomDatabase() {
@@ -51,6 +51,72 @@ abstract class LottoDatabase : RoomDatabase() {
         const val DATABASE_NAME = "lotto_database"
         const val PAID_DOCUMENT_RETENTION_DAYS = 180L
         const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
+
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // The top-two result is now derived from the last two digits of the
+                // manually entered three-digit result. Preserve already-paid bills.
+                db.execSQL("UPDATE draw_results SET twoDigitTop = substr(threeDigit, -2)")
+
+                db.execSQL("""
+                    DELETE FROM winning_sale_items
+                    WHERE prizeType = 'TWO_DIGIT_TOP'
+                      AND drawDate IN (
+                        SELECT d.drawDate
+                        FROM draw_results d
+                        WHERE d.payoutLocked = 0
+                          AND NOT EXISTS (
+                            SELECT 1 FROM winning_sale_items paid
+                            WHERE paid.drawDate = d.drawDate AND paid.payoutStatus = 'PAID'
+                          )
+                      )
+                """)
+
+                db.execSQL("""
+                    INSERT INTO winning_sale_items (
+                        drawDate, saleId, saleItemId, prizeType, number,
+                        stakeAmount, payoutMultiplier, prizeAmount,
+                        payoutStatus, recipientName, paidAt
+                    )
+                    SELECT d.drawDate, si.saleId, si.itemId, si.prizeType, si.number,
+                           si.amount, si.payoutMultiplier, si.amount * si.payoutMultiplier,
+                           'UNPAID', NULL, NULL
+                    FROM draw_results d
+                    INNER JOIN sales s ON s.drawDate = d.drawDate AND s.status = 'CONFIRMED'
+                    INNER JOIN sale_items si ON si.saleId = s.saleId
+                    WHERE d.payoutLocked = 0
+                      AND si.prizeType = 'TWO_DIGIT_TOP'
+                      AND si.number = substr(d.threeDigit, -2)
+                      AND NOT EXISTS (
+                        SELECT 1 FROM winning_sale_items paid
+                        WHERE paid.drawDate = d.drawDate AND paid.payoutStatus = 'PAID'
+                      )
+                """)
+
+                db.execSQL("""
+                    UPDATE draw_profit_summaries
+                    SET prizeLiability = (
+                        SELECT COALESCE(SUM(w.prizeAmount), 0)
+                        FROM winning_sale_items w
+                        WHERE w.drawDate = draw_profit_summaries.drawDate
+                    ),
+                    netProfit = salesTotal - (
+                        SELECT COALESCE(SUM(w.prizeAmount), 0)
+                        FROM winning_sale_items w
+                        WHERE w.drawDate = draw_profit_summaries.drawDate
+                    )
+                    WHERE drawDate IN (
+                        SELECT d.drawDate
+                        FROM draw_results d
+                        WHERE d.payoutLocked = 0
+                          AND NOT EXISTS (
+                            SELECT 1 FROM winning_sale_items paid
+                            WHERE paid.drawDate = d.drawDate AND paid.payoutStatus = 'PAID'
+                          )
+                    )
+                """)
+            }
+        }
 
         val MIGRATION_11_12 = object : Migration(11, 12) {
             override fun migrate(db: SupportSQLiteDatabase) {
