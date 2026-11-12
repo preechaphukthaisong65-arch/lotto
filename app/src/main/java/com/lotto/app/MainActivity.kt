@@ -191,12 +191,12 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             existingResult = drawResults.firstOrNull { it.drawDate == selectedResultDrawDate },
-                            onSave = { three, top, bottom, reason ->
+                            onSave = { three, bottom, reason ->
                                 val existing = drawResults.firstOrNull { it.drawDate == selectedResultDrawDate }
                                 val count = if (existing == null) {
-                                    drawResultRepository.saveResult(selectedResultDrawDate, three, top, bottom)
+                                    drawResultRepository.saveResult(selectedResultDrawDate, three, bottom)
                                 } else {
-                                    drawResultRepository.correctResult(selectedResultDrawDate, three, top, bottom, reason)
+                                    drawResultRepository.correctResult(selectedResultDrawDate, three, bottom, reason)
                                 }
                                 currentScreen = AppScreen.Winners.name
                                 count
@@ -224,6 +224,11 @@ class MainActivity : ComponentActivity() {
                         AppScreen.Settings.name -> SettingsScreen(
                             repository = drawCalendarRepository,
                             settingsRepository = settingsRepository,
+                            pendingResultDate = pendingResultDate,
+                            onOpenDrawResult = { date ->
+                                selectedResultDrawDate = date
+                                currentScreen = AppScreen.DrawResult.name
+                            },
                             onBack = { currentScreen = AppScreen.Home.name }
                         )
                         AppScreen.Reports.name -> ReportsScreen(
