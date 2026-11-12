@@ -1,6 +1,9 @@
 package com.lotto.app
 
 import android.os.Bundle
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.view.View
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -64,6 +67,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         hideSystemBars()
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7301)
+        }
         val container = (application as LottoApplication).container
         val saleRepository = container.saleRepository
         val creditAccountRepository = container.creditAccountRepository
@@ -94,6 +102,11 @@ class MainActivity : ComponentActivity() {
                 }
                 val activeSaleDrawDate = SaleWindowPolicy.activeDrawDate(drawDates, currentThailandTime).orEmpty()
                 var selectedResultDrawDate by rememberSaveable { mutableStateOf("") }
+                var pendingDrawConfirmationDate by remember { mutableStateOf<String?>(null) }
+                LaunchedEffect(drawDates) {
+                    val due = drawCalendarRepository.getUnconfirmedDrawDates()
+                    pendingDrawConfirmationDate = due.firstOrNull()
+                }
                 LaunchedEffect(Unit) {
                     while (true) {
                         calendarBotStatus = calendarBotStatusRepository.fetchLatest().displayText()
@@ -254,6 +267,15 @@ class MainActivity : ComponentActivity() {
                             onOpenDrawResult = {
                                 selectedResultDrawDate = pendingResultDate.orEmpty()
                                 currentScreen = AppScreen.DrawResult.name
+                            },
+                            pendingDrawConfirmationDate = pendingDrawConfirmationDate,
+                            onConfirmDrawDate = { dateText ->
+                                val date = LocalDate.parse(dateText)
+                                kotlinx.coroutines.MainScope().launch {
+                                    drawCalendarRepository.confirmDrawDate(date)
+                                    pendingDrawConfirmationDate = drawCalendarRepository.getUnconfirmedDrawDates().firstOrNull()
+                                    Toast.makeText(this@MainActivity, "ยืนยันวันออกรางวัล $dateText แล้ว", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         )
                     }
