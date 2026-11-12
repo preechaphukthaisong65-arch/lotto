@@ -2,6 +2,7 @@ package com.lotto.app
 
 import android.os.Bundle
 import android.Manifest
+import android.app.NotificationManager
 import android.content.pm.PackageManager
 import android.os.Build
 import android.view.View
@@ -278,6 +279,7 @@ class MainActivity : ComponentActivity() {
                                 val date = LocalDate.parse(dateText)
                                 kotlinx.coroutines.MainScope().launch {
                                     drawCalendarRepository.confirmDrawDate(date)
+                                    (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).cancel(dateText.hashCode())
                                     pendingDrawConfirmationDate = drawCalendarRepository.getUnconfirmedDrawDates().firstOrNull()
                                     Toast.makeText(this@MainActivity, "ยืนยันวันออกรางวัล $dateText แล้ว", Toast.LENGTH_SHORT).show()
                                 }
