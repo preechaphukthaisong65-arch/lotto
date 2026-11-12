@@ -108,6 +108,7 @@ class MainActivity : ComponentActivity() {
                 }
                 val activeSaleDrawDate = SaleWindowPolicy.activeDrawDate(drawDates, currentThailandTime).orEmpty()
                 var selectedResultDrawDate by rememberSaveable { mutableStateOf("") }
+                var resultReturnScreen by rememberSaveable { mutableStateOf(AppScreen.Home.name) }
                 var pendingDrawConfirmationDate by remember { mutableStateOf<String?>(null) }
                 LaunchedEffect(drawDates) {
                     val due = drawCalendarRepository.getUnconfirmedDrawDates()
@@ -187,7 +188,7 @@ class MainActivity : ComponentActivity() {
                                 currentScreen = if (drawResults.any { it.drawDate == selectedResultDrawDate }) {
                                     AppScreen.Winners.name
                                 } else {
-                                    AppScreen.Home.name
+                                    resultReturnScreen
                                 }
                             },
                             existingResult = drawResults.firstOrNull { it.drawDate == selectedResultDrawDate },
@@ -227,6 +228,7 @@ class MainActivity : ComponentActivity() {
                             pendingResultDate = pendingResultDate,
                             onOpenDrawResult = { date ->
                                 selectedResultDrawDate = date
+                                resultReturnScreen = AppScreen.Settings.name
                                 currentScreen = AppScreen.DrawResult.name
                             },
                             onBack = { currentScreen = AppScreen.Home.name }
@@ -277,6 +279,7 @@ class MainActivity : ComponentActivity() {
                             pendingResultDate = pendingResultDate,
                             onOpenDrawResult = {
                                 selectedResultDrawDate = pendingResultDate.orEmpty()
+                                resultReturnScreen = AppScreen.Home.name
                                 currentScreen = AppScreen.DrawResult.name
                             },
                             pendingDrawConfirmationDate = pendingDrawConfirmationDate,
