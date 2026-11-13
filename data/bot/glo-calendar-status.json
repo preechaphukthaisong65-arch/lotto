@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
   "checker": "LottoCalendarMonitor/1.0",
-  "checked_at_utc": "2026-11-12T22:32:03.662936+00:00",
-  "checked_at_thailand": "2026-11-13T05:32:03.662936+07:00",
+  "checked_at_utc": "2026-11-13T22:20:44.979127+00:00",
+  "checked_at_thailand": "2026-11-14T05:20:44.979127+07:00",
   "source_url": "https://www.glo.or.th/service/faq/award",
   "source_name": "สำนักงานสลากกินแบ่งรัฐบาล (GLO) - FAQ ภารกิจการออกรางวัล",
-  "access_status": "SKIPPED_ROBOTS_OR_POLICY_UNAVAILABLE",
-  "verification_status": "NOT_VERIFIED",
+  "access_status": "SUCCESS",
+  "verification_status": "OFFICIAL_RULE_ONLY_NO_DATED_CALENDAR",
   "published_calendar_detected": false,
   "latest_explicit_draw_date": null,
   "explicit_draw_dates": [],
-  "official_rule_text": null,
-  "source_sha256": null,
-  "message_th": "ข้ามการตรวจ เพราะ robots.txt ไม่อนุญาตหรือไม่สามารถตรวจสอบนโยบายการเข้าถึงได้",
-  "robots_policy": "could not verify robots.txt: HTTP 503"
+  "official_rule_text": "สำนักงานฯ ออกรางวัลเดือนละ 2 ครั้ง ทุกวันที่ 1 และ 16 ของทุกเดือน ยกเว้นวันขึ้นปีใหม่ จะออกรางวัลวันที่ 30 ธันวาคม ของทุกปี วันครู จะออกรางวัลวันที่ 17 มกราคม ของทุกปี วันแรงงาน จะออกรางวัลวันที่ 2 พฤษภาคม ของทุกปี และหากวันออกรางวังตรงกับวันสำคัญทางศาสนา สำนักงานฯ จะเลื่อนวันออกรางวัล โดยจะมีการประกาศให้ประชาชนได้ทราบ",
+  "source_sha256": "d53ba6df5f4cb09edb57f54540307850f7902720efbce267994fbbc746ad0b46",
+  "message_th": "หน้า FAQ ทางการระบุหลักเกณฑ์วันออกรางวัล แต่ไม่พบตารางปฏิทินที่ระบุวันเดือนปีล่วงหน้า จึงยังสรุปไม่ได้ว่ากองสลากประกาศปฏิทินไปถึงปีใด",
+  "robots_policy": "robots.txt returned 404; no published restrictions"
 }
